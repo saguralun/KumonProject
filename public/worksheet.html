@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>KumonDB Worksheet Input</title>
+
+  <link rel="stylesheet" href="/css/worksheet.css">
+</head>
+
+<body>
+  <main class="worksheet-page">
+    <aside class="subject-rail" aria-label="Subject filter">
+      <a class="home-link" href="/">Tables</a>
+      <div class="rail-title">Subject</div>
+      <div class="subject-buttons" id="subjectButtons">
+        <button type="button" class="subject-button active" data-subject="ALL">ALL</button>
+        <button type="button" class="subject-button" data-subject="ME">ME</button>
+        <button type="button" class="subject-button" data-subject="EFL">EFL</button>
+        <button type="button" class="subject-button" data-subject="TRP">TRP</button>
+      </div>
+    </aside>
+
+    <section class="workspace">
+      <header class="topbar">
+        <div>
+          <h1>Worksheet Input</h1>
+          <div class="subtle">KumonDB</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="search-band" aria-label="Student search">
+        <div class="search-mode" id="searchMode">
+          <button type="button" class="mode-button active" data-mode="id">ID</button>
+          <button type="button" class="mode-button" data-mode="name">ชื่อ</button>
+        </div>
+
+        <div class="search-field">
+          <input
+            id="studentSearch"
+            type="text"
+            autocomplete="off"
+            placeholder="Enrollment ID"
+            aria-label="Student search"
+          >
+          <div class="search-results hidden" id="searchResults" role="listbox"></div>
+        </div>
+      </section>
+
+      <section class="student-strip is-empty" id="studentStrip" aria-live="polite">
+        <div class="student-primary">
+          <div class="student-name" id="studentName">ยังไม่ได้เลือกเด็ก</div>
+          <div class="student-meta" id="studentMeta">เลือกจากช่องค้นหาด้านบน</div>
+        </div>
+        <label class="subject-select-wrap">
+          <span>Subject</span>
+          <select id="studentSubjectSelect" disabled></select>
+        </label>
+      </section>
+
+      <section class="input-layout">
+        <section class="input-panel">
+          <div class="input-toolbar">
+            <div class="date-control">
+              <span class="field-label">Receive Date</span>
+              <div class="date-stepper">
+                <button type="button" class="icon-button" id="datePrev" aria-label="Previous day">‹</button>
+                <input id="receiveDate" type="date" disabled>
+                <button type="button" class="icon-button" id="dateNext" aria-label="Next day">›</button>
+              </div>
+            </div>
+
+            <div class="pattern-control">
+              <span class="field-label">WS/day</span>
+              <div class="pattern-buttons" id="patternButtons"></div>
+            </div>
+          </div>
+
+          <div class="worksheet-inputs" id="worksheetInputs">
+            <div class="empty-state">เลือกเด็กเพื่อเริ่มกรอก WS</div>
+          </div>
+        </section>
+
+        <aside class="preview-panel">
+          <div class="preview-header">
+            <div>
+              <div class="panel-title">Preview</div>
+              <div class="subtle" id="previewCount">0 records</div>
+            </div>
+            <button type="button" class="save-button" id="saveButton" disabled>Save</button>
+          </div>
+          <div class="preview-list" id="previewList">
+            <div class="empty-state">ยังไม่มีรายการ</div>
+          </div>
+        </aside>
+      </section>
+
+      <section class="secondary-actions">
+        <button type="button" id="completeWsLevel" disabled>จบ WS Level</button>
+        <button type="button" id="completeZunLevel" disabled>จบ Zun Level</button>
+        <button type="button" id="receiveCd" disabled>รับ CD</button>
+        <button type="button" id="previewReceipt" disabled>Preview Receipt</button>
+      </section>
+
+      <section class="history-panel">
+        <div class="history-header">
+          <div>
+            <div class="panel-title">WS History</div>
+            <div class="subtle" id="historySubtitle">ล่าสุด 20 รายการ</div>
+          </div>
+          <label class="history-limit">
+            Show
+            <select id="historyLimit">
+              <option value="20" selected>20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
+        <div class="history-table-wrap" id="historyTableWrap">
+          <div class="empty-state">เลือกเด็กเพื่อดู history</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script type="module" src="/js/worksheet/worksheet.js"></script>
+</body>
+</html>

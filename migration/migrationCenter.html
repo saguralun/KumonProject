@@ -1,0 +1,3722 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>KumonDB — Migration Center</title>
+
+    <style>
+        :root {
+            --bg: #f5f7fa;
+            --card: #ffffff;
+            --text: #172033;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+
+            --blue: #2563eb;
+            --blue-soft: #eff6ff;
+
+            --green: #16a34a;
+            --green-soft: #ecfdf3;
+
+            --yellow: #d97706;
+            --yellow-soft: #fffbeb;
+
+            --red: #dc2626;
+            --red-soft: #fef2f2;
+
+            --gray-soft: #f3f4f6;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: auto;
+            padding: 28px;
+        }
+
+        /* =========================
+           Header
+        ========================= */
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 30px;
+            letter-spacing: -0.4px;
+        }
+
+        .subtitle {
+            margin-top: 5px;
+            color: var(--muted);
+        }
+
+        .header-badge {
+            padding: 8px 13px;
+            border-radius: 999px;
+            background: var(--blue-soft);
+            color: var(--blue);
+            font-weight: 700;
+            font-size: 13px;
+        }
+
+        /* =========================
+           Overall Status
+        ========================= */
+
+        .overall {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .overall-top {
+            display: flex;
+            justify-content: space-between;
+            gap: 20px;
+            align-items: center;
+        }
+
+        .overall-title {
+            font-size: 18px;
+            font-weight: 750;
+        }
+
+        .overall-detail {
+            color: var(--muted);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+
+        .progress {
+            height: 9px;
+            background: #eef0f3;
+            border-radius: 99px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 12.5%;
+            background: var(--blue);
+            transition: 0.25s;
+        }
+
+        /* =========================
+           Grid
+        ========================= */
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        /* =========================
+           Card
+        ========================= */
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .card.active {
+            border-color: #bfdbfe;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.06);
+        }
+
+        .card.disabled {
+            opacity: 0.68;
+        }
+
+        .card-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .card-title {
+            display: flex;
+            gap: 12px;
+        }
+
+        .icon {
+            font-size: 27px;
+        }
+
+        .name {
+            font-size: 19px;
+            font-weight: 750;
+        }
+
+        .desc {
+            font-size: 13px;
+            color: var(--muted);
+            margin-top: 3px;
+        }
+
+        /* =========================
+           Status Badge
+        ========================= */
+
+        .status {
+            padding: 5px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 750;
+            white-space: nowrap;
+        }
+
+        .status.ready {
+            background: var(--green-soft);
+            color: var(--green);
+        }
+
+        .status.warning {
+            background: var(--yellow-soft);
+            color: var(--yellow);
+        }
+
+        .status.todo {
+            background: var(--gray-soft);
+            color: #6b7280;
+        }
+
+        .status.error {
+            background: var(--red-soft);
+            color: var(--red);
+        }
+
+        /* =========================
+           Stats
+        ========================= */
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 9px;
+            margin: 18px 0;
+        }
+
+        .stat {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 10px;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 750;
+            margin-top: 3px;
+        }
+
+        /* =========================
+           Buttons
+        ========================= */
+
+        .actions {
+            display: flex;
+            gap: 9px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            border: 0;
+            border-radius: 9px;
+            padding: 10px 15px;
+            font-weight: 700;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+        }
+
+        .primary {
+            background: var(--blue);
+            color: white;
+        }
+
+        .secondary {
+            background: #eef2f7;
+            color: #374151;
+        }
+
+        .danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* =========================
+           Result
+        ========================= */
+
+        .result {
+            display: none;
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 13px;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .result.ready {
+            background: var(--green-soft);
+            color: #166534;
+        }
+
+        .result.warning {
+            background: var(--yellow-soft);
+            color: #92400e;
+        }
+
+        .result.error {
+            background: var(--red-soft);
+            color: #991b1b;
+        }
+
+        /* =========================
+           Footer
+        ========================= */
+
+        .footer {
+            margin-top: 22px;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        /* =========================
+           Responsive
+        ========================= */
+
+        @media (max-width: 800px) {
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                flex-direction: column;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+      /* =====================================
+        MIGRATION PREVIEW CENTER
+      ===================================== */
+
+      .preview-center {
+          background: var(--card);
+          border: 1px solid var(--line);
+          border-radius: 16px;
+          padding: 22px;
+          margin-bottom: 24px;
+      }
+
+      .preview-center-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 20px;
+      }
+
+      .preview-title {
+          font-size: 20px;
+          font-weight: 750;
+      }
+
+      .preview-description {
+          margin-top: 5px;
+          color: var(--muted);
+          font-size: 13px;
+      }
+
+
+      /* =====================================
+        Preview Tabs
+      ===================================== */
+
+      .preview-tabs {
+          display: flex;
+          gap: 8px;
+          overflow-x: auto;
+          padding: 18px 0 14px;
+          border-bottom: 1px solid var(--line);
+      }
+
+      .preview-tab {
+          background: var(--gray-soft);
+          color: #6b7280;
+          border: 1px solid transparent;
+          padding: 8px 13px;
+          border-radius: 9px;
+          white-space: nowrap;
+      }
+
+      .preview-tab.active {
+          background: var(--blue-soft);
+          color: var(--blue);
+          border-color: #bfdbfe;
+      }
+
+      .preview-tab:disabled {
+          opacity: .45;
+          cursor: not-allowed;
+      }
+
+
+      /* =====================================
+        Preview Content
+      ===================================== */
+
+      .preview-content {
+          padding-top: 20px;
+      }
+
+      .preview-empty {
+          min-height: 180px;
+
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+
+          text-align: center;
+
+          color: var(--muted);
+      }
+
+      .preview-empty-icon {
+          font-size: 36px;
+          margin-bottom: 10px;
+      }
+
+      .preview-empty-title {
+          font-size: 16px;
+          font-weight: 700;
+          color: var(--text);
+      }
+
+      .preview-empty-detail {
+          margin-top: 5px;
+          font-size: 13px;
+      }
+
+
+      /* =====================================
+        Preview Summary
+      ===================================== */
+
+      .preview-summary {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 10px;
+          margin-bottom: 18px;
+      }
+
+      .preview-stat {
+          background: #f8fafc;
+          border-radius: 10px;
+          padding: 12px;
+      }
+
+      .preview-stat-label {
+          font-size: 11px;
+          color: var(--muted);
+      }
+
+      .preview-stat-value {
+          margin-top: 4px;
+          font-size: 21px;
+          font-weight: 750;
+      }
+
+
+      /* =====================================
+        Preview Validation
+      ===================================== */
+
+      .preview-validation {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 9px;
+          margin-bottom: 20px;
+      }
+
+      .preview-check {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 4px 10px;
+
+          padding: 10px 12px;
+
+          border: 1px solid var(--line);
+          border-radius: 9px;
+      }
+
+      .preview-check-name {
+          font-size: 13px;
+      }
+
+      .preview-check-detail {
+          flex-basis: 100%;
+          color: var(--muted);
+          font-size: 12px;
+          line-height: 1.4;
+          overflow-wrap: anywhere;
+      }
+
+      .preview-check-ok {
+          color: var(--green);
+          font-weight: 700;
+          font-size: 12px;
+      }
+
+      .preview-check-error {
+          color: var(--red);
+          font-weight: 700;
+          font-size: 12px;
+      }
+
+      .preview-check-warning {
+          color: var(--yellow);
+          font-weight: 700;
+          font-size: 12px;
+      }
+
+
+      /* =====================================
+        Preview Table
+      ===================================== */
+
+      .preview-table-wrapper {
+          overflow-x: auto;
+
+          border: 1px solid var(--line);
+          border-radius: 12px;
+      }
+
+      .preview-table {
+          width: 100%;
+          border-collapse: collapse;
+          min-width: 900px;
+      }
+
+      .preview-table th,
+      .preview-table td {
+          padding: 10px 12px;
+
+          border-bottom: 1px solid #eef0f2;
+
+          text-align: left;
+
+          font-size: 13px;
+          white-space: nowrap;
+      }
+
+      .preview-table th {
+          background: #f8fafc;
+          font-weight: 700;
+      }
+
+      .preview-table-caption {
+          display: flex;
+          justify-content: space-between;
+          gap: 12px;
+          align-items: center;
+          flex-wrap: wrap;
+          margin-bottom: 10px;
+          font-weight: 750;
+      }
+
+      .preview-table-section {
+          margin-top: 22px;
+      }
+
+      .preview-table-title {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+      }
+
+      .preview-filter {
+          display: inline-flex;
+          gap: 4px;
+          padding: 3px;
+          border: 1px solid var(--line);
+          border-radius: 9px;
+          background: #f8fafc;
+      }
+
+      .preview-filter-button {
+          padding: 6px 9px;
+          border-radius: 7px;
+          background: transparent;
+          color: #475569;
+          font-size: 12px;
+      }
+
+      .preview-filter-button.active {
+          background: #ffffff;
+          color: var(--blue);
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+      }
+
+      .preview-note {
+          color: var(--muted);
+          font-size: 13px;
+          font-weight: 500;
+      }
+
+      .preview-pagination {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 14px;
+          flex-wrap: wrap;
+          margin-top: 14px;
+      }
+
+      .pagination-info {
+          color: var(--muted);
+          font-size: 13px;
+      }
+
+      .pagination-controls,
+      .pagination-size {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex-wrap: wrap;
+      }
+
+      .pagination-size-label {
+          color: var(--muted);
+          font-size: 12px;
+          font-weight: 700;
+      }
+
+      .page-button {
+          min-width: 34px;
+          padding: 8px 10px;
+          border: 1px solid var(--line);
+          background: #ffffff;
+          color: #374151;
+      }
+
+      .page-button.active {
+          background: var(--blue);
+          border-color: var(--blue);
+          color: #ffffff;
+      }
+
+      .page-ellipsis {
+          color: var(--muted);
+          padding: 0 4px;
+      }
+
+      .preview-check-todo {
+          color: var(--muted);
+          font-weight: 700;
+          font-size: 12px;
+      }
+
+
+      /* =====================================
+        Responsive
+      ===================================== */
+
+      @media (max-width: 900px) {
+
+          .preview-summary {
+              grid-template-columns: repeat(3, 1fr);
+          }
+
+      }
+
+      @media (max-width: 600px) {
+
+          .preview-summary {
+              grid-template-columns: repeat(2, 1fr);
+          }
+
+          .preview-validation {
+              grid-template-columns: 1fr;
+          }
+
+      }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- =====================================
+         HEADER
+    ====================================== -->
+
+    <header class="header">
+
+        <div>
+            <h1>Migration Center</h1>
+
+            <div class="subtitle">
+                KumonDB — ศูนย์ตรวจสอบและย้ายข้อมูลจากระบบเดิม
+            </div>
+        </div>
+
+        <div class="header-badge">
+            MIGRATION CONTROL
+        </div>
+
+    </header>
+
+
+    <!-- =====================================
+         OVERALL STATUS
+    ====================================== -->
+
+    <section class="overall">
+
+        <div class="overall-top">
+
+            <div>
+
+                <div class="overall-title">
+                    Overall Migration Status
+                </div>
+
+                <div
+                    id="overallDetail"
+                    class="overall-detail"
+                >
+                    Student เป็น module แรกที่กำลังเตรียมระบบ
+                </div>
+
+            </div>
+
+            <span
+                id="overallStatus"
+                class="status warning"
+            >
+                IN PROGRESS
+            </span>
+
+        </div>
+
+
+        <div class="progress">
+
+            <div
+                id="progressBar"
+                class="progress-bar"
+            ></div>
+
+        </div>
+
+    </section>
+
+    <!-- =====================================
+        MIGRATION PREVIEW CENTER
+    ====================================== -->
+
+    <section class="preview-center">
+
+        <div class="preview-center-header">
+
+            <div>
+                <div class="preview-title">
+                    🔎 Migration Preview Center
+                </div>
+
+                <div
+                    id="previewDescription"
+                    class="preview-description"
+                >
+                    เลือก Preview จาก Migration ด้านล่าง
+                </div>
+            </div>
+
+            <span
+                id="previewStatus"
+                class="status todo"
+            >
+                WAITING
+            </span>
+
+        </div>
+
+
+        <!-- Preview Tabs -->
+
+        <div
+            id="previewTabs"
+            class="preview-tabs"
+        >
+
+            <button
+                class="preview-tab active"
+                data-module="student"
+                onclick="selectPreview('student')"
+            >
+                👤 Student
+            </button>
+
+            <button
+                class="preview-tab"
+                data-module="enrollment"
+                onclick="selectPreview('enrollment')"
+            >
+                📚 Enrollment
+            </button>
+
+            <button
+                class="preview-tab"
+                data-module="enrollment_status"
+                onclick="selectPreview('enrollment_status')"
+                disabled
+            >
+                📋 Status
+            </button>
+
+            <button
+                class="preview-tab"
+                data-module="billing"
+                onclick="selectPreview('billing')"
+                disabled
+            >
+                💰 Billing
+            </button>
+
+            <button
+                class="preview-tab"
+                data-module="worksheet"
+                onclick="selectPreview('worksheet')"
+                disabled
+            >
+                📄 Worksheet
+            </button>
+
+            <button
+                class="preview-tab"
+                data-module="attendance"
+                onclick="selectPreview('attendance')"
+                disabled
+            >
+                🕒 Attendance
+            </button>
+
+        </div>
+
+
+        <!-- Preview Content -->
+
+        <div
+            id="previewContent"
+            class="preview-content"
+        >
+
+            <div class="preview-empty">
+
+                <div class="preview-empty-icon">
+                    🔍
+                </div>
+
+                <div class="preview-empty-title">
+                    ยังไม่มีข้อมูล Preview
+                </div>
+
+                <div class="preview-empty-detail">
+                    กด Preview จาก Migration ด้านล่าง
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- =====================================
+         MIGRATION MODULES
+    ====================================== -->
+
+    <main class="grid">
+
+
+        <!-- =================================
+             STUDENT
+        ================================== -->
+
+        <section class="card active">
+
+            <div class="card-head">
+
+                <div class="card-title">
+
+                    <div class="icon">
+                        👤
+                    </div>
+
+                    <div>
+
+                        <div class="name">
+                            Student
+                        </div>
+
+                        <div class="desc">
+                            ข้อมูลพื้นฐานนักเรียน
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <span
+                    id="studentStatus"
+                    class="status warning"
+                >
+                    PREVIEW READY
+                </span>
+
+            </div>
+
+
+            <div class="stats">
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        CSV Records
+                    </div>
+
+                    <div
+                        id="studentRecords"
+                        class="stat-value"
+                    >
+                        3,168
+                    </div>
+
+                </div>
+
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        Unique
+                    </div>
+
+                    <div
+                        id="studentUnique"
+                        class="stat-value"
+                    >
+                        2,019
+                    </div>
+
+                </div>
+
+
+                <div class="stat">
+
+                    <div class="stat-label">
+                        Duplicate
+                    </div>
+
+                    <div
+                        id="studentDuplicate"
+                        class="stat-value"
+                    >
+                        1,149
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="actions">
+
+                <button
+                    id="studentPreviewButton"
+                    class="primary"
+                    onclick="previewStudent()"
+                >
+                    🔍 Preview Student
+                </button>
+
+
+                <button
+                    id="studentMigrationButton"
+                    class="secondary"
+                    disabled
+                >
+                    🚀 Migration
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================
+             ENROLLMENT
+        ================================== -->
+
+        <section class="card disabled">
+
+            <div class="card-head">
+
+                <div class="card-title">
+
+                    <div class="icon">
+                        📚
+                    </div>
+
+                    <div>
+
+                        <div class="name">
+                            Enrollment
+                        </div>
+
+                        <div class="desc">
+                            ข้อมูลการสมัครเรียนแยกตามวิชา
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <span class="status todo">
+                    NOT STARTED
+                </span>
+
+            </div>
+
+
+            <div class="stats">
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Records
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Valid
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Errors
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="actions">
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🔍 Preview
+                </button>
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🚀 Migration
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================
+             ENROLLMENT STATUS
+        ================================== -->
+
+        <section class="card disabled">
+
+            <div class="card-head">
+
+                <div class="card-title">
+
+                    <div class="icon">
+                        📋
+                    </div>
+
+                    <div>
+
+                        <div class="name">
+                            Enrollment Status
+                        </div>
+
+                        <div class="desc">
+                            ประวัติสถานะของการสมัครเรียน
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <span class="status todo">
+                    NOT STARTED
+                </span>
+
+            </div>
+
+
+            <div class="stats">
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Records
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Valid
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Errors
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="actions">
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🔍 Preview
+                </button>
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🚀 Migration
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================
+             BILLING
+        ================================== -->
+
+        <section class="card disabled">
+
+            <div class="card-head">
+
+                <div class="card-title">
+
+                    <div class="icon">
+                        💰
+                    </div>
+
+                    <div>
+
+                        <div class="name">
+                            Billing
+                        </div>
+
+                        <div class="desc">
+                            ข้อมูลการเรียกเก็บและการชำระเงิน
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <span class="status todo">
+                    NOT STARTED
+                </span>
+
+            </div>
+
+
+            <div class="stats">
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Records
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Valid
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Errors
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="actions">
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🔍 Preview
+                </button>
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🚀 Migration
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================
+             WORKSHEET
+        ================================== -->
+
+        <section class="card disabled">
+
+            <div class="card-head">
+
+                <div class="card-title">
+
+                    <div class="icon">
+                        📄
+                    </div>
+
+                    <div>
+
+                        <div class="name">
+                            Worksheet
+                        </div>
+
+                        <div class="desc">
+                            ข้อมูล worksheet และการเรียน
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <span class="status todo">
+                    NOT STARTED
+                </span>
+
+            </div>
+
+
+            <div class="stats">
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Records
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Valid
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Errors
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="actions">
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🔍 Preview
+                </button>
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🚀 Migration
+                </button>
+
+            </div>
+
+        </section>
+
+
+
+        <!-- =================================
+             ATTENDANCE
+        ================================== -->
+
+        <section class="card disabled">
+
+            <div class="card-head">
+
+                <div class="card-title">
+
+                    <div class="icon">
+                        🕒
+                    </div>
+
+                    <div>
+
+                        <div class="name">
+                            Attendance
+                        </div>
+
+                        <div class="desc">
+                            ประวัติการเข้าเรียน
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <span class="status todo">
+                    NOT STARTED
+                </span>
+
+            </div>
+
+
+            <div class="stats">
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Records
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Valid
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+
+                <div class="stat">
+                    <div class="stat-label">
+                        Errors
+                    </div>
+
+                    <div class="stat-value">
+                        —
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="actions">
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🔍 Preview
+                </button>
+
+                <button
+                    class="secondary"
+                    disabled
+                >
+                    🚀 Migration
+                </button>
+
+            </div>
+
+        </section>
+
+    </main>
+
+
+    <div class="footer">
+        KumonDB Migration Center · Preview และ Migration จะถูกควบคุมจากหน้านี้
+    </div>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   Student Preview
+========================================================= */
+
+/* =========================================
+   PREVIEW STATE
+========================================= */
+
+const previewState = {
+
+    activeModule: null,
+
+    student: null,
+
+    enrollment: null,
+
+    enrollment_status: null,
+
+    billing: null,
+
+    worksheet: null,
+
+    attendance: null
+
+};
+
+
+/* =========================================
+   SHOW PREVIEW
+========================================= */
+
+function showPreview(module, data) {
+
+    previewState[module] = data;
+
+    previewState.activeModule = module;
+
+    renderPreview(module, data);
+
+    updatePreviewTabs(module);
+
+}
+
+
+/* =========================================
+   SELECT PREVIOUS PREVIEW
+========================================= */
+
+function selectPreview(module) {
+
+    const data = previewState[module];
+
+    if (!data) {
+        return;
+    }
+
+    previewState.activeModule = module;
+
+    renderPreview(module, data);
+
+    updatePreviewTabs(module);
+
+}
+
+
+/* =========================================
+   REFRESH TABS
+========================================= */
+
+function updatePreviewTabs(activeModule) {
+
+    document
+        .querySelectorAll(".preview-tab")
+        .forEach(button => {
+
+            button.classList.toggle(
+                "active",
+                button.dataset.module === activeModule
+            );
+
+        });
+
+}
+
+
+/* =========================================
+   RENDER PREVIEW
+========================================= */
+
+function renderPreview(module, data) {
+
+    const content =
+        document.getElementById("previewContent");
+
+    const description =
+        document.getElementById("previewDescription");
+
+    const status =
+        document.getElementById("previewStatus");
+
+
+    description.textContent =
+        `${data.title} — Preview Result`;
+
+
+    status.textContent =
+        data.status || "READY";
+
+
+    status.className =
+        "status " +
+        (
+            data.status === "ERROR"
+                ? "error"
+                : data.status === "WARNING"
+                    ? "warning"
+                    : "ready"
+        );
+
+
+    if (module === "student") {
+
+        renderStudentPreview(data);
+
+        return;
+    }
+
+
+    content.innerHTML = `
+
+        <div class="preview-empty">
+
+            <div class="preview-empty-icon">
+                🛠️
+            </div>
+
+            <div class="preview-empty-title">
+                ${data.title}
+            </div>
+
+            <div class="preview-empty-detail">
+                Preview module นี้ยังอยู่ระหว่างการพัฒนา
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================
+   STUDENT PREVIEW
+========================================= */
+
+function renderStudentPreview(data) {
+
+    const content =
+        document.getElementById("previewContent");
+
+
+    const errors =
+        data.lookupErrors || {};
+
+
+    content.innerHTML = `
+
+        <div class="preview-summary">
+
+            ${previewStat(
+                "CSV Records",
+                data.csvRecords
+            )}
+
+            ${previewStat(
+                "Unique",
+                data.uniqueStudents
+            )}
+
+            ${previewStat(
+                "Duplicate",
+                data.duplicateCount
+            )}
+
+            ${previewStat(
+                "Blocked",
+                data.blockedRows
+            )}
+
+            ${previewStat(
+                "Missing Name",
+                data.missingNameCount
+            )}
+
+        </div>
+
+
+        <div class="preview-validation">
+
+            ${previewCheck(
+                "Prefix Master",
+                errors.prefix || 0
+            )}
+
+            ${previewCheck(
+                "Gender Master",
+                errors.gender || 0
+            )}
+
+            ${previewCheck(
+                "School Grade Master",
+                errors.schoolGrade || 0
+            )}
+
+            ${previewCheck(
+                "Birth Date",
+                errors.birthDate || 0
+            )}
+
+        </div>
+
+
+        <div style="font-weight:750;margin-bottom:10px;">
+            Preview Rows
+        </div>
+
+
+        <div class="preview-table-wrapper">
+
+            <table class="preview-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>#</th>
+
+                        <th>Prefix</th>
+
+                        <th>First Name</th>
+
+                        <th>Last Name</th>
+
+                        <th>Nickname</th>
+
+                        <th>Gender</th>
+
+                        <th>Birth Date</th>
+
+                        <th>Grade</th>
+
+                        <th>School</th>
+
+                        <th>Mobile</th>
+
+                    </tr>
+
+                </thead>
+
+
+                <tbody>
+
+                    ${
+                        (data.previewRows || [])
+                            .map((row, index) => `
+
+                                <tr>
+
+                                    <td>
+                                        ${index + 1}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.prefix_id)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.first_name)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.last_name)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.nickname)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.gender_id)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.birth_date)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.school_grade_id)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.school_name)}
+                                    </td>
+
+                                    <td>
+                                        ${escapeHtml(row.mobile)}
+                                    </td>
+
+                                </tr>
+
+                            `)
+                            .join("")
+                    }
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================
+   PREVIEW STAT
+========================================= */
+
+function previewStat(label, value) {
+
+    return `
+
+        <div class="preview-stat">
+
+            <div class="preview-stat-label">
+                ${label}
+            </div>
+
+            <div class="preview-stat-value">
+                ${value ?? "—"}
+            </div>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================
+   PREVIEW CHECK
+========================================= */
+
+function previewCheck(label, count) {
+
+    const ok = Number(count) === 0;
+
+    return `
+
+        <div class="preview-check">
+
+            <span class="preview-check-name">
+                ${label}
+            </span>
+
+            <span
+                class="${
+                    ok
+                        ? "preview-check-ok"
+                        : "preview-check-error"
+                }"
+            >
+
+                ${
+                    ok
+                        ? "✓ 0 errors"
+                        : `✕ ${count} errors`
+                }
+
+            </span>
+
+        </div>
+
+    `;
+
+}
+
+
+/* =========================================
+   ESCAPE HTML
+========================================= */
+
+function escapeHtml(value) {
+
+    if (
+        value === null ||
+        value === undefined
+    ) {
+        return "";
+    }
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+
+}
+
+
+/* =========================================
+   STUDENT PREVIEW BUTTON
+========================================= */
+
+async function previewStudent() {
+
+    const button =
+        document.getElementById("studentPreviewButton");
+
+    button.disabled = true;
+
+    button.textContent =
+        "⏳ Previewing...";
+
+    try {
+
+        const response = await fetch(
+                "/api/migration/student/preview",
+            {
+                method: "POST"
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.message || "Preview failed"
+            );
+        }
+
+        showPreview(
+            "student",
+            data
+        );
+
+    } catch (error) {
+
+        console.error(error);
+
+        document.getElementById(
+            "previewDescription"
+        ).textContent =
+            error.message;
+
+        document.getElementById(
+            "previewStatus"
+        ).textContent =
+            "ERROR";
+
+        document.getElementById(
+            "previewStatus"
+        ).className =
+            "status error";
+
+    } finally {
+
+        button.disabled = false;
+
+        button.textContent =
+            "🔄 Preview Again";
+
+    }
+
+}
+
+</script>
+
+<script>
+/* =========================================================
+   Generic Migration Preview Engine
+========================================================= */
+
+const GENERIC_MIGRATION_MODULES = [
+    {
+        id: "student",
+        title: "Student",
+        shortTitle: "ST",
+        description: "Basic student master data",
+        previewReady: true,
+        importReady: true,
+        cardStats: ["New", "Skipped", "Errors"]
+    },
+    {
+        id: "enrollment",
+        title: "Enrollment",
+        shortTitle: "EN",
+        description: "Student subject enrollment records",
+        previewReady: true,
+        importReady: true,
+        cardStats: ["New", "Skipped", "Errors"]
+    },
+    {
+        id: "history",
+        title: "History",
+        shortTitle: "HI",
+        description: "Enrollment and status history",
+        previewReady: true,
+        importReady: true,
+        cardStats: ["New", "Skipped", "Errors"]
+    },
+    {
+        id: "billing",
+        title: "Billing",
+        shortTitle: "BI",
+        description: "Billing and billing detail records",
+        previewReady: true,
+        importReady: true,
+        importNewLabel: "New Details",
+        cardStats: ["New Details", "Skipped", "Errors"]
+    },
+    {
+        id: "at",
+        title: "AT",
+        shortTitle: "AT",
+        description: "Achievement test usage records",
+        previewReady: true,
+        importReady: true,
+        cardStats: ["New", "Skipped", "Errors"]
+    },
+    {
+        id: "dt",
+        title: "DT",
+        shortTitle: "DT",
+        description: "Diagnostic test usage records",
+        previewReady: true,
+        importReady: true,
+        cardStats: ["New", "Skipped", "Errors"]
+    },
+    {
+        id: "ws",
+        title: "WS",
+        shortTitle: "WS",
+        description: "Worksheet usage records",
+        previewReady: true,
+        importReady: true,
+        serverPaginated: true,
+        cardStats: ["New", "Skipped", "Errors"]
+    },
+    {
+        id: "worksheet-receive",
+        title: "Worksheet Receive",
+        shortTitle: "RC",
+        description: "Worksheet DO and receive records",
+        previewReady: true,
+        importReady: true,
+        importNewLabel: "New Details",
+        cardStats: ["New Details", "Skipped", "Errors"]
+    },
+    {
+        id: "cd",
+        title: "CD",
+        shortTitle: "CD",
+        description: "CD usage records",
+        previewReady: true,
+        importReady: true,
+        cardStats: ["New", "Skipped", "Errors"]
+    }
+];
+
+const GENERIC_MODULE_MAP = new Map(
+    GENERIC_MIGRATION_MODULES.map((moduleConfig) => [
+        moduleConfig.id,
+        moduleConfig
+    ])
+);
+
+const GENERIC_DEFAULT_PAGE_SIZE = 50;
+const GENERIC_PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+previewState.pageByModule = previewState.pageByModule || {};
+previewState.pageSizeByModule = previewState.pageSizeByModule || {};
+previewState.tablePageByModule = previewState.tablePageByModule || {};
+previewState.tablePageSizeByModule = previewState.tablePageSizeByModule || {};
+previewState.importedByModule = previewState.importedByModule || {};
+previewState.rowFilterByModule = previewState.rowFilterByModule || {};
+
+GENERIC_MIGRATION_MODULES.forEach((moduleConfig) => {
+    if (!(moduleConfig.id in previewState)) {
+        previewState[moduleConfig.id] = null;
+    }
+});
+
+function initializeGenericMigrationCenter() {
+    renderMigrationModuleCards();
+    renderPreviewTabs();
+    updatePreviewTabs("student");
+    updateOverallStatus();
+}
+
+function updateOverallStatus() {
+    const detail = document.getElementById("overallDetail");
+    const status = document.getElementById("overallStatus");
+    const progressBar = document.getElementById("progressBar");
+
+    if (detail) {
+        detail.textContent =
+            "Migration preview shows New rows only; skipped and warnings stay in the summary.";
+    }
+
+    if (status) {
+        status.textContent = "PREVIEW READY";
+        status.className = "status warning";
+    }
+
+    if (progressBar) {
+        const readyCount = GENERIC_MIGRATION_MODULES
+            .filter((moduleConfig) => moduleConfig.previewReady)
+            .length;
+
+        progressBar.style.width =
+            `${(readyCount / GENERIC_MIGRATION_MODULES.length) * 100}%`;
+    }
+}
+
+function renderMigrationModuleCards() {
+    const grid = document.querySelector("main.grid");
+
+    if (!grid) {
+        return;
+    }
+
+    grid.innerHTML = GENERIC_MIGRATION_MODULES
+        .map(renderMigrationModuleCard)
+        .join("");
+}
+
+function renderMigrationModuleCard(moduleConfig) {
+    const statusText = moduleConfig.previewReady
+        ? "PREVIEW READY"
+        : "NOT STARTED";
+    const cardClass = moduleConfig.previewReady
+        ? "card active"
+        : "card disabled";
+
+    return `
+        <section
+            class="${cardClass}"
+            data-migration-card="${moduleConfig.id}"
+        >
+            <div class="card-head">
+                <div class="card-title">
+                    <div class="icon">
+                        ${escapeHtml(moduleConfig.shortTitle)}
+                    </div>
+                    <div>
+                        <div class="name">
+                            ${escapeHtml(moduleConfig.title)}
+                        </div>
+                        <div class="desc">
+                            ${escapeHtml(moduleConfig.description)}
+                        </div>
+                    </div>
+                </div>
+
+                <span
+                    class="status ${statusClass(statusText)}"
+                    data-module-status="${moduleConfig.id}"
+                >
+                    ${escapeHtml(statusText)}
+                </span>
+            </div>
+
+            <div
+                class="stats"
+                data-module-stats="${moduleConfig.id}"
+            >
+                ${renderCardStats(moduleConfig)}
+            </div>
+
+            <div class="actions">
+                <button
+                    id="${moduleConfig.id}PreviewButton"
+                    class="${moduleConfig.previewReady ? "primary" : "secondary"}"
+                    onclick="previewModule('${moduleConfig.id}')"
+                >
+                    ${moduleConfig.previewReady ? "Preview" : "Show Placeholder"}
+                </button>
+
+                ${renderImportButton(moduleConfig)}
+            </div>
+        </section>
+    `;
+}
+
+function renderImportButton(moduleConfig) {
+    if (!moduleConfig.importReady) {
+        return `
+            <button
+                class="secondary"
+                disabled
+            >
+                Migration
+            </button>
+        `;
+    }
+
+    return `
+        <button
+            id="${moduleConfig.id}ImportButton"
+            class="danger"
+            onclick="importModule('${moduleConfig.id}')"
+            disabled
+        >
+            Import
+        </button>
+    `;
+}
+
+function renderCardStats(moduleConfig, data = null) {
+    const summary = Array.isArray(data?.summary)
+        ? data.summary
+        : [];
+    const hasImportSummary =
+        summary.some((item) => item.label === "Inserted") &&
+        summary.some((item) => item.label === "Skipped");
+    const cardStats = hasImportSummary
+        ? ["Inserted", "Skipped", "Errors"]
+        : moduleConfig.cardStats;
+
+    const statItems = cardStats.map((label) => {
+        const match = summary.find((item) => item.label === label);
+
+        return {
+            label,
+            value: match ? match.value : null
+        };
+    });
+
+    return statItems
+        .map((item) => `
+            <div class="stat">
+                <div class="stat-label">
+                    ${escapeHtml(item.label)}
+                </div>
+                <div class="stat-value">
+                    ${formatDisplayValue(item.value)}
+                </div>
+            </div>
+        `)
+        .join("");
+}
+
+function renderPreviewTabs() {
+    const tabs = document.getElementById("previewTabs");
+
+    if (!tabs) {
+        return;
+    }
+
+    tabs.innerHTML = GENERIC_MIGRATION_MODULES
+        .map((moduleConfig) => `
+            <button
+                class="preview-tab"
+                data-module="${moduleConfig.id}"
+                onclick="selectPreview('${moduleConfig.id}')"
+            >
+                ${escapeHtml(moduleConfig.title)}
+            </button>
+        `)
+        .join("");
+}
+
+function showPreview(moduleOrData, maybeData) {
+    const rawData = maybeData || moduleOrData;
+    const moduleId = maybeData
+        ? moduleOrData
+        : rawData.module;
+    const moduleConfig =
+        GENERIC_MODULE_MAP.get(moduleId) ||
+        GENERIC_MODULE_MAP.get(rawData.module);
+
+    if (!moduleConfig) {
+        return;
+    }
+
+    const data = normalizePreviewData(rawData, moduleConfig);
+
+    previewState[moduleConfig.id] = data;
+    previewState.activeModule = moduleConfig.id;
+    ensureDefaultRowFilter(data);
+    previewState.pageByModule[moduleConfig.id] =
+        getInitialPage(data, moduleConfig.id);
+    previewState.pageSizeByModule[moduleConfig.id] =
+        getInitialPageSize(data, moduleConfig.id);
+    initializePreviewTableState(data);
+
+    renderPreview(data);
+    updatePreviewTabs(moduleConfig.id);
+    updateModuleCard(moduleConfig.id, data);
+}
+
+function selectPreview(moduleId) {
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+
+    if (!moduleConfig) {
+        return;
+    }
+
+    let data = previewState[moduleId];
+
+    if (!data) {
+        data = buildClientPlaceholder(moduleConfig);
+        previewState[moduleId] = data;
+    }
+
+    previewState.activeModule = moduleId;
+    renderPreview(data);
+    updatePreviewTabs(moduleId);
+}
+
+function updatePreviewTabs(activeModule) {
+    document
+        .querySelectorAll(".preview-tab")
+        .forEach((button) => {
+            button.classList.toggle(
+                "active",
+                button.dataset.module === activeModule
+            );
+        });
+}
+
+function renderPreview(data) {
+    const content = document.getElementById("previewContent");
+    const description = document.getElementById("previewDescription");
+    const status = document.getElementById("previewStatus");
+
+    if (!content || !description || !status) {
+        return;
+    }
+
+    description.textContent = `${data.title} - Preview Result`;
+    status.textContent = data.status || "READY";
+    status.className = `status ${statusClass(data.status)}`;
+
+    const hasTables = hasPreviewTables(data);
+    const visibleRows = hasTables ? [] : getVisiblePreviewRows(data);
+    const pagination = hasTables ? null : getPagination(data, visibleRows);
+    const pageRows = hasTables
+        ? []
+        : visibleRows.slice(
+            pagination.startIndex,
+            pagination.endIndex
+        );
+
+    content.innerHTML = `
+        <div class="preview-summary">
+            ${renderPreviewSummary(data.summary)}
+        </div>
+
+        <div class="preview-validation">
+            ${renderPreviewValidation(data.validation)}
+        </div>
+
+        ${
+            hasTables
+                ? renderPreviewTables(data)
+                : `
+                    <div class="preview-table-caption">
+                        <div class="preview-table-title">
+                            <span>New Preview Rows</span>
+                        </div>
+                        <span class="preview-note">
+                            ${renderShowingText(pagination)}
+                        </span>
+                    </div>
+
+                    ${renderPreviewTable(data.columns, pageRows, data)}
+                    ${renderPaginationControls(data.module, pagination)}
+                `
+        }
+    `;
+}
+
+function isServerPaginatedPreview(data) {
+    return Boolean(
+        data?.serverPaginated ||
+        GENERIC_MODULE_MAP.get(data?.module)?.serverPaginated
+    );
+}
+
+function hasPreviewTables(data) {
+    return Array.isArray(data.tables) && data.tables.length > 0;
+}
+
+function initializePreviewTableState(data) {
+    if (!hasPreviewTables(data)) {
+        return;
+    }
+
+    data.tables.forEach((table) => {
+        const key = previewTableStateKey(data.module, table.id);
+
+        previewState.tablePageByModule[key] =
+            getInitialTablePage(data.module, table);
+        previewState.tablePageSizeByModule[key] =
+            getInitialTablePageSize(data.module, table);
+    });
+}
+
+function renderPreviewTables(data) {
+    return data.tables
+        .map((table) => {
+            const pagination = getTablePagination(data.module, table);
+            const pageRows = table.rows.slice(
+                pagination.startIndex,
+                pagination.endIndex
+            );
+
+            return `
+                <section class="preview-table-section">
+                    <div class="preview-table-caption">
+                        <div class="preview-table-title">
+                            <span>${escapeHtml(table.title)}</span>
+                        </div>
+                        <span class="preview-note">
+                            ${renderShowingText(pagination)}
+                        </span>
+                    </div>
+
+                    ${renderPreviewTable(table.columns, pageRows, table)}
+                    ${renderTablePaginationControls(data.module, table.id, pagination)}
+                </section>
+            `;
+        })
+        .join("");
+}
+
+function renderPreviewSummary(summary) {
+    if (!Array.isArray(summary) || summary.length === 0) {
+        return previewStat("Records", null);
+    }
+
+    return summary
+        .map((item) => previewStat(item.label, item.value))
+        .join("");
+}
+
+function supportsPreviewRowFilter(data) {
+    if (!["student", "enrollment"].includes(data.module)) {
+        return false;
+    }
+
+    return data.rows.some((row) =>
+        row.import_action !== undefined ||
+        row.action !== undefined
+    );
+}
+
+function ensureDefaultRowFilter(data) {
+    if (!supportsPreviewRowFilter(data)) {
+        return;
+    }
+
+    if (!previewState.rowFilterByModule[data.module]) {
+        previewState.rowFilterByModule[data.module] = "new";
+    }
+}
+
+function getPreviewRowFilter(data) {
+    ensureDefaultRowFilter(data);
+
+    return previewState.rowFilterByModule[data.module] || "all";
+}
+
+function getRowAction(row) {
+    return String(row.import_action || row.action || "").toUpperCase();
+}
+
+function rowMatchesPreviewFilter(row, filterMode) {
+    if (filterMode !== "new") {
+        return true;
+    }
+
+    return getRowAction(row) === "INSERT";
+}
+
+function getVisiblePreviewRows(data) {
+    if (!supportsPreviewRowFilter(data)) {
+        return data.rows;
+    }
+
+    const filterMode = getPreviewRowFilter(data);
+
+    return data.rows.filter((row) =>
+        rowMatchesPreviewFilter(row, filterMode)
+    );
+}
+
+function renderPreviewRowFilter(data) {
+    if (!supportsPreviewRowFilter(data)) {
+        return "";
+    }
+
+    const filterMode = getPreviewRowFilter(data);
+
+    return `
+        <div
+            class="preview-filter"
+            aria-label="Preview row filter"
+        >
+            <button
+                class="preview-filter-button ${filterMode === "new" ? "active" : ""}"
+                onclick="setPreviewRowFilter('${data.module}', 'new')"
+            >
+                New only
+            </button>
+            <button
+                class="preview-filter-button ${filterMode === "all" ? "active" : ""}"
+                onclick="setPreviewRowFilter('${data.module}', 'all')"
+            >
+                All rows
+            </button>
+        </div>
+    `;
+}
+
+function renderPreviewValidation(validation) {
+    if (!Array.isArray(validation) || validation.length === 0) {
+        return previewCheck({
+            label: "Validation",
+            status: "NOT STARTED"
+        });
+    }
+
+    return validation
+        .map((item) => previewCheck(item))
+        .join("");
+}
+
+function renderPreviewTable(columns, rows, data = null) {
+    if (!Array.isArray(columns) || columns.length === 0) {
+        return `
+            <div class="preview-empty">
+                <div class="preview-empty-title">
+                    No preview columns yet
+                </div>
+                <div class="preview-empty-detail">
+                    This module is ready for a future adapter.
+                </div>
+            </div>
+        `;
+    }
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+        const detail = data && data.rows.length > 0
+            ? "No rows match the current filter."
+            : "The preview returned zero rows.";
+
+        return `
+            <div class="preview-empty">
+                <div class="preview-empty-title">
+                    No preview rows
+                </div>
+                <div class="preview-empty-detail">
+                    ${escapeHtml(detail)}
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="preview-table-wrapper">
+            <table class="preview-table">
+                <thead>
+                    <tr>
+                        ${
+                            columns
+                                .map((column) => `
+                                    <th>
+                                        ${escapeHtml(column.label)}
+                                    </th>
+                                `)
+                                .join("")
+                        }
+                    </tr>
+                </thead>
+                <tbody>
+                    ${
+                        rows
+                            .map((row) => `
+                                <tr>
+                                    ${
+                                        columns
+                                            .map((column) => `
+                                                <td>
+                                                    ${formatCellValue(row, column)}
+                                                </td>
+                                            `)
+                                            .join("")
+                                    }
+                                </tr>
+                            `)
+                            .join("")
+                    }
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderPaginationControls(moduleId, pagination) {
+    const sizeOptions = pagination.pageSizeOptions.length > 0
+        ? pagination.pageSizeOptions
+        : GENERIC_PAGE_SIZE_OPTIONS;
+
+    if (pagination.totalRows === 0) {
+        return "";
+    }
+
+    return `
+        <div class="preview-pagination">
+            <div class="pagination-size">
+                <span class="pagination-size-label">
+                    Rows per page
+                </span>
+                ${
+                    sizeOptions
+                        .map((size) => `
+                            <button
+                                class="page-button ${size === pagination.pageSize ? "active" : ""}"
+                                onclick="setPreviewPageSize('${moduleId}', ${size})"
+                            >
+                                ${size}
+                            </button>
+                        `)
+                        .join("")
+                }
+            </div>
+
+            <div class="pagination-controls">
+                <button
+                    class="page-button"
+                    onclick="setPreviewPage('${moduleId}', ${pagination.page - 1})"
+                    ${pagination.page <= 1 ? "disabled" : ""}
+                >
+                    Prev
+                </button>
+
+                ${
+                    paginationPageItems(pagination.page, pagination.totalPages)
+                        .map((pageItem) => {
+                            if (pageItem === "...") {
+                                return `<span class="page-ellipsis">...</span>`;
+                            }
+
+                            return `
+                                <button
+                                    class="page-button ${pageItem === pagination.page ? "active" : ""}"
+                                    onclick="setPreviewPage('${moduleId}', ${pageItem})"
+                                >
+                                    ${pageItem}
+                                </button>
+                            `;
+                        })
+                        .join("")
+                }
+
+                <button
+                    class="page-button"
+                    onclick="setPreviewPage('${moduleId}', ${pagination.page + 1})"
+                    ${pagination.page >= pagination.totalPages ? "disabled" : ""}
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function renderTablePaginationControls(moduleId, tableId, pagination) {
+    const sizeOptions = pagination.pageSizeOptions.length > 0
+        ? pagination.pageSizeOptions
+        : GENERIC_PAGE_SIZE_OPTIONS;
+
+    if (pagination.totalRows === 0) {
+        return "";
+    }
+
+    return `
+        <div class="preview-pagination">
+            <div class="pagination-size">
+                <span class="pagination-size-label">
+                    Rows per page
+                </span>
+                ${
+                    sizeOptions
+                        .map((size) => `
+                            <button
+                                class="page-button ${size === pagination.pageSize ? "active" : ""}"
+                                onclick="setPreviewTablePageSize('${moduleId}', '${tableId}', ${size})"
+                            >
+                                ${size}
+                            </button>
+                        `)
+                        .join("")
+                }
+            </div>
+
+            <div class="pagination-controls">
+                <button
+                    class="page-button"
+                    onclick="setPreviewTablePage('${moduleId}', '${tableId}', ${pagination.page - 1})"
+                    ${pagination.page <= 1 ? "disabled" : ""}
+                >
+                    Prev
+                </button>
+
+                ${
+                    paginationPageItems(pagination.page, pagination.totalPages)
+                        .map((pageItem) => {
+                            if (pageItem === "...") {
+                                return `<span class="page-ellipsis">...</span>`;
+                            }
+
+                            return `
+                                <button
+                                    class="page-button ${pageItem === pagination.page ? "active" : ""}"
+                                    onclick="setPreviewTablePage('${moduleId}', '${tableId}', ${pageItem})"
+                                >
+                                    ${pageItem}
+                                </button>
+                            `;
+                        })
+                        .join("")
+                }
+
+                <button
+                    class="page-button"
+                    onclick="setPreviewTablePage('${moduleId}', '${tableId}', ${pagination.page + 1})"
+                    ${pagination.page >= pagination.totalPages ? "disabled" : ""}
+                >
+                    Next
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+function setPreviewPage(moduleId, page) {
+    const data = previewState[moduleId];
+
+    if (!data) {
+        return;
+    }
+
+    const pagination = getPagination(data, getVisiblePreviewRows(data));
+    const nextPage = clamp(
+        Number(page),
+        1,
+        pagination.totalPages || 1
+    );
+    previewState.pageByModule[moduleId] = nextPage;
+
+    if (isServerPaginatedPreview(data)) {
+        refreshServerPaginatedPreview(
+            moduleId,
+            nextPage,
+            pagination.pageSize
+        );
+        return;
+    }
+
+    renderPreview(data);
+}
+
+function setPreviewTablePage(moduleId, tableId, page) {
+    const data = previewState[moduleId];
+    const table = data?.tables?.find((item) => item.id === tableId);
+
+    if (!data || !table) {
+        return;
+    }
+
+    const pagination = getTablePagination(moduleId, table);
+    previewState.tablePageByModule[previewTableStateKey(moduleId, tableId)] = clamp(
+        Number(page),
+        1,
+        pagination.totalPages || 1
+    );
+
+    renderPreview(data);
+}
+
+function setPreviewPageSize(moduleId, pageSize) {
+    const data = previewState[moduleId];
+
+    if (!data) {
+        return;
+    }
+
+    previewState.pageSizeByModule[moduleId] =
+        normalizePageSize(pageSize, data.pagination?.pageSizeOptions);
+    previewState.pageByModule[moduleId] = 1;
+
+    if (isServerPaginatedPreview(data)) {
+        refreshServerPaginatedPreview(
+            moduleId,
+            1,
+            previewState.pageSizeByModule[moduleId]
+        );
+        return;
+    }
+
+    renderPreview(data);
+}
+
+function setPreviewTablePageSize(moduleId, tableId, pageSize) {
+    const data = previewState[moduleId];
+    const table = data?.tables?.find((item) => item.id === tableId);
+
+    if (!data || !table) {
+        return;
+    }
+
+    const key = previewTableStateKey(moduleId, tableId);
+
+    previewState.tablePageSizeByModule[key] =
+        normalizePageSize(pageSize, table.pagination?.pageSizeOptions);
+    previewState.tablePageByModule[key] = 1;
+
+    renderPreview(data);
+}
+
+function setPreviewRowFilter(moduleId, filterMode) {
+    const data = previewState[moduleId];
+
+    if (!data) {
+        return;
+    }
+
+    previewState.rowFilterByModule[moduleId] =
+        filterMode === "all" ? "all" : "new";
+    previewState.pageByModule[moduleId] = 1;
+
+    renderPreview(data);
+}
+
+async function previewModule(moduleId) {
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+    const button = document.getElementById(`${moduleId}PreviewButton`);
+
+    if (!moduleConfig || !button) {
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Previewing...";
+
+    try {
+        previewState.pageByModule[moduleId] = 1;
+        const response = await fetchPreviewResponse(
+            moduleId,
+            1,
+            previewState.pageSizeByModule[moduleId]
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Preview failed");
+        }
+
+        showPreview(data);
+    } catch (error) {
+        console.error(error);
+        showPreview({
+            module: moduleId,
+            title: moduleConfig.title,
+            status: "ERROR",
+            summary: [
+                { label: "Records", value: null },
+                { label: "Errors", value: 1 }
+            ],
+            validation: [
+                {
+                    label: "Preview Request",
+                    status: "ERROR",
+                    errors: 1,
+                    message: error.message
+                }
+            ],
+            columns: [],
+            rows: [],
+            pagination: emptyPagination()
+        });
+    } finally {
+        button.disabled = false;
+        button.textContent = moduleConfig.previewReady
+            ? "Preview Again"
+            : "Show Placeholder";
+        updateImportButton(moduleId);
+    }
+}
+
+async function refreshServerPaginatedPreview(moduleId, page, pageSize) {
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+
+    if (!moduleConfig) {
+        return;
+    }
+
+    try {
+        const response = await fetchPreviewResponse(moduleId, page, pageSize);
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Preview failed");
+        }
+
+        showPreview(data);
+    } catch (error) {
+        console.error(error);
+        showPreview({
+            module: moduleId,
+            title: moduleConfig.title,
+            status: "ERROR",
+            summary: [
+                { label: "Records", value: null },
+                { label: "Errors", value: 1 }
+            ],
+            validation: [
+                {
+                    label: "Preview Request",
+                    status: "ERROR",
+                    errors: 1,
+                    message: error.message
+                }
+            ],
+            columns: [],
+            rows: [],
+            serverPaginated: true,
+            pagination: emptyPagination()
+        });
+    }
+}
+
+function fetchPreviewResponse(moduleId, page, pageSize) {
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+    let url = `/api/migration/${moduleId}/preview`;
+
+    if (moduleConfig?.serverPaginated) {
+        const params = new URLSearchParams();
+
+        params.set("page", String(page || 1));
+        params.set(
+            "pageSize",
+            String(pageSize || GENERIC_DEFAULT_PAGE_SIZE)
+        );
+        url = `${url}?${params.toString()}`;
+    }
+
+    return fetch(url, {
+        method: "POST"
+    });
+}
+
+async function importModule(moduleId) {
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+    const importButton = document.getElementById(`${moduleId}ImportButton`);
+    const previewButton = document.getElementById(`${moduleId}PreviewButton`);
+
+    if (!moduleConfig || !moduleConfig.importReady || !importButton) {
+        return;
+    }
+
+    if (!canImportModule(moduleId)) {
+        alert(importRequirementText(moduleId));
+        updateImportButton(moduleId);
+        return;
+    }
+
+    if (!confirm(importConfirmationText(moduleId))) {
+        return;
+    }
+
+    importButton.disabled = true;
+    importButton.textContent = "Importing...";
+
+    if (previewButton) {
+        previewButton.disabled = true;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/migration/${moduleId}/import`,
+            {
+                method: "POST"
+            }
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.message || "Import failed");
+        }
+
+        showPreview(data);
+
+        if (String(data.status || "").toUpperCase() !== "ERROR") {
+            previewState.importedByModule[moduleId] = true;
+        }
+    } catch (error) {
+        console.error(error);
+        showPreview({
+            module: moduleId,
+            title: `${moduleConfig.title} Import`,
+            status: "ERROR",
+            summary: [
+                { label: "Inserted", value: 0 },
+                { label: "Skipped", value: 0 },
+                { label: "Errors", value: 1 }
+            ],
+            validation: [
+                {
+                    label: "Import Request",
+                    status: "ERROR",
+                    errors: 1,
+                    message: error.message
+                }
+            ],
+            columns: [],
+            rows: [],
+            pagination: emptyPagination()
+        });
+    } finally {
+        if (previewButton) {
+            previewButton.disabled = false;
+        }
+
+        importButton.textContent = "Import";
+        updateAllImportButtons();
+    }
+}
+
+function updateAllImportButtons() {
+    GENERIC_MIGRATION_MODULES.forEach((moduleConfig) =>
+        updateImportButton(moduleConfig.id)
+    );
+}
+
+function updateImportButton(moduleId) {
+    const button = document.getElementById(`${moduleId}ImportButton`);
+
+    if (!button) {
+        return;
+    }
+
+    button.disabled = !canImportModule(moduleId);
+    button.title = button.disabled
+        ? importRequirementText(moduleId)
+        : "";
+}
+
+function canImportModule(moduleId) {
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+    const data = previewState[moduleId];
+
+    if (!moduleConfig?.importReady || !data) {
+        return false;
+    }
+
+    if (hasBlockingPreviewError(data)) {
+        return false;
+    }
+
+    if (importNewCount(moduleConfig, data) <= 0) {
+        return false;
+    }
+
+    if (moduleId === "enrollment" && !previewState.importedByModule.student) {
+        return false;
+    }
+
+    return true;
+}
+
+function hasBlockingPreviewError(data) {
+    const status = String(data.status || "").toUpperCase();
+
+    if (status === "ERROR" || status === "FAILED") {
+        return true;
+    }
+
+    return Array.isArray(data.validation) && data.validation.some((item) =>
+        String(item.status || "").toUpperCase() === "ERROR"
+    );
+}
+
+function importRequirementText(moduleId) {
+    const data = previewState[moduleId];
+
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+
+    if (data && importNewCount(moduleConfig, data) <= 0) {
+        return "ไม่มี New rows สำหรับ Import";
+    }
+
+    if (moduleId === "enrollment" && !previewState.importedByModule.student) {
+        return "Import Student ให้สำเร็จก่อน แล้วค่อย Import Enrollment";
+    }
+
+    return "ต้อง Preview module นี้ให้ผ่าน validation ก่อน Import";
+}
+
+function summaryValue(data, label) {
+    const item = Array.isArray(data?.summary)
+        ? data.summary.find((summaryItem) => summaryItem.label === label)
+        : null;
+
+    return Number(item?.value || 0);
+}
+
+function importNewCount(moduleConfig, data) {
+    return summaryValue(data, moduleConfig?.importNewLabel || "New");
+}
+
+function importConfirmationText(moduleId) {
+    if (moduleId === "student") {
+        return "ยืนยัน Import Student จริงหรือไม่? ระบบจะเพิ่มเฉพาะนักเรียนที่ยังไม่มี และข้ามชื่อเดิมที่เจอด้วย first_name + last_name";
+    }
+
+    if (moduleId === "enrollment") {
+        return "ยืนยัน Import Enrollment จริงหรือไม่? ระบบจะเพิ่มเฉพาะ enrollment ที่ยังไม่มี และข้าม student_id + subject_id ที่มีอยู่แล้ว";
+    }
+
+    if (moduleId === "worksheet-receive") {
+        return "ยืนยัน Import Worksheet Receive จริงหรือไม่? ระบบจะเพิ่มเฉพาะ DO/detail ที่ยังไม่มี และข้าม Type ที่ไม่ใช่ WS";
+    }
+
+    if (moduleId === "billing") {
+        return "ยืนยัน Import Billing จริงหรือไม่? ระบบจะเพิ่มเฉพาะ receipt/detail ที่ยังไม่มี";
+    }
+
+    if (moduleId === "ws") {
+        return "ยืนยัน Import WS จริงหรือไม่? ไฟล์นี้มีขนาดใหญ่ ระบบจะเพิ่มเฉพาะ worksheet_used ที่ยังไม่มี";
+    }
+
+    return "ยืนยัน Import จริงหรือไม่?";
+}
+
+function previewStudent() {
+    previewModule("student");
+}
+
+function updateModuleCard(moduleId, data) {
+    const moduleConfig = GENERIC_MODULE_MAP.get(moduleId);
+    const card = document.querySelector(
+        `[data-migration-card="${moduleId}"]`
+    );
+
+    if (!moduleConfig || !card) {
+        return;
+    }
+
+    const status = card.querySelector(
+        `[data-module-status="${moduleId}"]`
+    );
+    const stats = card.querySelector(
+        `[data-module-stats="${moduleId}"]`
+    );
+
+    card.classList.toggle("active", data.status !== "NOT STARTED");
+    card.classList.toggle("disabled", data.status === "NOT STARTED");
+
+    if (status) {
+        status.textContent = data.status || "READY";
+        status.className = `status ${statusClass(data.status)}`;
+    }
+
+    if (stats) {
+        stats.innerHTML = renderCardStats(moduleConfig, data);
+    }
+
+    updateImportButton(moduleId);
+}
+
+function normalizePreviewData(data, moduleConfig) {
+    const rows = Array.isArray(data.rows)
+        ? data.rows
+        : Array.isArray(data.previewRows)
+            ? data.previewRows
+            : [];
+    const summary = Array.isArray(data.summary)
+        ? data.summary
+        : legacySummary(data);
+    const validation = Array.isArray(data.validation)
+        ? data.validation
+        : legacyValidation(data);
+    const columns = Array.isArray(data.columns)
+        ? data.columns
+        : legacyColumns(moduleConfig.id);
+    const tables = Array.isArray(data.tables)
+        ? data.tables.map((table) => normalizePreviewTable(table))
+        : [];
+
+    const pagination = {
+        ...emptyPagination(),
+        ...(data.pagination || {})
+    };
+
+    if (!data.serverPaginated && !moduleConfig.serverPaginated) {
+        pagination.totalRows = rows.length;
+    }
+
+    return {
+        module: data.module || moduleConfig.id,
+        title: data.title || moduleConfig.title,
+        status: data.status || "READY",
+        serverPaginated: Boolean(data.serverPaginated || moduleConfig.serverPaginated),
+        summary,
+        validation,
+        columns,
+        rows,
+        tables,
+        pagination
+    };
+}
+
+function normalizePreviewTable(table) {
+    const rows = Array.isArray(table.rows)
+        ? table.rows
+        : [];
+    const columns = Array.isArray(table.columns)
+        ? table.columns
+        : [];
+
+    return {
+        id: table.id || "preview_table",
+        title: table.title || "Preview Rows",
+        columns,
+        rows,
+        pagination: {
+            ...emptyPagination(),
+            ...(table.pagination || {}),
+            totalRows: rows.length
+        }
+    };
+}
+
+function legacySummary(data) {
+    if (data.csvRecords !== undefined) {
+        return [
+            { label: "CSV Records", value: data.csvRecords },
+            { label: "Unique", value: data.uniqueStudents },
+            { label: "Duplicate", value: data.duplicateCount },
+            { label: "Blocked", value: data.blockedRows },
+            { label: "Missing Name", value: data.missingNameCount }
+        ];
+    }
+
+    return [
+        { label: "Records", value: null },
+        { label: "New", value: null },
+        { label: "Skipped", value: null },
+        { label: "Errors", value: null },
+        { label: "Warnings", value: null }
+    ];
+}
+
+function legacyValidation(data) {
+    const errors = data.lookupErrors || {};
+
+    if (Object.keys(errors).length === 0) {
+        return [
+            {
+                label: "Preview Adapter",
+                status: data.status || "NOT STARTED",
+                errors: null
+            }
+        ];
+    }
+
+    return [
+        { label: "Prefix Master", status: errors.prefix ? "ERROR" : "READY", errors: errors.prefix || 0 },
+        { label: "Gender Master", status: errors.gender ? "ERROR" : "READY", errors: errors.gender || 0 },
+        { label: "School Grade Master", status: errors.schoolGrade ? "ERROR" : "READY", errors: errors.schoolGrade || 0 },
+        { label: "Birth Date", status: errors.birthDate ? "ERROR" : "READY", errors: errors.birthDate || 0 }
+    ];
+}
+
+function legacyColumns(moduleId) {
+    if (moduleId !== "student") {
+        return [];
+    }
+
+    return [
+        { key: "row_number", label: "#" },
+        { key: "prefix_id", label: "Prefix" },
+        { key: "first_name", label: "First Name" },
+        { key: "last_name", label: "Last Name" },
+        { key: "nickname", label: "Nickname" },
+        { key: "gender_id", label: "Gender" },
+        { key: "birth_date", label: "Birth Date" },
+        { key: "school_grade_id", label: "Grade" },
+        { key: "school_name", label: "School" },
+        { key: "mobile", label: "Mobile" },
+        { key: "email", label: "Email" },
+        { key: "address_number", label: "Address No." },
+        { key: "address_village", label: "Village" },
+        { key: "address_alley", label: "Alley" },
+        { key: "address_road", label: "Road" },
+        { key: "address_subdistrict", label: "Subdistrict" },
+        { key: "address_district", label: "District" },
+        { key: "address_province", label: "Province" },
+        { key: "address_zipcode", label: "Zipcode" },
+        { key: "remark", label: "Remark" },
+        { key: "created_at", label: "Created At", defaultValue: "DB default" },
+        { key: "updated_at", label: "Updated At", defaultValue: "DB default" }
+    ];
+}
+
+function buildClientPlaceholder(moduleConfig) {
+    const status = moduleConfig.previewReady
+        ? "PREVIEW READY"
+        : "NOT STARTED";
+
+    return {
+        module: moduleConfig.id,
+        title: moduleConfig.title,
+        status,
+        summary: [
+            { label: "Records", value: null },
+            { label: "New", value: null },
+            { label: "Skipped", value: null },
+            { label: "Errors", value: null },
+            { label: "Warnings", value: null }
+        ],
+        validation: [
+            {
+                label: "Preview Adapter",
+                status,
+                errors: null
+            }
+        ],
+        columns: [],
+        rows: [],
+        pagination: emptyPagination()
+    };
+}
+
+function emptyPagination() {
+    return {
+        page: 1,
+        pageSize: GENERIC_DEFAULT_PAGE_SIZE,
+        pageSizeOptions: GENERIC_PAGE_SIZE_OPTIONS,
+        totalRows: 0,
+        totalPages: 0,
+        startRow: 0,
+        endRow: 0
+    };
+}
+
+function getPagination(data, rows = data.rows) {
+    if (isServerPaginatedPreview(data)) {
+        const totalRows = Number(data.pagination?.totalRows || rows.length);
+        const pageSize = normalizePageSize(
+            data.pagination?.pageSize ||
+            previewState.pageSizeByModule[data.module] ||
+            GENERIC_DEFAULT_PAGE_SIZE,
+            data.pagination?.pageSizeOptions
+        );
+        const totalPages = Math.ceil(totalRows / pageSize);
+        const page = totalPages === 0
+            ? 1
+            : clamp(
+                Number(data.pagination?.page || previewState.pageByModule[data.module] || 1),
+                1,
+                totalPages
+            );
+
+        previewState.pageByModule[data.module] = page;
+        previewState.pageSizeByModule[data.module] = pageSize;
+
+        return {
+            page,
+            pageSize,
+            pageSizeOptions: data.pagination?.pageSizeOptions || GENERIC_PAGE_SIZE_OPTIONS,
+            totalRows,
+            allRows: totalRows,
+            totalPages,
+            startIndex: 0,
+            endIndex: rows.length,
+            startRow: data.pagination?.startRow || (totalRows === 0 ? 0 : (page - 1) * pageSize + 1),
+            endRow: data.pagination?.endRow || Math.min(page * pageSize, totalRows)
+        };
+    }
+
+    const totalRows = rows.length;
+    const allRows = data.rows.length;
+    const pageSize = getInitialPageSize(data, data.module);
+    const totalPages = Math.ceil(totalRows / pageSize);
+    const page = totalPages === 0
+        ? 1
+        : clamp(getInitialPage(data, data.module), 1, totalPages);
+    const startIndex = totalRows === 0
+        ? 0
+        : (page - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalRows);
+
+    previewState.pageByModule[data.module] = page;
+    previewState.pageSizeByModule[data.module] = pageSize;
+
+    return {
+        page,
+        pageSize,
+        pageSizeOptions: data.pagination?.pageSizeOptions || GENERIC_PAGE_SIZE_OPTIONS,
+        totalRows,
+        allRows,
+        totalPages,
+        startIndex,
+        endIndex,
+        startRow: totalRows === 0 ? 0 : startIndex + 1,
+        endRow: endIndex
+    };
+}
+
+function getTablePagination(moduleId, table) {
+    const totalRows = table.rows.length;
+    const allRows = table.rows.length;
+    const pageSize = getInitialTablePageSize(moduleId, table);
+    const totalPages = Math.ceil(totalRows / pageSize);
+    const page = totalPages === 0
+        ? 1
+        : clamp(getInitialTablePage(moduleId, table), 1, totalPages);
+    const startIndex = totalRows === 0
+        ? 0
+        : (page - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, totalRows);
+    const key = previewTableStateKey(moduleId, table.id);
+
+    previewState.tablePageByModule[key] = page;
+    previewState.tablePageSizeByModule[key] = pageSize;
+
+    return {
+        page,
+        pageSize,
+        pageSizeOptions: table.pagination?.pageSizeOptions || GENERIC_PAGE_SIZE_OPTIONS,
+        totalRows,
+        allRows,
+        totalPages,
+        startIndex,
+        endIndex,
+        startRow: totalRows === 0 ? 0 : startIndex + 1,
+        endRow: endIndex
+    };
+}
+
+function getInitialPage(data, moduleId) {
+    return Number(
+        previewState.pageByModule[moduleId] ||
+        data.pagination?.page ||
+        1
+    );
+}
+
+function getInitialPageSize(data, moduleId) {
+    return normalizePageSize(
+        previewState.pageSizeByModule[moduleId] ||
+        data.pagination?.pageSize ||
+        GENERIC_DEFAULT_PAGE_SIZE,
+        data.pagination?.pageSizeOptions
+    );
+}
+
+function previewTableStateKey(moduleId, tableId) {
+    return `${moduleId}:${tableId}`;
+}
+
+function getInitialTablePage(moduleId, table) {
+    return Number(
+        previewState.tablePageByModule[previewTableStateKey(moduleId, table.id)] ||
+        table.pagination?.page ||
+        1
+    );
+}
+
+function getInitialTablePageSize(moduleId, table) {
+    return normalizePageSize(
+        previewState.tablePageSizeByModule[previewTableStateKey(moduleId, table.id)] ||
+        table.pagination?.pageSize ||
+        GENERIC_DEFAULT_PAGE_SIZE,
+        table.pagination?.pageSizeOptions
+    );
+}
+
+function normalizePageSize(pageSize, options = GENERIC_PAGE_SIZE_OPTIONS) {
+    const allowedOptions = Array.isArray(options) && options.length > 0
+        ? options
+        : GENERIC_PAGE_SIZE_OPTIONS;
+    const size = Number(pageSize);
+
+    return allowedOptions.includes(size)
+        ? size
+        : GENERIC_DEFAULT_PAGE_SIZE;
+}
+
+function renderShowingText(pagination) {
+    if (pagination.totalRows === 0) {
+        return pagination.allRows > 0
+            ? `Showing 0 of ${pagination.allRows.toLocaleString("en-US")} rows`
+            : "Showing 0 rows";
+    }
+
+    const text = `Showing ${pagination.startRow.toLocaleString("en-US")}-${pagination.endRow.toLocaleString("en-US")} of ${pagination.totalRows.toLocaleString("en-US")} rows`;
+
+    if (pagination.allRows && pagination.allRows !== pagination.totalRows) {
+        return `${text} (${pagination.allRows.toLocaleString("en-US")} total)`;
+    }
+
+    return text;
+}
+
+function paginationPageItems(page, totalPages) {
+    if (totalPages <= 7) {
+        return Array.from(
+            { length: totalPages },
+            (_, index) => index + 1
+        );
+    }
+
+    const pages = new Set([
+        1,
+        totalPages,
+        page - 2,
+        page - 1,
+        page,
+        page + 1,
+        page + 2
+    ]);
+    const sortedPages = [...pages]
+        .filter((item) => item >= 1 && item <= totalPages)
+        .sort((a, b) => a - b);
+    const output = [];
+
+    sortedPages.forEach((item, index) => {
+        if (index > 0 && item - sortedPages[index - 1] > 1) {
+            output.push("...");
+        }
+
+        output.push(item);
+    });
+
+    return output;
+}
+
+function previewStat(label, value) {
+    return `
+        <div class="preview-stat">
+            <div class="preview-stat-label">
+                ${escapeHtml(label)}
+            </div>
+            <div class="preview-stat-value">
+                ${formatDisplayValue(value)}
+            </div>
+        </div>
+    `;
+}
+
+function previewCheck(itemOrLabel, maybeCount) {
+    const item = typeof itemOrLabel === "object"
+        ? itemOrLabel
+        : {
+            label: itemOrLabel,
+            status: Number(maybeCount) === 0 ? "READY" : "ERROR",
+            errors: maybeCount
+        };
+    const status = String(item.status || "READY").toUpperCase();
+    const className = validationClass(status);
+    const detail = item.message
+        ? `
+            <span class="preview-check-detail">
+                ${escapeHtml(item.message)}
+            </span>
+        `
+        : "";
+
+    return `
+        <div
+            class="preview-check"
+            title="${escapeHtml(item.message || "")}"
+        >
+            <span class="preview-check-name">
+                ${escapeHtml(item.label)}
+            </span>
+            <span class="${className}">
+                ${escapeHtml(validationText(item))}
+            </span>
+            ${detail}
+        </div>
+    `;
+}
+
+function validationText(item) {
+    const status = String(item.status || "READY").toUpperCase();
+
+    if (status === "NOT STARTED" || status === "PREVIEW READY") {
+        return status;
+    }
+
+    if (status === "READY") {
+        return `${Number(item.errors || 0).toLocaleString("en-US")} errors`;
+    }
+
+    if (status === "WARNING") {
+        const warnings = item.warnings ?? item.errors ?? 0;
+
+        return `${Number(warnings).toLocaleString("en-US")} warnings`;
+    }
+
+    if (item.errors === null || item.errors === undefined) {
+        return status;
+    }
+
+    return `${Number(item.errors).toLocaleString("en-US")} errors`;
+}
+
+function validationClass(status) {
+    if (status === "READY") {
+        return "preview-check-ok";
+    }
+
+    if (status === "ERROR") {
+        return "preview-check-error";
+    }
+
+    if (status === "WARNING") {
+        return "preview-check-warning";
+    }
+
+    return "preview-check-todo";
+}
+
+function statusClass(status) {
+    const normalized = String(status || "").toUpperCase();
+
+    if (normalized === "ERROR" || normalized === "FAILED") {
+        return "error";
+    }
+
+    if (normalized === "WARNING" || normalized === "PREVIEW READY") {
+        return "warning";
+    }
+
+    if (normalized === "NOT STARTED" || normalized === "WAITING") {
+        return "todo";
+    }
+
+    return "ready";
+}
+
+function formatDisplayValue(value) {
+    if (value === null || value === undefined || value === "") {
+        return "&mdash;";
+    }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+        return value.toLocaleString("en-US");
+    }
+
+    return escapeHtml(value);
+}
+
+function formatCellValue(row, column) {
+    const value = row[column.key];
+
+    if (
+        (value === null || value === undefined || value === "") &&
+        column.defaultValue !== undefined
+    ) {
+        return escapeHtml(column.defaultValue);
+    }
+
+    return formatDisplayValue(value);
+}
+
+function clamp(value, min, max) {
+    const numberValue = Number.isFinite(value)
+        ? value
+        : min;
+
+    return Math.min(
+        Math.max(numberValue, min),
+        max
+    );
+}
+
+function escapeHtml(value) {
+    if (value === null || value === undefined) {
+        return "";
+    }
+
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+window.previewModule = previewModule;
+window.importModule = importModule;
+window.previewStudent = previewStudent;
+window.selectPreview = selectPreview;
+window.setPreviewPage = setPreviewPage;
+window.setPreviewPageSize = setPreviewPageSize;
+window.setPreviewTablePage = setPreviewTablePage;
+window.setPreviewTablePageSize = setPreviewTablePageSize;
+window.setPreviewRowFilter = setPreviewRowFilter;
+
+if (document.readyState === "loading") {
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeGenericMigrationCenter
+    );
+} else {
+    initializeGenericMigrationCenter();
+}
+</script>
+
+</body>
+</html>

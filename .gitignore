@@ -1,0 +1,16 @@
+# Environment / passwords
+.env
+
+# Node.js packages
+node_modules/
+
+# Logs
+*.log
+
+# Migration source data
+migration/*.csv
+migration/*.txt
+
+# OS / Editor
+.DS_Store
+Thumbs.db
