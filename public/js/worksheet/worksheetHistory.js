@@ -23,6 +23,7 @@ export function renderHistory(container, rows) {
         <table class="history-table">
             <thead>
                 <tr>
+                    <th class="history-action-column"></th>
                     <th>Date</th>
                     <th>Type</th>
                     <th>Level</th>
@@ -40,6 +41,20 @@ export function renderHistory(container, rows) {
 
                     return `
                         <tr${rowClass}>
+                            <td class="history-action-cell">
+                                ${isUnprocessedStockRecord(row)
+                                    ? `
+                                        <button
+                                            type="button"
+                                            class="history-delete-button"
+                                            data-delete-history-id="${escapeHtml(row.worksheetUsedId)}"
+                                            aria-label="Delete worksheet record"
+                                        >
+                                            ลบ
+                                        </button>
+                                    `
+                                    : ""}
+                            </td>
                             <td>${escapeHtml(formatDateDisplay(row.worksheetDate))}</td>
                             <td>
                                 <span class="badge ${row.worksheetType === "ZUN" ? "zun" : "main"}">

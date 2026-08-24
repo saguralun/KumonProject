@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Payment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/payment.css">
+</head>
+<body>
+  <main class="payment-page">
+    <aside class="payment-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link" href="/" data-admin-only>Tables</a>
+        <a class="home-link" href="/worksheet.html">WS Input</a>
+        <a class="home-link" href="/student-manager.html">Students</a>
+        <a class="home-link active" href="/payment.html" data-staff-up>Payment</a>
+        <a class="home-link" href="/users.html" data-admin-only>Users</a>
+      </nav>
+
+      <div class="side-header">
+        <h1>Payment</h1>
+        <div class="subtle">เช็กจ่ายเงินรายเดือน</div>
+      </div>
+
+      <section class="filter-panel">
+        <label>
+          <span>ค่าเรียนเดือน</span>
+          <select id="billingMonth"></select>
+        </label>
+        <label>
+          <span>ปี</span>
+          <input id="billingYear" type="number" min="2000" max="2600" step="1">
+        </label>
+        <label>
+          <span>Subject</span>
+          <select id="subjectFilter">
+            <option value="ALL">ALL</option>
+            <option value="ME">ME</option>
+            <option value="EFL">EFL</option>
+            <option value="TRP">TRP</option>
+          </select>
+        </label>
+        <label>
+          <span>Status</span>
+          <select id="paymentStatus">
+            <option value="all">ทั้งหมด</option>
+            <option value="unpaid">ยังไม่จ่าย</option>
+            <option value="paid">จ่ายแล้ว</option>
+          </select>
+        </label>
+      </section>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="payment-workspace">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Payment Center</div>
+          <div class="subtle" id="pageSubtitle">เลือกเดือนเพื่อดูว่าใครจ่ายแล้วบ้าง</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="summary-grid" aria-label="Payment summary">
+        <div class="summary-card">
+          <span>ทั้งหมด</span>
+          <strong id="totalStudents">0</strong>
+        </div>
+        <div class="summary-card is-paid">
+          <span>จ่ายแล้ว</span>
+          <strong id="paidStudents">0</strong>
+        </div>
+        <div class="summary-card is-unpaid">
+          <span>ยังไม่จ่าย</span>
+          <strong id="unpaidStudents">0</strong>
+        </div>
+        <div class="summary-card is-net">
+          <span>Total Net</span>
+          <strong id="totalNetAmount">0.00</strong>
+        </div>
+        <div class="summary-card is-expected">
+          <span>Expected Net</span>
+          <strong id="expectedNetAmount">0.00</strong>
+        </div>
+        <div class="summary-card is-unpaid-net">
+          <span>Unpaid Net</span>
+          <strong id="unpaidNetAmount">0.00</strong>
+        </div>
+      </section>
+
+      <section class="search-panel" aria-label="Payment search">
+        <div class="quick-filter-row" aria-label="Quick payment filters">
+          <button type="button" class="quick-filter-button" data-status-filter="unpaid">ยังไม่จ่าย</button>
+          <button type="button" class="quick-filter-button" data-status-filter="paid">จ่ายแล้ว</button>
+          <button type="button" class="quick-filter-button" data-status-filter="all">ทั้งหมด</button>
+        </div>
+        <label>
+          <span>ค้นหาเด็ก / ID / Enrollment</span>
+          <input id="paymentSearch" type="text" autocomplete="off" placeholder="พิมพ์ชื่อเด็ก, student id หรือ enrollment id">
+        </label>
+      </section>
+
+      <section class="payment-table-panel">
+        <div class="table-header">
+          <div>
+            <div class="panel-title">รายการเด็ก</div>
+            <div class="subtle" id="resultSubtitle">กำลังโหลด...</div>
+          </div>
+          <div class="table-actions">
+            <button type="button" class="secondary-button" id="printUnpaidButton">🖨️ Print unpaid</button>
+            <button type="button" class="secondary-button" id="exportUnpaidButton">⬇️ Export CSV</button>
+            <button type="button" class="secondary-button" id="refreshButton">🔄 Refresh</button>
+          </div>
+        </div>
+        <div class="payment-table-wrap" id="paymentTableWrap">
+          <div class="empty-state">กำลังโหลด...</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="modal-backdrop hidden" id="receiptModal" role="dialog" aria-modal="true" aria-labelledby="receiptModalTitle">
+    <div class="receipt-dialog">
+      <div class="receipt-dialog-header">
+        <div>
+          <div class="panel-title" id="receiptModalTitle">Receipt Preview</div>
+          <div class="subtle" id="receiptModalSubtitle">80mm thermal receipt</div>
+        </div>
+        <button type="button" class="icon-button" id="receiptClose" aria-label="Close">✕</button>
+      </div>
+
+      <div class="receipt-period-controls">
+        <label>
+          <span>Payment</span>
+          <select id="receiptPaymentMethod"></select>
+        </label>
+      </div>
+
+      <div class="receipt-paper" id="receiptPaper">
+        <div class="empty-state">ยังไม่มีใบเสร็จ</div>
+      </div>
+
+      <div class="receipt-actions">
+        <button type="button" class="secondary-button" id="receiptPrint">🖨️ Print</button>
+        <button type="button" class="save-button" id="receiptReceivePayment">💵 รับเงิน</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/authClient.js"></script>
+  <script type="module" src="/js/payment.js"></script>
+</body>
+</html>

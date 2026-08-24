@@ -167,6 +167,7 @@ export function buildPreviewRecords({
     }
 
     const enrollment = context.enrollment;
+    const forceKumonConnect = enrollment.isKumonConnect === true;
     const mainRecords = buildGroupPreview({
         receiveDate,
         pattern,
@@ -188,7 +189,14 @@ export function buildPreviewRecords({
         })
         : [];
 
-    return [...mainRecords, ...zunRecords].sort((a, b) => (
+    return [...mainRecords, ...zunRecords].map((record) => forceKumonConnect
+        ? {
+            ...record,
+            cpws: false,
+            isKumonConnect: true
+        }
+        : record
+    ).sort((a, b) => (
         a.worksheetDate === b.worksheetDate
             ? a.kind.localeCompare(b.kind)
             : a.worksheetDate.localeCompare(b.worksheetDate)

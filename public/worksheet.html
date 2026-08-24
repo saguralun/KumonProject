@@ -6,13 +6,22 @@
 
   <title>KumonDB Worksheet Input</title>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/worksheet.css">
 </head>
 
 <body>
   <main class="worksheet-page">
     <aside class="subject-rail" aria-label="Subject filter">
-      <a class="home-link" href="/">Tables</a>
+      <nav class="rail-nav" aria-label="Main navigation">
+        <a class="home-link" href="/" data-admin-only>Tables</a>
+        <a class="home-link active" href="/worksheet.html">WS Input</a>
+        <a class="home-link" href="/student-manager.html">Students</a>
+        <a class="home-link" href="/payment.html" data-staff-up>Payment</a>
+        <a class="home-link" href="/users.html" data-admin-only>Users</a>
+      </nav>
       <div class="rail-title">Subject</div>
       <div class="subject-buttons" id="subjectButtons">
         <button type="button" class="subject-button active" data-subject="ALL">ALL</button>
@@ -20,6 +29,7 @@
         <button type="button" class="subject-button" data-subject="EFL">EFL</button>
         <button type="button" class="subject-button" data-subject="TRP">TRP</button>
       </div>
+      <div class="auth-bar" id="authBar"></div>
     </aside>
 
     <section class="workspace">
@@ -61,23 +71,22 @@
       </section>
 
       <section class="input-layout">
-        <section class="input-panel">
-          <div class="input-toolbar">
-            <div class="date-control">
-              <span class="field-label">Receive Date</span>
-              <div class="date-stepper">
-                <button type="button" class="icon-button" id="datePrev" aria-label="Previous day">‹</button>
-                <input id="receiveDate" type="date" disabled>
-                <button type="button" class="icon-button" id="dateNext" aria-label="Next day">›</button>
-              </div>
-            </div>
+        <div class="pattern-control">
+          <span class="field-label">WS/day</span>
+          <div class="pattern-buttons" id="patternButtons"></div>
+        </div>
 
-            <div class="pattern-control">
-              <span class="field-label">WS/day</span>
-              <div class="pattern-buttons" id="patternButtons"></div>
-            </div>
+        <div class="date-control">
+          <span class="field-label">Receive Date</span>
+          <div class="date-stepper">
+            <button type="button" class="icon-button" id="datePrev" aria-label="Previous day">◀</button>
+            <input id="receiveDate" type="date" disabled>
+            <button type="button" class="icon-button" id="dateNext" aria-label="Next day">▶</button>
           </div>
+          <div class="receive-weekday" id="receiveWeekday">เลือกวันที่</div>
+        </div>
 
+        <section class="input-panel">
           <div class="worksheet-inputs" id="worksheetInputs">
             <div class="empty-state">เลือกเด็กเพื่อเริ่มกรอก WS</div>
           </div>
@@ -89,7 +98,7 @@
               <div class="panel-title">Preview</div>
               <div class="subtle" id="previewCount">0 records</div>
             </div>
-            <button type="button" class="save-button" id="saveButton" disabled>Save</button>
+            <button type="button" class="save-button" id="saveButton" disabled>💾 Save</button>
           </div>
           <div class="preview-list" id="previewList">
             <div class="empty-state">ยังไม่มีรายการ</div>
@@ -98,22 +107,24 @@
       </section>
 
       <section class="secondary-actions">
-        <button type="button" id="completeWsLevel" disabled>จบ WS Level</button>
-        <button type="button" id="completeZunLevel" disabled>จบ Zun Level</button>
-        <button type="button" id="receiveCd" disabled>รับ CD</button>
-        <button type="button" id="previewReceipt" disabled>Preview Receipt</button>
+        <button type="button" id="completeWsLevel" disabled><span class="button-icon">📝</span><span>สอบ AT</span></button>
+        <button type="button" id="completeZunLevel" disabled><span class="button-icon">🎯</span><span>จบ Zun</span></button>
+        <button type="button" id="receiveCd" disabled><span class="button-icon">💿</span><span>รับ CD</span></button>
+        <button type="button" id="findIncompleteWs"><span class="button-icon">🔎</span><span>หา WS ค้าง</span></button>
       </section>
 
       <section class="history-panel">
         <div class="history-header">
           <div>
             <div class="panel-title">WS History</div>
-            <div class="subtle" id="historySubtitle">ล่าสุด 20 รายการ</div>
+            <div class="subtle" id="historySubtitle">ล่าสุด 30 รายการ</div>
           </div>
+          <div class="history-month-summary" id="historyMonthSummary">เดือนนี้: ยังไม่มีข้อมูล</div>
           <label class="history-limit">
             Show
             <select id="historyLimit">
-              <option value="20" selected>20</option>
+              <option value="20">20</option>
+              <option value="30" selected>30</option>
               <option value="50">50</option>
               <option value="100">100</option>
             </select>
@@ -126,6 +137,89 @@
     </section>
   </main>
 
+  <div class="modal-backdrop hidden" id="atModal" role="dialog" aria-modal="true" aria-labelledby="atModalTitle">
+    <div class="at-dialog">
+      <form class="at-form" id="atForm">
+        <div class="at-dialog-header">
+          <div>
+            <div class="panel-title" id="atModalTitle">จบ WS Level</div>
+            <div class="subtle" id="atModalSubtitle">Achievement Test</div>
+          </div>
+          <button type="button" class="icon-button at-close-button" id="atCancel" aria-label="Close">✕</button>
+        </div>
+
+        <div class="at-student-grid">
+          <label>
+            <span>ID Student</span>
+            <input id="atEnrollmentId" type="text" readonly>
+          </label>
+          <label>
+            <span>Subject</span>
+            <input id="atSubject" type="text" readonly>
+          </label>
+          <label>
+            <span>Level</span>
+            <input id="atLevel" type="text" readonly>
+          </label>
+          <label>
+            <span>Date AT</span>
+            <input id="atDate" type="date" required>
+          </label>
+        </div>
+
+        <div class="at-score-grid">
+          <label>
+            <span>Score</span>
+            <input id="atScore" type="number" min="0" step="1" required>
+          </label>
+          <label>
+            <span>Max Score</span>
+            <input id="atMaxScore" type="number" readonly>
+          </label>
+          <label>
+            <span>Time</span>
+            <input id="atTime" type="number" min="0" step="1" required>
+          </label>
+          <label>
+            <span>Max Time</span>
+            <input id="atMaxTime" type="number" readonly>
+          </label>
+          <label>
+            <span>Group</span>
+            <input id="atGroup" type="number" min="1" max="5" step="1" required>
+          </label>
+        </div>
+
+        <div class="at-pass-control" id="atPassControl" aria-label="AT result">
+          <button type="button" class="at-result-button" data-at-pass="false">ไม่ผ่าน</button>
+          <button type="button" class="at-result-button active" data-at-pass="true">ผ่าน</button>
+        </div>
+
+        <div class="at-dialog-footer">
+          <button type="button" class="secondary-button hidden" id="atEditLatest">แก้รอบล่าสุด</button>
+          <button type="submit" class="save-button" id="atSaveButton">💾 บันทึก AT</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="incompleteWsModal" role="dialog" aria-modal="true" aria-labelledby="incompleteWsTitle">
+    <div class="incomplete-ws-dialog">
+      <div class="incomplete-ws-header">
+        <div>
+          <div class="panel-title" id="incompleteWsTitle">เด็กที่ยังไม่ได้กรอก WS</div>
+          <div class="subtle" id="incompleteWsSubtitle">เช็ก WS ล่าสุดก่อนวันที่ 21 ของเดือนนี้</div>
+        </div>
+        <button type="button" class="icon-button at-close-button" id="incompleteWsClose" aria-label="Close">✕</button>
+      </div>
+
+      <div class="incomplete-ws-table-wrap" id="incompleteWsTableWrap">
+        <div class="empty-state">กดปุ่มเพื่อค้นหา</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/authClient.js"></script>
   <script type="module" src="/js/worksheet/worksheet.js"></script>
 </body>
 </html>

@@ -1,0 +1,100 @@
+const els = {
+  tabs: document.getElementById("loginTabs"),
+  message: document.getElementById("loginMessage"),
+  adminForm: document.getElementById("adminForm"),
+  guestForm: document.getElementById("guestForm"),
+  adminSubmit: document.getElementById("adminSubmit"),
+  guestSubmit: document.getElementById("guestSubmit")
+};
+
+function setMessage(text) {
+  if (!text) {
+    els.message.classList.add("hidden");
+    els.message.textContent = "";
+    return;
+  }
+
+  els.message.textContent = text;
+  els.message.classList.remove("hidden");
+}
+
+function setTab(tab) {
+  setMessage("");
+
+  els.tabs.querySelectorAll(".login-tab").forEach((button) => {
+    button.classList.toggle("active", button.dataset.tab === tab);
+  });
+
+  els.adminForm.classList.toggle("hidden", tab !== "admin");
+  els.guestForm.classList.toggle("hidden", tab !== "guest");
+}
+
+async function requestJson(url, options = {}) {
+  const response = await fetch(url, {
+    headers: { "Content-Type": "application/json" },
+    ...options
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok || data.success === false) {
+    throw new Error(data.error || "เข้าสู่ระบบไม่สำเร็จ");
+  }
+
+  return data;
+}
+
+function redirectForRole(role) {
+  window.location.href = role === "admin" ? "/" : "/worksheet.html";
+}
+
+els.tabs.addEventListener("click", (event) => {
+  const button = event.target.closest(".login-tab");
+
+  if (button) {
+    setTab(button.dataset.tab);
+  }
+});
+
+els.adminForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setMessage("");
+  els.adminSubmit.disabled = true;
+
+  try {
+    const formData = new FormData(els.adminForm);
+    const data = await requestJson("/api/auth/login/admin", {
+      method: "POST",
+      body: JSON.stringify({
+        username: formData.get("username"),
+        password: formData.get("password")
+      })
+    });
+
+    redirectForRole(data.user.role);
+  } catch (error) {
+    setMessage(error.message);
+    els.adminSubmit.disabled = false;
+  }
+});
+
+els.guestForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setMessage("");
+  els.guestSubmit.disabled = true;
+
+  try {
+    const formData = new FormData(els.guestForm);
+    const data = await requestJson("/api/auth/login/guest", {
+      method: "POST",
+      body: JSON.stringify({
+        displayName: formData.get("displayName"),
+        pin: formData.get("pin")
+      })
+    });
+
+    redirectForRole(data.user.role);
+  } catch (error) {
+    setMessage(error.message);
+    els.guestSubmit.disabled = false;
+  }
+});

@@ -7,7 +7,10 @@ node_modules/
 # Logs
 *.log
 
-# Migration source data
+# Local tooling
+.claude/
+
+# Local migration source data
 migration/*.csv
 migration/*.txt
 

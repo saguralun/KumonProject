@@ -1,4 +1,5 @@
 import { worksheetApi } from "./worksheetApi.js";
+import { bindFourDigitYearDateInputs } from "../dateInputYear.js";
 import {
     addDays,
     buildPreviewRecords,
@@ -26,6 +27,7 @@ const els = {
     studentMeta: document.getElementById("studentMeta"),
     studentSubjectSelect: document.getElementById("studentSubjectSelect"),
     receiveDate: document.getElementById("receiveDate"),
+    receiveWeekday: document.getElementById("receiveWeekday"),
     datePrev: document.getElementById("datePrev"),
     dateNext: document.getElementById("dateNext"),
     patternButtons: document.getElementById("patternButtons"),
@@ -36,10 +38,32 @@ const els = {
     completeWsLevel: document.getElementById("completeWsLevel"),
     completeZunLevel: document.getElementById("completeZunLevel"),
     receiveCd: document.getElementById("receiveCd"),
-    previewReceipt: document.getElementById("previewReceipt"),
+    findIncompleteWs: document.getElementById("findIncompleteWs"),
     historyLimit: document.getElementById("historyLimit"),
     historySubtitle: document.getElementById("historySubtitle"),
-    historyTableWrap: document.getElementById("historyTableWrap")
+    historyMonthSummary: document.getElementById("historyMonthSummary"),
+    historyTableWrap: document.getElementById("historyTableWrap"),
+    atModal: document.getElementById("atModal"),
+    atForm: document.getElementById("atForm"),
+    atModalTitle: document.getElementById("atModalTitle"),
+    atModalSubtitle: document.getElementById("atModalSubtitle"),
+    atCancel: document.getElementById("atCancel"),
+    atEnrollmentId: document.getElementById("atEnrollmentId"),
+    atSubject: document.getElementById("atSubject"),
+    atLevel: document.getElementById("atLevel"),
+    atDate: document.getElementById("atDate"),
+    atScore: document.getElementById("atScore"),
+    atMaxScore: document.getElementById("atMaxScore"),
+    atTime: document.getElementById("atTime"),
+    atMaxTime: document.getElementById("atMaxTime"),
+    atGroup: document.getElementById("atGroup"),
+    atPassControl: document.getElementById("atPassControl"),
+    atEditLatest: document.getElementById("atEditLatest"),
+    atSaveButton: document.getElementById("atSaveButton"),
+    incompleteWsModal: document.getElementById("incompleteWsModal"),
+    incompleteWsClose: document.getElementById("incompleteWsClose"),
+    incompleteWsSubtitle: document.getElementById("incompleteWsSubtitle"),
+    incompleteWsTableWrap: document.getElementById("incompleteWsTableWrap")
 };
 
 const state = {
@@ -51,9 +75,16 @@ const state = {
     searchTimer: null,
     context: null,
     history: [],
+    worksheetMonthSummary: null,
     patterns: [],
     patternCode: "daily10",
-    isSaving: false
+    isSaving: false,
+    isCompletingZun: false,
+    atModal: {
+        editingAtUsedId: null,
+        isPass: true,
+        source: null
+    }
 };
 
 function setStatus(message, type = "neutral") {
@@ -64,6 +95,30 @@ function setStatus(message, type = "neutral") {
 
 function currentPattern() {
     return selectedPattern(state.patterns, state.patternCode);
+}
+
+function weekdayLabelFromIsoDate(dateText) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText || "")) {
+        return "เลือกวันที่";
+    }
+
+    const [year, month, day] = dateText.split("-").map(Number);
+    const date = new Date(year, month - 1, day);
+    const weekdayNames = [
+        "วันอาทิตย์",
+        "วันจันทร์",
+        "วันอังคาร",
+        "วันพุธ",
+        "วันพฤหัสบดี",
+        "วันศุกร์",
+        "วันเสาร์"
+    ];
+
+    return weekdayNames[date.getDay()];
+}
+
+function updateReceiveWeekday() {
+    els.receiveWeekday.textContent = weekdayLabelFromIsoDate(els.receiveDate.value);
 }
 
 function readWorksheetNos(kind) {
@@ -181,14 +236,17 @@ function populateStudentStrip(context) {
     const enrollment = context.enrollment;
 
     els.studentStrip.classList.remove("is-empty");
-    els.studentName.textContent = enrollment.studentName;
+    els.studentName.innerHTML = `
+        <span>${escapeHtml(enrollment.studentName)}</span>
+        ${enrollment.isKumonConnect ? `<span class="student-name-badge">KC</span>` : ""}
+    `;
     els.studentMeta.textContent = [
         `ID ${enrollment.enrollmentId}`,
         enrollment.subjectCode,
         `Current ${enrollment.currentLevelCode}`,
         enrollment.currentZunLevelCode ? `Zun ${enrollment.currentZunLevelCode}` : "No Zun",
         enrollment.statusName
-    ].join(" • ");
+    ].filter(Boolean).join(" • ");
     els.studentSubjectSelect.disabled = false;
     els.studentSubjectSelect.innerHTML = context.studentEnrollments.map((item) => `
         <option value="${escapeHtml(item.enrollmentId)}" ${item.enrollmentId === enrollment.enrollmentId ? "selected" : ""}>
@@ -208,6 +266,17 @@ function renderPatternButtons() {
             ${escapeHtml(pattern.shortLabel)}
         </button>
     `).join("");
+}
+
+function focusWorksheetControl(input) {
+    if (!input) {
+        return;
+    }
+
+    input.focus();
+    if (typeof input.select === "function") {
+        input.select();
+    }
 }
 
 function renderOptionsDatalist(id, options) {
@@ -258,28 +327,42 @@ function buildInputValues({
     return values;
 }
 
+function renderWorksheetOptions(options, value, { allowEmpty = false } = {}) {
+    const currentValue = String(value || "");
+    const emptyOption = allowEmpty
+        ? `<option value="" ${currentValue ? "" : "selected"}>-</option>`
+        : "";
+
+    return emptyOption + options.map((option) => {
+        const optionValue = String(option.worksheetNo);
+
+        return `
+            <option value="${escapeHtml(optionValue)}" ${optionValue === currentValue ? "selected" : ""}>
+                ${escapeHtml(optionValue)}
+            </option>
+        `;
+    }).join("");
+}
+
 function renderWorksheetField({
     kind,
     index,
     label,
     value,
-    listId
+    options
 }) {
     return `
         <label class="worksheet-field">
             <span class="worksheet-field-label">${escapeHtml(label)}</span>
             <div class="worksheet-stepper">
                 <button type="button" class="icon-button" data-step="-1" data-kind="${kind}" data-index="${index}" aria-label="Previous worksheet">‹</button>
-                <input
-                    type="text"
-                    inputmode="numeric"
-                    autocomplete="off"
-                    list="${escapeHtml(listId)}"
-                    value="${escapeHtml(value)}"
+                <select
                     data-ws-input
                     data-kind="${kind}"
                     data-index="${index}"
                 >
+                    ${renderWorksheetOptions(options, value, { allowEmpty: kind === "zun" })}
+                </select>
                 <button type="button" class="icon-button" data-step="1" data-kind="${kind}" data-index="${index}" aria-label="Next worksheet">›</button>
             </div>
         </label>
@@ -294,7 +377,6 @@ function renderInputSection({
     options,
     optional = false
 }) {
-    const listId = `${kind}WorksheetOptions`;
     const count = values.length;
 
     return `
@@ -310,11 +392,59 @@ function renderInputSection({
                     index,
                     label: count === 2 ? `ช่อง ${index + 1}` : "Worksheet",
                     value,
-                    listId
+                    options
                 })).join("")}
             </div>
-            ${renderOptionsDatalist(listId, options)}
         </fieldset>
+    `;
+}
+
+function renderPairedInputSections({
+    mainValues,
+    zunValues
+}) {
+    const rowCount = Math.max(mainValues.length, zunValues.length);
+    const rows = [];
+
+    for (let index = 0; index < rowCount; index += 1) {
+        rows.push(`
+            <div class="worksheet-pair-row">
+                <fieldset class="input-section worksheet-fieldset worksheet-pair-cell">
+                    <legend class="section-heading">
+                        <span class="section-title">Main WS</span>
+                        <span class="level-pill">${escapeHtml(state.context.enrollment.currentLevelCode || "-")}</span>
+                        ${rowCount > 1 ? `<span class="optional-note">ช่อง ${index + 1}</span>` : ""}
+                    </legend>
+                    ${renderWorksheetField({
+                        kind: "main",
+                        index,
+                        label: rowCount > 1 ? `WS ${index + 1}` : "Worksheet",
+                        value: mainValues[index] || "",
+                        options: state.context.worksheetOptions.main
+                    })}
+                </fieldset>
+                <fieldset class="input-section worksheet-fieldset worksheet-pair-cell">
+                    <legend class="section-heading">
+                        <span class="section-title">Zun</span>
+                        <span class="level-pill">${escapeHtml(state.context.enrollment.currentZunLevelCode || "-")}</span>
+                        <span class="optional-note">Optional${rowCount > 1 ? ` • ช่อง ${index + 1}` : ""}</span>
+                    </legend>
+                    ${renderWorksheetField({
+                        kind: "zun",
+                        index,
+                        label: rowCount > 1 ? `Zun ${index + 1}` : "Worksheet",
+                        value: zunValues[index] || "",
+                        options: state.context.worksheetOptions.zun
+                    })}
+                </fieldset>
+            </div>
+        `);
+    }
+
+    return `
+        <div class="worksheet-pair-grid">
+            ${rows.join("")}
+        </div>
     `;
 }
 
@@ -332,15 +462,7 @@ function renderWorksheetInputs({ preserve = false } = {}) {
         pattern,
         previousValues: previousMain
     });
-    const sections = [
-        renderInputSection({
-            kind: "main",
-            title: "Main WS",
-            levelCode: state.context.enrollment.currentLevelCode,
-            values: mainValues,
-            options: state.context.worksheetOptions.main
-        })
-    ];
+    const sections = [];
 
     if (state.context.enrollment.currentZunLevelMasterId) {
         const zunValues = buildInputValues({
@@ -349,20 +471,24 @@ function renderWorksheetInputs({ preserve = false } = {}) {
             previousValues: previousZun
         });
 
+        sections.push(renderPairedInputSections({
+            mainValues,
+            zunValues
+        }));
+    } else {
         sections.push(renderInputSection({
-            kind: "zun",
-            title: "Zun",
-            levelCode: state.context.enrollment.currentZunLevelCode,
-            values: zunValues,
-            options: state.context.worksheetOptions.zun,
-            optional: true
+            kind: "main",
+            title: "Main WS",
+            levelCode: state.context.enrollment.currentLevelCode,
+            values: mainValues,
+            options: state.context.worksheetOptions.main
         }));
     }
 
     els.worksheetInputs.innerHTML = sections.join("");
     els.worksheetInputs.querySelectorAll("[data-ws-input]").forEach((input) => {
-        input.addEventListener("input", updatePreview);
-        input.addEventListener("focus", () => input.select());
+        input.addEventListener("change", updatePreview);
+        input.addEventListener("focus", () => focusWorksheetControl(input));
     });
     els.worksheetInputs.querySelectorAll("[data-step]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -389,14 +515,16 @@ function renderPreviewList(records) {
                 <div class="preview-label">${escapeHtml(record.worksheetLabel)}</div>
                 <div class="preview-kind">${escapeHtml(record.kind)} • packet ${escapeHtml(record.packetWorksheetNo)}</div>
             </div>
-            <div class="preview-flag ${record.cpws ? "cpws" : "auto"}">
-                ${record.cpws ? "CPWS" : "auto"}
+            <div class="preview-flag ${record.isKumonConnect ? "kc" : (record.cpws ? "cpws" : "auto")}">
+                ${record.isKumonConnect ? "KC" : (record.cpws ? "CPWS" : "auto")}
             </div>
         </div>
     `).join("");
 }
 
 function updatePreview() {
+    updateReceiveWeekday();
+
     const pattern = currentPattern();
     const mainWorksheetNos = readWorksheetNos("main");
     const zunWorksheetNos = readWorksheetNos("zun");
@@ -407,16 +535,20 @@ function updatePreview() {
         mainWorksheetNos,
         zunWorksheetNos
     });
+    const cdRequirement = currentCdRequirement();
+    const cdReady = !cdRequirement || cdRequirement.hasReceived;
     const canSave = Boolean(
         state.context
         && !state.isSaving
         && els.receiveDate.value
         && requiredMainReady(pattern, mainWorksheetNos)
+        && cdReady
     );
 
     els.previewCount.textContent = `${records.length} records`;
     els.saveButton.disabled = !canSave;
     renderPreviewList(records);
+    updateSecondaryActions();
 }
 
 function renderHistoryTable({ scrollToTop = false } = {}) {
@@ -428,6 +560,10 @@ function renderHistoryTable({ scrollToTop = false } = {}) {
     }
 }
 
+function setActionButton(button, icon, text) {
+    button.innerHTML = `<span class="button-icon">${escapeHtml(icon)}</span><span>${escapeHtml(text)}</span>`;
+}
+
 function updateSecondaryActions() {
     const context = state.context;
 
@@ -435,21 +571,485 @@ function updateSecondaryActions() {
         els.completeWsLevel.disabled = true;
         els.completeZunLevel.disabled = true;
         els.receiveCd.disabled = true;
-        els.previewReceipt.disabled = true;
         return;
     }
 
-    els.completeWsLevel.disabled = !context.completionState?.canCompleteWsLevel;
-    els.completeZunLevel.disabled = !(
-        context.enrollment.currentZunLevelMasterId
-        && context.completionState?.canCompleteZunLevel
+    const canCompleteAt = Boolean(context.completionState?.atCompletion?.canComplete);
+    const canEditLatestAt = Boolean(
+        context.completionState?.latestAtCompletion
+        && context.completionState.latestAtCompletion.isPass === false
     );
-    els.previewReceipt.disabled = false;
 
-    const hasCdMaster = context.cdState?.hasCdMaster;
-    const hasReceivedCd = context.cdState?.hasReceivedCd;
-    els.receiveCd.disabled = !hasCdMaster || hasReceivedCd;
-    els.receiveCd.textContent = hasReceivedCd ? "รับ CD แล้ว" : "รับ CD";
+    els.completeWsLevel.disabled = !canCompleteAt && !canEditLatestAt;
+    setActionButton(
+        els.completeWsLevel,
+        canCompleteAt ? "📝" : "🔁",
+        canCompleteAt ? "สอบ AT" : "สอบ AT ล่าสุด"
+    );
+    const canCompleteZun = Boolean(context.completionState?.zunCompletion?.canComplete);
+
+    els.completeZunLevel.disabled = !canCompleteZun || state.isCompletingZun;
+    setActionButton(els.completeZunLevel, "🎯", "จบ Zun");
+
+    const cdRequirement = currentCdRequirement();
+    els.receiveCd.disabled = !cdRequirement || cdRequirement.hasReceived;
+    setActionButton(
+        els.receiveCd,
+        "💿",
+        cdRequirement
+            ? (cdRequirement.hasReceived ? `CD ${cdRequirement.cdNo} ${cdRequirement.cpcd ? "รับแล้ว" : "ไม่รับ"}` : `รับ CD ${cdRequirement.cdNo}`)
+            : "ไม่ต้องใช้ CD"
+    );
+}
+
+function cdNoForThaiLevel({
+    levelCode,
+    worksheetNo
+}) {
+    const normalizedLevelCode = String(levelCode || "").toUpperCase();
+    const packetNo = Number(worksheetNo);
+
+    if (["7A", "6A"].includes(normalizedLevelCode)) {
+        if (packetNo >= 1 && packetNo <= 41) {
+            return 1;
+        }
+
+        if (packetNo >= 51 && packetNo <= 91) {
+            return 2;
+        }
+
+        if (packetNo >= 101 && packetNo <= 141) {
+            return 3;
+        }
+
+        if (packetNo >= 151 && packetNo <= 191) {
+            return 4;
+        }
+
+        return null;
+    }
+
+    if (["5A", "4A", "3A", "2A", "AI"].includes(normalizedLevelCode)) {
+        return 1;
+    }
+
+    return null;
+}
+
+function requiredCdNoForCurrentInput() {
+    if (!state.context) {
+        return null;
+    }
+
+    const enrollment = state.context.enrollment;
+    const subjectCode = String(enrollment.subjectCode || "").toUpperCase();
+
+    if (subjectCode === "EFL") {
+        return 1;
+    }
+
+    if (subjectCode !== "TRP") {
+        return null;
+    }
+
+    const firstMainNo = readWorksheetNos("main")[0];
+
+    return cdNoForThaiLevel({
+        levelCode: enrollment.currentLevelCode,
+        worksheetNo: firstMainNo
+    });
+}
+
+function currentCdRequirement() {
+    const requiredCdNo = requiredCdNoForCurrentInput();
+
+    if (!requiredCdNo || !state.context?.cdState?.availableCds?.length) {
+        return null;
+    }
+
+    const cdMaster = state.context.cdState.availableCds.find((item) =>
+        Number(item.cdNo) === Number(requiredCdNo)
+    );
+
+    if (!cdMaster) {
+        return null;
+    }
+
+    const receivedIds = new Set(
+        (state.context.cdState.receivedCdMasterIds || []).map(Number)
+    );
+    const receivedRecord = (state.context.cdState.receivedCds || []).find((item) =>
+        Number(item.cdMasterId) === Number(cdMaster.cdMasterId)
+    );
+
+    return {
+        cdMasterId: cdMaster.cdMasterId,
+        cdNo: cdMaster.cdNo,
+        hasReceived: receivedIds.has(Number(cdMaster.cdMasterId)),
+        cpcd: receivedRecord?.cpcd ?? null
+    };
+}
+
+function monthName(month) {
+    return [
+        "",
+        "มกราคม",
+        "กุมภาพันธ์",
+        "มีนาคม",
+        "เมษายน",
+        "พฤษภาคม",
+        "มิถุนายน",
+        "กรกฎาคม",
+        "สิงหาคม",
+        "กันยายน",
+        "ตุลาคม",
+        "พฤศจิกายน",
+        "ธันวาคม"
+    ][Number(month)] || month;
+}
+
+function renderWorksheetMonthSummary(summary) {
+    if (!summary) {
+        els.historyMonthSummary.textContent = "เดือนนี้: ยังไม่มีข้อมูล";
+        return;
+    }
+
+    els.historyMonthSummary.textContent = `${monthName(summary.billingMonth)} ${summary.billingYear}: ใช้ ${summary.usedDays} วัน • CPWS ${summary.cpwsRecords} ชุด`;
+}
+
+function latestWorksheetText(row) {
+    if (!row.latestWorksheetDate) {
+        return "ยังไม่มี WS";
+    }
+
+    const label = row.latestWorksheetLabel || "-";
+    const packet = row.latestPacketWorksheetNo
+        ? `packet ${row.latestPacketWorksheetNo}`
+        : "packet -";
+
+    return `${label} • ${packet}`;
+}
+
+function renderIncompleteWsRows(rows) {
+    if (!rows.length) {
+        els.incompleteWsTableWrap.innerHTML = `<div class="empty-state">ทุกคนกรอกถึงวันที่ 20 แล้ว</div>`;
+        return;
+    }
+
+    els.incompleteWsTableWrap.innerHTML = `
+        <table class="incomplete-ws-table">
+            <thead>
+                <tr>
+                    <th>Enrollment</th>
+                    <th>Student</th>
+                    <th>Subject</th>
+                    <th>Current</th>
+                    <th>Latest WS</th>
+                    <th>Latest Date</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows.map((row) => `
+                    <tr data-incomplete-enrollment-id="${escapeHtml(row.enrollmentId)}">
+                        <td>#${escapeHtml(row.enrollmentId)}</td>
+                        <td>${escapeHtml(row.studentName)}</td>
+                        <td>${escapeHtml(row.subjectCode)}</td>
+                        <td>${escapeHtml(row.currentLevelCode || "-")}</td>
+                        <td>${escapeHtml(latestWorksheetText(row))}</td>
+                        <td>${escapeHtml(row.latestWorksheetDate ? formatDateDisplay(row.latestWorksheetDate) : "-")}</td>
+                    </tr>
+                `).join("")}
+            </tbody>
+        </table>
+    `;
+}
+
+async function openIncompleteWsModal() {
+    els.incompleteWsModal.classList.remove("hidden");
+    els.incompleteWsSubtitle.textContent = "กำลังเช็ก WS ล่าสุดก่อนวันที่ 21 ของเดือนนี้";
+    els.incompleteWsTableWrap.innerHTML = `<div class="empty-state">กำลังค้นหา...</div>`;
+
+    try {
+        const data = await worksheetApi.getIncompleteWorksheets();
+        const rows = data.rows || [];
+        const totalRows = Number(data.totalRows || rows.length);
+        const countText = totalRows > rows.length
+            ? `${rows.length} รายการล่าสุด`
+            : `พบ ${rows.length} รายการ`;
+
+        els.incompleteWsSubtitle.textContent = `เช็กถึง ${formatDateDisplay(data.cutoffDate)} • ${countText}`;
+        renderIncompleteWsRows(rows);
+    } catch (error) {
+        els.incompleteWsTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+        setStatus(error.message, "error");
+    }
+}
+
+function closeIncompleteWsModal() {
+    els.incompleteWsModal.classList.add("hidden");
+}
+
+async function selectIncompleteWsEnrollment(enrollmentId) {
+    closeIncompleteWsModal();
+    await loadEnrollmentContext(enrollmentId);
+}
+
+async function receiveCd() {
+    if (!state.context) {
+        return;
+    }
+
+    const cdRequirement = currentCdRequirement();
+
+    if (!cdRequirement || cdRequirement.hasReceived) {
+        return;
+    }
+
+    const isTakingCd = window.confirm(`รับ CD ${cdRequirement.cdNo} สำหรับ level นี้ใช่ไหม?\nOK = รับ CD\nCancel = ไม่รับ CD`);
+
+    if (
+        !isTakingCd
+        && !window.confirm(`บันทึกว่าไม่รับ CD ${cdRequirement.cdNo} ใช่ไหม?`)
+    ) {
+        return;
+    }
+
+    try {
+        const result = await worksheetApi.receiveCd({
+            enrollmentId: state.context.enrollment.enrollmentId,
+            cdMasterId: cdRequirement.cdMasterId,
+            cdDate: els.receiveDate.value,
+            cpcd: isTakingCd
+        });
+
+        const receivedIds = state.context.cdState.receivedCdMasterIds || [];
+
+        if (!receivedIds.map(Number).includes(Number(result.cdMasterId))) {
+            state.context.cdState.receivedCdMasterIds = [
+                ...receivedIds,
+                result.cdMasterId
+            ];
+        }
+        state.context.cdState.receivedCds = [
+            ...(state.context.cdState.receivedCds || []),
+            {
+                cdUsedId: result.cdUsedId,
+                cdMasterId: result.cdMasterId,
+                cdNo: result.cdNo,
+                cdDate: els.receiveDate.value,
+                cpcd: result.cpcd,
+                isStockProcessed: false
+            }
+        ];
+
+        updateSecondaryActions();
+        updatePreview();
+        setStatus(
+            result.inserted
+                ? `บันทึก CD ${result.cdNo} (${result.cpcd ? "รับ CD" : "ไม่รับ CD"}) แล้ว`
+                : `CD ${result.cdNo} เคยบันทึกแล้ว`,
+            "success"
+        );
+    } catch (error) {
+        setStatus(error.message, "error");
+    }
+}
+
+function setAtPass(isPass) {
+    state.atModal.isPass = Boolean(isPass);
+    els.atPassControl.querySelectorAll("[data-at-pass]").forEach((button) => {
+        button.classList.toggle(
+            "active",
+            (button.dataset.atPass === "true") === state.atModal.isPass
+        );
+    });
+}
+
+function isAtFormReady() {
+    const score = Number(els.atScore.value);
+    const usedTime = Number(els.atTime.value);
+    const atGroup = Number(els.atGroup.value);
+    const maxScore = Number(els.atMaxScore.value);
+    const maxTime = Number(els.atMaxTime.value);
+
+    return (
+        Number.isInteger(score)
+        && score > 0
+        && score <= maxScore
+        && Number.isInteger(usedTime)
+        && usedTime > 0
+        && usedTime <= maxTime
+        && Number.isInteger(atGroup)
+        && atGroup >= 1
+        && atGroup <= 5
+    );
+}
+
+function updateAtSaveState() {
+    els.atSaveButton.disabled = !isAtFormReady();
+}
+
+function atAttemptLabel(atCompletion) {
+    const attemptNo = Number(atCompletion?.nextAttemptNo || 1);
+
+    return attemptNo > 1 ? `สอบรอบที่ ${attemptNo}` : "สอบรอบแรก";
+}
+
+function fillAtFormFromSource({
+    source,
+    edit = false
+}) {
+    const enrollment = state.context.enrollment;
+    const latestAttempt = source?.latestAttempt || null;
+    const attempt = edit ? source : latestAttempt;
+
+    state.atModal.editingAtUsedId = edit ? source.atUsedId : null;
+    state.atModal.source = source;
+    els.atEnrollmentId.value = enrollment.enrollmentId;
+    els.atSubject.value = enrollment.subjectCode;
+    els.atLevel.value = edit
+        ? source.levelCode
+        : enrollment.currentLevelCode;
+    els.atDate.value = edit
+        ? source.atDate
+        : els.receiveDate.value;
+    els.atMaxScore.value = source.maxScore ?? "";
+    els.atMaxTime.value = source.maxTime ?? "";
+    els.atScore.max = source.maxScore ?? "";
+    els.atTime.max = source.maxTime ?? "";
+    els.atScore.value = edit && attempt ? attempt.score : "";
+    els.atTime.value = edit && attempt ? attempt.usedTime : "";
+    els.atGroup.value = edit && attempt ? attempt.atGroup : 1;
+    els.atSaveButton.textContent = edit ? "💾 บันทึกการแก้ไข" : "💾 บันทึก AT";
+    setAtPass(edit && attempt ? attempt.isPass : true);
+    updateAtSaveState();
+}
+
+function openAtModal({ editLatest = false } = {}) {
+    if (!state.context) {
+        return;
+    }
+
+    const atCompletion = state.context.completionState?.atCompletion;
+    const latestAt = state.context.completionState?.latestAtCompletion;
+    const source = editLatest || !atCompletion?.canComplete
+        ? latestAt
+        : atCompletion;
+
+    if (!source) {
+        setStatus("ยังไม่มีข้อมูล AT ให้บันทึกหรือแก้ไข", "error");
+        return;
+    }
+
+    const isEdit = Boolean(editLatest || !atCompletion?.canComplete);
+    const subtitle = isEdit
+        ? `แก้ ${source.levelCode} • ${formatDateDisplay(source.atDate)}`
+        : `${state.context.enrollment.currentLevelCode} • ${atAttemptLabel(atCompletion)}`;
+
+    els.atModalTitle.textContent = isEdit ? "แก้ AT ล่าสุด" : "จบ WS Level";
+    els.atModalSubtitle.textContent = subtitle;
+    fillAtFormFromSource({
+        source,
+        edit: isEdit
+    });
+
+    els.atEditLatest.classList.toggle(
+        "hidden",
+        isEdit || !atCompletion?.latestAttempt
+    );
+    els.atModal.classList.remove("hidden");
+    window.setTimeout(() => {
+        els.atScore.focus();
+        els.atScore.select();
+    }, 20);
+}
+
+function closeAtModal() {
+    els.atModal.classList.add("hidden");
+}
+
+function validateAtForm() {
+    const score = Number(els.atScore.value);
+    const maxScore = Number(els.atMaxScore.value);
+    const usedTime = Number(els.atTime.value);
+    const maxTime = Number(els.atMaxTime.value);
+    const atGroup = Number(els.atGroup.value);
+
+    if (!Number.isInteger(score) || score <= 0 || score > maxScore) {
+        throw new Error(`Score ต้องอยู่ระหว่าง 1-${maxScore}`);
+    }
+
+    if (!Number.isInteger(usedTime) || usedTime <= 0 || usedTime > maxTime) {
+        throw new Error(`Time ต้องอยู่ระหว่าง 1-${maxTime}`);
+    }
+
+    if (!Number.isInteger(atGroup) || atGroup < 1 || atGroup > 5) {
+        throw new Error("Group ต้องอยู่ระหว่าง 1-5");
+    }
+
+    return {
+        score,
+        usedTime,
+        atGroup
+    };
+}
+
+async function saveAtCompletion(event) {
+    event.preventDefault();
+
+    if (!state.context) {
+        return;
+    }
+
+    try {
+        const values = validateAtForm();
+
+        els.atSaveButton.disabled = true;
+        const result = await worksheetApi.saveAtCompletion({
+            enrollmentId: state.context.enrollment.enrollmentId,
+            atUsedId: state.atModal.editingAtUsedId,
+            atDate: els.atDate.value,
+            score: values.score,
+            usedTime: values.usedTime,
+            atGroup: values.atGroup,
+            isPass: state.atModal.isPass
+        });
+
+        closeAtModal();
+        await loadEnrollmentContext(result.enrollmentId);
+        setStatus(result.isPass ? "บันทึก AT ผ่าน และเลื่อน level แล้ว" : "บันทึก AT ไม่ผ่านแล้ว", "success");
+    } catch (error) {
+        setStatus(error.message, "error");
+    } finally {
+        els.atSaveButton.disabled = false;
+    }
+}
+
+async function completeZunLevel() {
+    if (!state.context || state.isCompletingZun || els.completeZunLevel.disabled) {
+        return;
+    }
+
+    state.isCompletingZun = true;
+    updateSecondaryActions();
+    setStatus("กำลังจบ Zun Level...");
+
+    try {
+        const result = await worksheetApi.completeZunLevel({
+            enrollmentId: state.context.enrollment.enrollmentId
+        });
+        const message = result.isFinal
+            ? "จบ Zun แล้ว และล้าง Zun level เป็นว่าง"
+            : `เปลี่ยน Zun เป็น ${result.nextZunLevelCode} แล้ว`;
+
+        await loadEnrollmentContext(result.enrollmentId);
+        setStatus(message, "success");
+    } catch (error) {
+        setStatus(error.message, "error");
+    } finally {
+        state.isCompletingZun = false;
+        updateSecondaryActions();
+    }
 }
 
 async function loadEnrollmentContext(enrollmentId) {
@@ -463,16 +1063,19 @@ async function loadEnrollmentContext(enrollmentId) {
 
         state.context = context;
         state.history = context.history || [];
+        state.worksheetMonthSummary = context.worksheetMonthSummary || null;
         state.patterns = context.patterns || state.patterns;
         state.patternCode = context.defaults.patternCode || "daily10";
         els.receiveDate.disabled = false;
         els.datePrev.disabled = false;
         els.dateNext.disabled = false;
         els.receiveDate.value = context.defaults.receiveDate;
+        els.studentSearch.value = `#${context.enrollment.enrollmentId} ${context.enrollment.studentName}`;
 
         populateStudentStrip(context);
         renderPatternButtons();
         renderWorksheetInputs();
+        await refreshWorksheetMonthSummary();
         renderHistoryTable({ scrollToTop: true });
         updateSecondaryActions();
         updateHistorySubtitle();
@@ -495,11 +1098,16 @@ async function refreshHistory() {
     try {
         const data = await worksheetApi.getHistory(
             state.context.enrollment.enrollmentId,
-            Number(els.historyLimit.value)
+            Number(els.historyLimit.value),
+            {
+                billingDate: els.receiveDate.value
+            }
         );
 
         state.history = data.history || [];
+        state.worksheetMonthSummary = data.worksheetMonthSummary || state.worksheetMonthSummary;
         renderHistoryTable({ scrollToTop: true });
+        renderWorksheetMonthSummary(state.worksheetMonthSummary);
         updateHistorySubtitle();
     } catch (error) {
         setStatus(error.message, "error");
@@ -516,8 +1124,7 @@ function stepWorksheet(kind, index, direction) {
     }
 
     input.value = moveWorksheetNo(input.value, optionsForKind(kind), direction);
-    input.focus();
-    input.select();
+    focusWorksheetControl(input);
     updatePreview();
 }
 
@@ -527,8 +1134,7 @@ function focusFirstMainInput() {
     );
 
     if (input) {
-        input.focus();
-        input.select();
+        focusWorksheetControl(input);
     }
 }
 
@@ -541,8 +1147,7 @@ function advanceWorksheet(kind, index) {
     const nextInput = inputs[currentIndex + 1];
 
     if (nextInput) {
-        nextInput.focus();
-        nextInput.select();
+        focusWorksheetControl(nextInput);
         return;
     }
 
@@ -556,12 +1161,13 @@ function shiftDate(days) {
 
     els.receiveDate.value = addDays(els.receiveDate.value, days);
     updatePreview();
+    refreshWorksheetMonthSummary();
 }
 
 function setSaving(isSaving) {
     state.isSaving = isSaving;
     els.saveButton.disabled = true;
-    els.saveButton.textContent = isSaving ? "Saving" : "Save";
+    els.saveButton.textContent = isSaving ? "⏳ Saving" : "💾 Save";
     updatePreview();
 }
 
@@ -592,6 +1198,7 @@ async function saveEntries() {
         state.context.history = state.history;
         state.context.completionState = result.completionState;
         els.receiveDate.value = result.nextReceiveDate;
+        await refreshWorksheetMonthSummary();
 
         renderHistoryTable({ scrollToTop: true });
         updateSecondaryActions();
@@ -601,6 +1208,66 @@ async function saveEntries() {
         setStatus(error.message, "error");
     } finally {
         setSaving(false);
+    }
+}
+
+async function deleteHistoryRecord(worksheetUsedId) {
+    if (!state.context || !worksheetUsedId) {
+        return;
+    }
+
+    const recordId = Number(worksheetUsedId);
+    const row = state.history.find((item) =>
+        Number(item.worksheetUsedId) === recordId
+    );
+
+    if (
+        !row ||
+        row.isStockProcessed !== false
+    ) {
+        return;
+    }
+
+    if (!window.confirm("ลบ record นี้ใช่ไหม?")) {
+        return;
+    }
+
+    try {
+        await worksheetApi.deleteEntry({
+            enrollmentId: state.context.enrollment.enrollmentId,
+            worksheetUsedId: recordId
+        });
+
+        state.history = state.history.filter((item) =>
+            Number(item.worksheetUsedId) !== recordId
+        );
+        state.context.history = state.history;
+        await refreshWorksheetMonthSummary();
+        renderHistoryTable();
+        updateHistorySubtitle();
+        setStatus("ลบ record แล้ว", "success");
+    } catch (error) {
+        setStatus(error.message, "error");
+    }
+}
+
+async function refreshWorksheetMonthSummary() {
+    if (!state.context || !els.receiveDate.value) {
+        return;
+    }
+
+    try {
+        const data = await worksheetApi.getWorksheetSummary(
+            state.context.enrollment.enrollmentId,
+            {
+                billingDate: els.receiveDate.value
+            }
+        );
+
+        state.worksheetMonthSummary = data.worksheetMonthSummary || null;
+        renderWorksheetMonthSummary(state.worksheetMonthSummary);
+    } catch (error) {
+        setStatus(error.message, "error");
     }
 }
 
@@ -690,23 +1357,80 @@ function bindEvents() {
         focusFirstMainInput();
     });
 
-    els.receiveDate.addEventListener("input", updatePreview);
+    els.receiveDate.addEventListener("input", () => {
+        updatePreview();
+        refreshWorksheetMonthSummary();
+    });
     els.datePrev.addEventListener("click", () => shiftDate(-1));
     els.dateNext.addEventListener("click", () => shiftDate(1));
     els.saveButton.addEventListener("click", saveEntries);
     els.historyLimit.addEventListener("change", refreshHistory);
+    els.historyTableWrap.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-delete-history-id]");
+
+        if (button) {
+            deleteHistoryRecord(button.dataset.deleteHistoryId);
+        }
+    });
 
     els.completeWsLevel.addEventListener("click", () => {
-        setStatus("จบ WS Level เตรียมไว้แล้ว");
+        openAtModal();
     });
     els.completeZunLevel.addEventListener("click", () => {
-        setStatus("จบ Zun Level เตรียมไว้แล้ว");
+        completeZunLevel();
     });
     els.receiveCd.addEventListener("click", () => {
-        setStatus("รับ CD เตรียมไว้แล้ว");
+        receiveCd();
     });
-    els.previewReceipt.addEventListener("click", () => {
-        setStatus("Preview Receipt เตรียมไว้แล้ว");
+    els.findIncompleteWs.addEventListener("click", () => {
+        openIncompleteWsModal();
+    });
+    els.incompleteWsClose.addEventListener("click", closeIncompleteWsModal);
+    els.incompleteWsModal.addEventListener("mousedown", (event) => {
+        if (event.target === els.incompleteWsModal) {
+            closeIncompleteWsModal();
+        }
+    });
+    els.incompleteWsTableWrap.addEventListener("click", (event) => {
+        const row = event.target.closest("[data-incomplete-enrollment-id]");
+
+        if (row) {
+            selectIncompleteWsEnrollment(row.dataset.incompleteEnrollmentId);
+        }
+    });
+    els.atForm.addEventListener("submit", saveAtCompletion);
+    els.atCancel.addEventListener("click", closeAtModal);
+    els.atModal.addEventListener("mousedown", (event) => {
+        if (event.target === els.atModal) {
+            closeAtModal();
+        }
+    });
+    els.atPassControl.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-at-pass]");
+
+        if (button) {
+            setAtPass(button.dataset.atPass === "true");
+        }
+    });
+    els.atEditLatest.addEventListener("click", () => {
+        const latestAttempt = state.context?.completionState?.atCompletion?.latestAttempt;
+
+        if (latestAttempt) {
+            els.atModalTitle.textContent = "แก้ AT ล่าสุด";
+            els.atModalSubtitle.textContent = `แก้ ${latestAttempt.levelCode} • ${formatDateDisplay(latestAttempt.atDate)}`;
+            fillAtFormFromSource({
+                source: latestAttempt,
+                edit: true
+            });
+            els.atEditLatest.classList.add("hidden");
+        }
+    });
+    [
+        els.atScore,
+        els.atTime,
+        els.atGroup
+    ].forEach((input) => {
+        input.addEventListener("input", updateAtSaveState);
     });
 
     bindWorksheetKeyboard(document, {
@@ -717,6 +1441,7 @@ function bindEvents() {
 }
 
 function init() {
+    bindFourDigitYearDateInputs(document);
     els.datePrev.disabled = true;
     els.dateNext.disabled = true;
     bindEvents();

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Login</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/login.css">
+</head>
+<body>
+  <main class="login-page">
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="login-title">KumonDB</div>
+        <div class="login-subtitle">เข้าสู่ระบบเพื่อใช้งาน</div>
+      </div>
+
+      <div class="login-tabs" id="loginTabs">
+        <button type="button" class="login-tab active" data-tab="admin">เข้าสู่ระบบ</button>
+        <button type="button" class="login-tab" data-tab="guest">Guest</button>
+      </div>
+
+      <div class="login-message hidden" id="loginMessage"></div>
+
+      <form id="adminForm" class="login-form">
+        <label>
+          <span>Username</span>
+          <input name="username" type="text" autocomplete="username" required autofocus>
+        </label>
+        <label>
+          <span>Password</span>
+          <input name="password" type="password" autocomplete="current-password" required>
+        </label>
+        <button type="submit" class="login-submit" id="adminSubmit">เข้าสู่ระบบ</button>
+      </form>
+
+      <form id="guestForm" class="login-form hidden">
+        <label>
+          <span>ชื่อผู้ใช้งาน</span>
+          <input name="displayName" type="text" placeholder="เช่น ชื่อพนักงาน" required>
+        </label>
+        <label>
+          <span>PIN</span>
+          <input name="pin" type="password" inputmode="numeric" autocomplete="off" required>
+        </label>
+        <button type="submit" class="login-submit" id="guestSubmit">เข้าสู่ระบบแบบ Guest</button>
+      </form>
+
+      <div class="login-note">Guest เข้าถึงได้เฉพาะงานประจำวัน (กรอก WS, สอบ AT, รับเงิน) ไม่สามารถแก้ไขข้อมูลหลักของนักเรียนได้</div>
+    </div>
+  </main>
+
+  <script src="/js/login.js"></script>
+</body>
+</html>

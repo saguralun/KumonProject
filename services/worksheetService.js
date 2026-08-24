@@ -2,7 +2,7 @@ import pool from "../config/db.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
-const DEFAULT_HISTORY_LIMIT = 20;
+const DEFAULT_HISTORY_LIMIT = 30;
 const MAX_HISTORY_LIMIT = 100;
 
 export const WORKSHEET_PATTERNS = [
@@ -143,7 +143,7 @@ function dateParts(dateText) {
 function formatStudentName(row) {
     const firstName = row.first_name || "";
     const lastName = row.last_name || "";
-    const nickname = row.nickname ? ` (${row.nickname})` : "";
+    const nickname = row.nickname ? ` (น้อง${row.nickname})` : "";
 
     return `${firstName} ${lastName}${nickname}`.trim();
 }
@@ -191,6 +191,7 @@ function mapEnrollment(row) {
         currentZunLevelCode: row.current_zun_level_code,
         startingWorksheetMasterId: row.starting_worksheet_master_id,
         startingWorksheetNo: row.starting_worksheet_no,
+        isKumonConnect: row.is_kumon_connect === true,
         statusCode: row.status_code,
         statusName: row.status_name
     };
@@ -213,6 +214,30 @@ function mapHistoryRow(row) {
         worksheetYear: row.worksheet_year,
         cpws: row.cpws,
         isStockProcessed: row.is_stock_processed,
+        createdAt: row.created_at
+    };
+}
+
+function mapAtAttempt(row) {
+    if (!row) {
+        return null;
+    }
+
+    return {
+        atUsedId: row.at_used_id,
+        enrollmentId: row.enrollment_id,
+        atMasterId: row.at_master_id,
+        levelMasterId: row.level_master_id,
+        levelCode: row.level_code,
+        nextLevelMasterId: row.next_level_master_id,
+        nextLevelCode: row.next_level_code,
+        atDate: normalizeDate(row.at_date),
+        score: row.score,
+        usedTime: row.used_time,
+        atGroup: row.at_group,
+        isPass: row.is_pass,
+        maxScore: row.max_score,
+        maxTime: row.max_time,
         createdAt: row.created_at
     };
 }
@@ -240,6 +265,7 @@ async function getEnrollmentRow(enrollmentId, { activeOnly = true } = {}) {
             current_level.level_code AS current_level_code,
             current_zun.level_code AS current_zun_level_code,
             start_ws.worksheet_no AS starting_worksheet_no,
+            COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE) AS is_kumon_connect,
             status.status_code,
             status.status_name
         FROM ${TABLE_SCHEMA}.enrollment e
@@ -320,6 +346,7 @@ export async function searchEnrollments({
             current_level.level_code AS current_level_code,
             current_zun.level_code AS current_zun_level_code,
             start_ws.worksheet_no AS starting_worksheet_no,
+            COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE) AS is_kumon_connect,
             status.status_code,
             status.status_name
         FROM ${TABLE_SCHEMA}.enrollment e
@@ -347,6 +374,85 @@ export async function searchEnrollments({
     return result.rows.map(mapEnrollment);
 }
 
+export async function getIncompleteWorksheetStudents() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const cutoffDate = `${year}-${String(month).padStart(2, "0")}-21`;
+    const result = await pool.query(`
+        WITH latest_ws AS (
+            SELECT DISTINCT ON (wu.enrollment_id)
+                wu.enrollment_id,
+                wu.worksheet_date,
+                wu.actual_worksheet_no,
+                wm.worksheet_no AS packet_worksheet_no,
+                level.level_code
+            FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm
+                ON wm.worksheet_master_id = wu.worksheet_master_id
+            JOIN ${TABLE_SCHEMA}.level_master level
+                ON level.level_master_id = wm.level_master_id
+            WHERE level.level_type = 1
+            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
+        )
+        SELECT
+            e.enrollment_id,
+            COUNT(*) OVER()::int AS total_rows,
+            e.student_id,
+            student.first_name,
+            student.last_name,
+            student.nickname,
+            subject.subject_code,
+            COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE) AS is_kumon_connect,
+            current_level.level_code AS current_level_code,
+            latest_ws.worksheet_date AS latest_worksheet_date,
+            latest_ws.level_code AS latest_level_code,
+            latest_ws.actual_worksheet_no AS latest_actual_worksheet_no,
+            latest_ws.packet_worksheet_no AS latest_packet_worksheet_no
+        FROM ${TABLE_SCHEMA}.enrollment e
+        JOIN ${TABLE_SCHEMA}.student student
+            ON student.student_id = e.student_id
+        JOIN ${TABLE_SCHEMA}.subject_master subject
+            ON subject.subject_id = e.subject_id
+        JOIN ${TABLE_SCHEMA}.level_master current_level
+            ON current_level.level_master_id = e.current_level_master_id
+        JOIN ${TABLE_SCHEMA}.status_master status
+            ON status.status_id = e.current_status_group1_id
+        LEFT JOIN latest_ws
+            ON latest_ws.enrollment_id = e.enrollment_id
+        WHERE status.status_code = ANY($1::text[])
+          AND (
+              latest_ws.worksheet_date IS NULL
+              OR latest_ws.worksheet_date < $2::date
+          )
+        ORDER BY
+            latest_ws.worksheet_date NULLS FIRST,
+            student.first_name,
+            student.last_name,
+            subject.subject_id
+        LIMIT 30
+    `, [ACTIVE_STATUS_CODES, cutoffDate]);
+
+    return {
+        cutoffDate,
+        totalRows: Number(result.rows[0]?.total_rows || 0),
+        returnedRows: result.rows.length,
+        rows: result.rows.map((row) => ({
+            enrollmentId: row.enrollment_id,
+            studentId: row.student_id,
+            studentName: formatStudentName(row),
+            subjectCode: row.subject_code,
+            currentLevelCode: row.current_level_code,
+            isKumonConnect: row.is_kumon_connect === true,
+            latestWorksheetDate: normalizeDate(row.latest_worksheet_date),
+            latestWorksheetLabel: row.latest_level_code && row.latest_actual_worksheet_no
+                ? `${row.latest_level_code}${row.latest_actual_worksheet_no}`
+                : "",
+            latestPacketWorksheetNo: row.latest_packet_worksheet_no || null
+        }))
+    };
+}
+
 export async function getActiveStudentEnrollments(studentId) {
     const result = await pool.query(`
         SELECT
@@ -364,6 +470,7 @@ export async function getActiveStudentEnrollments(studentId) {
             current_level.level_code AS current_level_code,
             current_zun.level_code AS current_zun_level_code,
             start_ws.worksheet_no AS starting_worksheet_no,
+            COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE) AS is_kumon_connect,
             status.status_code,
             status.status_name
         FROM ${TABLE_SCHEMA}.enrollment e
@@ -503,6 +610,60 @@ export async function getHistory(enrollmentId, limit = DEFAULT_HISTORY_LIMIT) {
     return result.rows.map(mapHistoryRow);
 }
 
+export async function getWorksheetMonthSummary({
+    enrollmentId,
+    billingDate,
+    billingMonth,
+    billingYear
+}) {
+    const normalizedEnrollmentId = Number(enrollmentId);
+
+    if (!Number.isInteger(normalizedEnrollmentId) || normalizedEnrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    const period = normalizeBillingPeriod({
+        billingDate: billingDate || normalizeDate(new Date()),
+        billingMonth,
+        billingYear
+    });
+    const result = await pool.query(`
+        SELECT
+            COUNT(*)::int AS total_records,
+            COUNT(DISTINCT worksheet_date)::int AS used_days,
+            COUNT(*) FILTER (WHERE cpws = TRUE)::int AS cpws_records
+        FROM ${TABLE_SCHEMA}.worksheet_used
+        WHERE enrollment_id = $1
+          AND EXTRACT(MONTH FROM (
+                CASE
+                    WHEN EXTRACT(DAY FROM worksheet_date) > 20
+                    THEN worksheet_date + INTERVAL '1 month'
+                    ELSE worksheet_date
+                END
+              ))::int = $2
+          AND EXTRACT(YEAR FROM (
+                CASE
+                    WHEN EXTRACT(DAY FROM worksheet_date) > 20
+                    THEN worksheet_date + INTERVAL '1 month'
+                    ELSE worksheet_date
+                END
+              ))::int = $3
+    `, [
+        normalizedEnrollmentId,
+        period.billingMonth,
+        period.billingYear
+    ]);
+    const row = result.rows[0] || {};
+
+    return {
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        totalRecords: Number(row.total_records || 0),
+        usedDays: Number(row.used_days || 0),
+        cpwsRecords: Number(row.cpws_records || 0)
+    };
+}
+
 async function getLevelCompletionState(enrollment) {
     const result = await pool.query(`
         SELECT
@@ -528,43 +689,216 @@ async function getLevelCompletionState(enrollment) {
                       AND wm.worksheet_no = 91
                       AND wu.cpws = TRUE
                 )
-            END AS can_complete_zun_level
+            END AS can_complete_zun_level,
+            at_master.at_master_id,
+            at_master.max_score,
+            at_master.max_time,
+            current_level.next_level_master_id,
+            next_level.level_code AS next_level_code
+        FROM ${TABLE_SCHEMA}.level_master current_level
+        LEFT JOIN ${TABLE_SCHEMA}.level_master next_level
+            ON next_level.level_master_id = current_level.next_level_master_id
+        LEFT JOIN ${TABLE_SCHEMA}.at_master at_master
+            ON at_master.subject_id = $4
+           AND at_master.level_master_id = current_level.level_master_id
+        WHERE current_level.level_master_id = $2
     `, [
         enrollment.enrollmentId,
         enrollment.currentLevelMasterId,
-        enrollment.currentZunLevelMasterId
+        enrollment.currentZunLevelMasterId,
+        enrollment.subjectId
     ]);
+    const row = result.rows[0] || {};
+    const atMasterId = row.at_master_id || null;
+    let attemptCount = 0;
+    let hasPassed = false;
+    let latestAttempt = null;
+    let zunCompletion = {
+        canComplete: Boolean(row.can_complete_zun_level),
+        currentZunLevelMasterId: enrollment.currentZunLevelMasterId,
+        currentZunLevelCode: enrollment.currentZunLevelCode,
+        nextZunLevelMasterId: null,
+        nextZunLevelCode: null,
+        isFinal: false
+    };
+
+    if (atMasterId) {
+        const attemptResult = await pool.query(`
+            SELECT
+                COUNT(*)::int AS attempt_count,
+                COALESCE(BOOL_OR(is_pass), FALSE) AS has_passed
+            FROM ${TABLE_SCHEMA}.at_used
+            WHERE enrollment_id = $1
+              AND at_master_id = $2
+        `, [enrollment.enrollmentId, atMasterId]);
+        const latestResult = await pool.query(`
+            SELECT
+                at_used.at_used_id,
+                at_used.enrollment_id,
+                at_used.at_master_id,
+                at_used.at_date,
+                at_used.score,
+                at_used.used_time,
+                at_used.at_group,
+                at_used.is_pass,
+                at_used.created_at,
+                at_master.level_master_id,
+                level.level_code,
+                level.next_level_master_id,
+                next_level.level_code AS next_level_code,
+                at_master.max_score,
+                at_master.max_time
+            FROM ${TABLE_SCHEMA}.at_used at_used
+            JOIN ${TABLE_SCHEMA}.at_master at_master
+                ON at_master.at_master_id = at_used.at_master_id
+            JOIN ${TABLE_SCHEMA}.level_master level
+                ON level.level_master_id = at_master.level_master_id
+            LEFT JOIN ${TABLE_SCHEMA}.level_master next_level
+                ON next_level.level_master_id = level.next_level_master_id
+            WHERE at_used.enrollment_id = $1
+              AND at_used.at_master_id = $2
+            ORDER BY at_used.created_at DESC, at_used.at_used_id DESC
+            LIMIT 1
+        `, [enrollment.enrollmentId, atMasterId]);
+
+        attemptCount = Number(attemptResult.rows[0]?.attempt_count || 0);
+        hasPassed = Boolean(attemptResult.rows[0]?.has_passed);
+        latestAttempt = mapAtAttempt(latestResult.rows[0]);
+    }
+
+    if (enrollment.currentZunLevelMasterId) {
+        const zunResult = await pool.query(`
+            SELECT
+                current_zun.next_level_master_id,
+                next_zun.level_code AS next_level_code
+            FROM ${TABLE_SCHEMA}.level_master current_zun
+            LEFT JOIN ${TABLE_SCHEMA}.level_master next_zun
+                ON next_zun.level_master_id = current_zun.next_level_master_id
+            WHERE current_zun.level_master_id = $1
+        `, [enrollment.currentZunLevelMasterId]);
+        const zunRow = zunResult.rows[0] || {};
+
+        zunCompletion = {
+            ...zunCompletion,
+            nextZunLevelMasterId: zunRow.next_level_master_id ?? null,
+            nextZunLevelCode: zunRow.next_level_code ?? null,
+            isFinal: !zunRow.next_level_master_id
+        };
+    }
+
+    const latestAnyAt = await getLatestAtAttempt(enrollment.enrollmentId);
+    const hasWorksheet191 = Boolean(row.can_complete_ws_level);
+    const canCompleteWsLevel = Boolean(
+        (hasWorksheet191 || enrollment.isKumonConnect)
+        && atMasterId
+        && !hasPassed
+    );
 
     return {
-        canCompleteWsLevel: Boolean(result.rows[0]?.can_complete_ws_level),
-        canCompleteZunLevel: Boolean(result.rows[0]?.can_complete_zun_level)
+        canCompleteWsLevel,
+        canCompleteZunLevel: Boolean(row.can_complete_zun_level),
+        atCompletion: {
+            canComplete: canCompleteWsLevel,
+            hasWorksheet191,
+            bypassWorksheet191: Boolean(enrollment.isKumonConnect && !hasWorksheet191),
+            hasAtMaster: Boolean(atMasterId),
+            hasPassed,
+            atMasterId,
+            maxScore: row.max_score ?? null,
+            maxTime: row.max_time ?? null,
+            nextLevelMasterId: row.next_level_master_id ?? null,
+            nextLevelCode: row.next_level_code ?? null,
+            attemptCount,
+            nextAttemptNo: attemptCount + 1,
+            latestAttempt
+        },
+        zunCompletion,
+        latestAtCompletion: latestAnyAt
     };
 }
 
-async function getCdState(enrollment) {
+async function getLatestAtAttempt(enrollmentId) {
     const result = await pool.query(`
         SELECT
-            EXISTS (
-                SELECT 1
-                FROM ${TABLE_SCHEMA}.cd_master
-                WHERE level_master_id = $1
-            ) AS has_cd_master,
-            EXISTS (
-                SELECT 1
-                FROM ${TABLE_SCHEMA}.cd_used cd
-                JOIN ${TABLE_SCHEMA}.cd_master master
-                    ON master.cd_master_id = cd.cd_master_id
-                WHERE cd.enrollment_id = $2
-                  AND master.level_master_id = $1
-            ) AS has_received_cd
+            at_used.at_used_id,
+            at_used.enrollment_id,
+            at_used.at_master_id,
+            at_used.at_date,
+            at_used.score,
+            at_used.used_time,
+            at_used.at_group,
+            at_used.is_pass,
+            at_used.created_at,
+            at_master.level_master_id,
+            level.level_code,
+            level.next_level_master_id,
+            next_level.level_code AS next_level_code,
+            at_master.max_score,
+            at_master.max_time
+        FROM ${TABLE_SCHEMA}.at_used at_used
+        JOIN ${TABLE_SCHEMA}.at_master at_master
+            ON at_master.at_master_id = at_used.at_master_id
+        JOIN ${TABLE_SCHEMA}.level_master level
+            ON level.level_master_id = at_master.level_master_id
+        LEFT JOIN ${TABLE_SCHEMA}.level_master next_level
+            ON next_level.level_master_id = level.next_level_master_id
+        WHERE at_used.enrollment_id = $1
+        ORDER BY at_used.created_at DESC, at_used.at_used_id DESC
+        LIMIT 1
+    `, [enrollmentId]);
+
+    return mapAtAttempt(result.rows[0]);
+}
+
+async function getCdState(enrollment) {
+    const mastersResult = await pool.query(`
+        SELECT
+            cd_master_id,
+            level_master_id,
+            cd_no
+        FROM ${TABLE_SCHEMA}.cd_master
+        WHERE level_master_id = $1
+        ORDER BY cd_no
+    `, [enrollment.currentLevelMasterId]);
+    const receivedResult = await pool.query(`
+        SELECT
+            cd.cd_used_id,
+            cd.cd_master_id,
+            cd.cd_date,
+            cd.cpcd,
+            cd.is_stock_processed,
+            master.cd_no
+        FROM ${TABLE_SCHEMA}.cd_used cd
+        JOIN ${TABLE_SCHEMA}.cd_master master
+            ON master.cd_master_id = cd.cd_master_id
+        WHERE cd.enrollment_id = $1
+          AND master.level_master_id = $2
+        ORDER BY master.cd_no, cd.cd_date DESC, cd.cd_used_id DESC
     `, [
-        enrollment.currentLevelMasterId,
-        enrollment.enrollmentId
+        enrollment.enrollmentId,
+        enrollment.currentLevelMasterId
     ]);
+    const receivedCdMasterIds = [
+        ...new Set(receivedResult.rows.map((row) => Number(row.cd_master_id)))
+    ];
 
     return {
-        hasCdMaster: Boolean(result.rows[0]?.has_cd_master),
-        hasReceivedCd: Boolean(result.rows[0]?.has_received_cd)
+        hasCdMaster: mastersResult.rows.length > 0,
+        hasReceivedCd: receivedCdMasterIds.length > 0,
+        availableCds: mastersResult.rows.map((row) => ({
+            cdMasterId: row.cd_master_id,
+            levelMasterId: row.level_master_id,
+            cdNo: row.cd_no
+        })),
+        receivedCdMasterIds,
+        receivedCds: receivedResult.rows.map((row) => ({
+            cdUsedId: row.cd_used_id,
+            cdMasterId: row.cd_master_id,
+            cdNo: row.cd_no,
+            cdDate: normalizeDate(row.cd_date),
+            cpcd: row.cpcd,
+            isStockProcessed: row.is_stock_processed
+        }))
     };
 }
 
@@ -581,6 +915,7 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
         mainWorksheetOptions,
         zunWorksheetOptions,
         history,
+        worksheetMonthSummary,
         defaultReceiveDate,
         completionState,
         cdState
@@ -589,6 +924,9 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
         getWorksheetOptions(enrollment.currentLevelMasterId),
         getWorksheetOptions(enrollment.currentZunLevelMasterId),
         getHistory(enrollment.enrollmentId, historyLimit),
+        getWorksheetMonthSummary({
+            enrollmentId: enrollment.enrollmentId
+        }),
         getDefaultReceiveDate(enrollment.enrollmentId),
         getLevelCompletionState(enrollment),
         getCdState(enrollment)
@@ -619,6 +957,7 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
             zun: zunWorksheetOptions
         },
         history,
+        worksheetMonthSummary,
         completionState,
         cdState
     };
@@ -862,6 +1201,13 @@ export async function saveWorksheetEntries(payload) {
         throw httpError(400, "ไม่มีรายการ worksheet ให้บันทึก");
     }
 
+    if (enrollment.isKumonConnect) {
+        records.forEach((record) => {
+            record.cpws = false;
+            record.isStockProcessed = false;
+        });
+    }
+
     const client = await pool.connect();
 
     try {
@@ -883,6 +1229,1130 @@ export async function saveWorksheetEntries(payload) {
             records: savedRecords,
             nextReceiveDate: addDays(latestSavedDate, 1),
             completionState
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+function normalizeSmallInt(value, label, { min = 0, max = 32767 } = {}) {
+    const numberValue = Number(value);
+
+    if (!Number.isInteger(numberValue) || numberValue < min || numberValue > max) {
+        throw httpError(400, `${label} ไม่ถูกต้อง`);
+    }
+
+    return numberValue;
+}
+
+function normalizeBoolean(value, label) {
+    if (typeof value === "boolean") {
+        return value;
+    }
+
+    if (value === "true" || value === "TRUE" || value === "1") {
+        return true;
+    }
+
+    if (value === "false" || value === "FALSE" || value === "0") {
+        return false;
+    }
+
+    throw httpError(400, `${label} ไม่ถูกต้อง`);
+}
+
+function money(value) {
+    return Number(Number(value || 0).toFixed(2));
+}
+
+function kumonMonthYearFromDate(dateText) {
+    const [year, month, day] = dateText.split("-").map(Number);
+    const nextMonth = day > 20 ? month + 1 : month;
+
+    if (nextMonth > 12) {
+        return {
+            billingMonth: 1,
+            billingYear: year + 1
+        };
+    }
+
+    return {
+        billingMonth: nextMonth,
+        billingYear: year
+    };
+}
+
+function normalizeBillingPeriod({
+    billingDate,
+    billingMonth,
+    billingYear
+}) {
+    const dateText = assertIsoDate(billingDate || normalizeDate(new Date()), "Billing date");
+    const parsedMonth = Number(billingMonth);
+    const parsedYear = Number(billingYear);
+
+    if (Number.isInteger(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12) {
+        if (!Number.isInteger(parsedYear) || parsedYear < 2000 || parsedYear > 2600) {
+            throw httpError(400, "ปีค่าเรียนไม่ถูกต้อง");
+        }
+
+        return {
+            billingDate: dateText,
+            billingMonth: parsedMonth,
+            billingYear: parsedYear
+        };
+    }
+
+    return {
+        billingDate: dateText,
+        ...kumonMonthYearFromDate(dateText)
+    };
+}
+
+function formatBillingPeriod({
+    billingMonth,
+    billingYear
+}) {
+    return `${billingMonth}/${billingYear}`;
+}
+
+async function insertPaymentEnrollmentStatusHistory(client, receipt) {
+    let inserted = 0;
+
+    for (const detail of receipt.details) {
+        const statusCode = String(detail.statusGroup1Code || "").toUpperCase();
+
+        if (!detail.statusGroup1Id || ["C", "CP"].includes(statusCode)) {
+            continue;
+        }
+
+        const result = await client.query(`
+            INSERT INTO ${TABLE_SCHEMA}.enrollment_status (
+                enrollment_id,
+                status_id,
+                status_month,
+                status_year
+            )
+            SELECT $1, $2, $3, $4
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM ${TABLE_SCHEMA}.enrollment_status existing
+                WHERE existing.enrollment_id = $1
+                  AND existing.status_id = $2
+                  AND existing.status_month = $3
+                  AND existing.status_year = $4
+            )
+            RETURNING enrollment_status_id
+        `, [
+            detail.enrollmentId,
+            detail.statusGroup1Id,
+            receipt.billingMonth,
+            receipt.billingYear
+        ]);
+
+        if (result.rows[0]) {
+            inserted += 1;
+        }
+    }
+
+    return inserted;
+}
+
+async function normalizeEnrollmentStatusesAfterPayment(client, receipt) {
+    const enrollmentIds = [
+        ...new Set(receipt.details.map((detail) => Number(detail.enrollmentId)).filter(Number.isInteger))
+    ];
+
+    if (!enrollmentIds.length) {
+        return 0;
+    }
+
+    const continueResult = await client.query(`
+        SELECT status_id
+        FROM ${TABLE_SCHEMA}.status_master
+        WHERE status_code = 'C'
+          AND status_group = 1
+        LIMIT 1
+    `);
+    const continueStatusId = continueResult.rows[0]?.status_id;
+
+    if (!continueStatusId) {
+        throw httpError(500, "ไม่พบ status C");
+    }
+
+    const result = await client.query(`
+        UPDATE ${TABLE_SCHEMA}.enrollment
+        SET current_status_group1_id = $2,
+            current_status_group2_id = CASE
+                WHEN current_status_group2_id IN (
+                    SELECT status_id
+                    FROM ${TABLE_SCHEMA}.status_master
+                    WHERE status_code = 'F'
+                      AND status_group = 2
+                )
+                THEN current_status_group2_id
+                ELSE NULL
+            END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE enrollment_id = ANY($1::int[])
+    `, [
+        enrollmentIds,
+        continueStatusId
+    ]);
+
+    return result.rowCount;
+}
+
+function calculateReceiptDetailFee({
+    center,
+    enrollment
+}) {
+    const fullTuition = money(center.full_tuition);
+    const fullAdditionalFee = enrollment.additionFee
+        ? money(center.addition_full_tuition)
+        : 0;
+    const statusGroup2Code = enrollment.statusGroup2Code || null;
+    const isFree = ["F", "FS", "FSH"].includes(statusGroup2Code);
+    const isHalfMonth = ["H", "FSH"].includes(statusGroup2Code);
+
+    if (isFree) {
+        return {
+            tuitionFee: 0,
+            registrationFee: 0,
+            additionalFee: 0,
+            discountAmount: 0,
+            netAmount: 0
+        };
+    }
+
+    const tuitionFee = isHalfMonth
+        ? money(fullTuition / 2)
+        : fullTuition;
+    const additionalFee = isHalfMonth
+        ? money(fullAdditionalFee / 2)
+        : fullAdditionalFee;
+    const netAmount = money(tuitionFee + additionalFee);
+
+    return {
+        tuitionFee,
+        registrationFee: 0,
+        additionalFee,
+        discountAmount: 0,
+        netAmount
+    };
+}
+
+async function getNextReceiptNo({
+    billingMonth,
+    billingYear,
+    client = pool
+}) {
+    const periodResult = await client.query(`
+        SELECT receipt_book
+        FROM ${TABLE_SCHEMA}.billing
+        WHERE billing_month = $1
+          AND billing_year = $2
+        ORDER BY receipt_book DESC
+        LIMIT 1
+    `, [billingMonth, billingYear]);
+
+    if (periodResult.rows[0]) {
+        const receiptBook = Number(periodResult.rows[0].receipt_book);
+        const receiptNoResult = await client.query(`
+            SELECT COALESCE(MAX(receipt_no), 0)::int + 1 AS next_receipt_no
+            FROM ${TABLE_SCHEMA}.billing
+            WHERE receipt_book = $1
+              AND billing_month = $2
+              AND billing_year = $3
+        `, [receiptBook, billingMonth, billingYear]);
+
+        return {
+            receiptBook,
+            receiptNo: Number(receiptNoResult.rows[0]?.next_receipt_no || 1)
+        };
+    }
+
+    const nextBookResult = await client.query(`
+        SELECT COALESCE(MAX(receipt_book), 0)::int + 1 AS next_receipt_book
+        FROM ${TABLE_SCHEMA}.billing
+    `);
+
+    return {
+        receiptBook: Number(nextBookResult.rows[0]?.next_receipt_book || 1),
+        receiptNo: 1
+    };
+}
+
+async function buildReceiptPreview({
+    enrollmentId,
+    billingDate,
+    billingMonth,
+    billingYear,
+    paymentMethodId,
+    existingBillingId = null,
+    client = pool
+}) {
+    const normalizedEnrollmentId = Number(enrollmentId);
+
+    if (!Number.isInteger(normalizedEnrollmentId) || normalizedEnrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    const period = normalizeBillingPeriod({
+        billingDate,
+        billingMonth,
+        billingYear
+    });
+    const currentEnrollment = await getEnrollmentRow(normalizedEnrollmentId);
+
+    if (!currentEnrollment) {
+        throw httpError(404, "ไม่พบ enrollment ที่ยังใช้งานอยู่");
+    }
+
+    const centerResult = await client.query(`
+        SELECT *
+        FROM ${TABLE_SCHEMA}.center_master
+        ORDER BY center_id
+        LIMIT 1
+    `);
+    const center = centerResult.rows[0];
+
+    if (!center) {
+        throw httpError(500, "ไม่พบ center master");
+    }
+
+    const normalizedPaymentMethodId = paymentMethodId ? Number(paymentMethodId) : null;
+    const paymentResult = await client.query(`
+        SELECT payment_method_id, payment_method_code, payment_method_name
+        FROM ${TABLE_SCHEMA}.payment_method_master
+        WHERE ($1::smallint IS NULL AND payment_method_code = 'CA')
+           OR payment_method_id = $1::smallint
+        LIMIT 1
+    `, [Number.isInteger(normalizedPaymentMethodId) ? normalizedPaymentMethodId : null]);
+    const paymentMethod = paymentResult.rows[0];
+
+    if (!paymentMethod) {
+        throw httpError(400, "Payment method ไม่ถูกต้อง");
+    }
+
+    const existingBillingResult = await client.query(`
+        SELECT
+            billing.billing_id,
+            billing.receipt_book,
+            billing.receipt_no,
+            billing.billing_date,
+            billing.payment_method_id,
+            billing.total_amount,
+            billing.discount_amount,
+            billing.net_amount,
+            billing.billing_month,
+            billing.billing_year,
+            payment.payment_method_code,
+            payment.payment_method_name
+        FROM ${TABLE_SCHEMA}.billing
+        JOIN ${TABLE_SCHEMA}.payment_method_master payment
+            ON payment.payment_method_id = billing.payment_method_id
+        WHERE student_id = $1
+          AND billing_month = $2
+          AND billing_year = $3
+        ORDER BY billing_date DESC, billing_id DESC
+        LIMIT 1
+    `, [
+        currentEnrollment.student_id,
+        period.billingMonth,
+        period.billingYear
+    ]);
+    const existingBilling = existingBillingResult.rows[0] || null;
+    const useExistingBilling = existingBilling && (
+        existingBillingId === true
+        || Number(existingBillingId) === Number(existingBilling.billing_id)
+    );
+    const shouldShowExistingReceiptNumber = Boolean(existingBilling);
+    const existingDetailsByEnrollmentId = new Map();
+
+    if (shouldShowExistingReceiptNumber) {
+        const existingDetailsResult = await client.query(`
+            SELECT
+                enrollment_id,
+                tuition_fee,
+                registration_fee,
+                additional_fee,
+                discount_amount,
+                net_amount
+            FROM ${TABLE_SCHEMA}.billing_detail
+            WHERE billing_id = $1
+        `, [existingBilling.billing_id]);
+
+        existingDetailsResult.rows.forEach((row) => {
+            existingDetailsByEnrollmentId.set(Number(row.enrollment_id), row);
+        });
+    }
+    const receiptNo = shouldShowExistingReceiptNumber
+        ? {
+            receiptBook: existingBilling.receipt_book,
+            receiptNo: existingBilling.receipt_no
+        }
+        : await getNextReceiptNo({
+            billingMonth: period.billingMonth,
+            billingYear: period.billingYear,
+            client
+        });
+    const enrollmentsResult = await client.query(`
+        SELECT
+            e.enrollment_id,
+            e.student_id,
+            e.current_level_master_id,
+            e.current_zun_level_master_id,
+            e.current_status_group1_id,
+            e.current_status_group2_id,
+            student.first_name,
+            student.last_name,
+            student.nickname,
+            student.school_grade_id,
+            grade.addition_fee,
+            subject.subject_code,
+            subject.subject_name,
+            current_level.level_code AS current_level_code,
+            current_zun.level_code AS current_zun_level_code,
+            status1.status_code AS status_group1_code,
+            status1.status_name AS status_group1_name,
+            status2.status_code AS status_group2_code,
+            status2.status_name AS status_group2_name
+        FROM ${TABLE_SCHEMA}.enrollment e
+        JOIN ${TABLE_SCHEMA}.student student
+            ON student.student_id = e.student_id
+        LEFT JOIN ${TABLE_SCHEMA}.school_grade_master grade
+            ON grade.school_grade_id = student.school_grade_id
+        JOIN ${TABLE_SCHEMA}.subject_master subject
+            ON subject.subject_id = e.subject_id
+        JOIN ${TABLE_SCHEMA}.level_master current_level
+            ON current_level.level_master_id = e.current_level_master_id
+        LEFT JOIN ${TABLE_SCHEMA}.level_master current_zun
+            ON current_zun.level_master_id = e.current_zun_level_master_id
+        JOIN ${TABLE_SCHEMA}.status_master status1
+            ON status1.status_id = e.current_status_group1_id
+        LEFT JOIN ${TABLE_SCHEMA}.status_master status2
+            ON status2.status_id = e.current_status_group2_id
+        WHERE e.student_id = $1
+          AND status1.status_code = ANY($2::text[])
+        ORDER BY subject.subject_id, e.enrollment_id
+    `, [
+        currentEnrollment.student_id,
+        ACTIVE_STATUS_CODES
+    ]);
+    const detailRows = enrollmentsResult.rows.map((row) => {
+        const fee = calculateReceiptDetailFee({
+            center,
+            enrollment: {
+                additionFee: row.addition_fee,
+                statusGroup2Code: row.status_group2_code
+            }
+        });
+
+        const existingDetail = existingDetailsByEnrollmentId.get(Number(row.enrollment_id));
+
+        return {
+            enrollmentId: row.enrollment_id,
+            subjectCode: row.subject_code,
+            subjectName: row.subject_name,
+            currentLevelMasterId: row.current_level_master_id,
+            currentLevelCode: row.current_level_code,
+            currentZunLevelMasterId: row.current_zun_level_master_id,
+            currentZunLevelCode: row.current_zun_level_code,
+            statusGroup1Id: row.current_status_group1_id,
+            statusGroup1Code: row.status_group1_code,
+            statusGroup1Name: row.status_group1_name,
+            statusGroup2Id: row.current_status_group2_id,
+            statusGroup2Code: row.status_group2_code,
+            statusGroup2Name: row.status_group2_name,
+            ...(existingDetail ? {
+                tuitionFee: money(existingDetail.tuition_fee),
+                registrationFee: money(existingDetail.registration_fee),
+                additionalFee: money(existingDetail.additional_fee),
+                discountAmount: money(existingDetail.discount_amount),
+                netAmount: money(existingDetail.net_amount)
+            } : fee)
+        };
+    });
+
+    if (!detailRows.length) {
+        throw httpError(400, "ไม่มี enrollment ที่รับเงินได้");
+    }
+
+    const computedDiscountAmount = money(detailRows.reduce((sum, row) => sum + row.discountAmount, 0));
+    const computedNetAmount = money(detailRows.reduce((sum, row) => sum + row.netAmount, 0));
+    const computedTotalAmount = money(computedNetAmount + computedDiscountAmount);
+    const discountAmount = useExistingBilling
+        ? money(existingBilling.discount_amount)
+        : computedDiscountAmount;
+    const netAmount = useExistingBilling
+        ? money(existingBilling.net_amount)
+        : computedNetAmount;
+    const totalAmount = useExistingBilling
+        ? money(existingBilling.total_amount)
+        : computedTotalAmount;
+
+    return {
+        billingId: useExistingBilling ? existingBilling.billing_id : null,
+        alreadyPaid: Boolean(existingBilling),
+        existingBillingId: existingBilling?.billing_id || null,
+        receiptBook: receiptNo.receiptBook,
+        receiptNo: receiptNo.receiptNo,
+        studentId: currentEnrollment.student_id,
+        sourceEnrollmentId: normalizedEnrollmentId,
+        studentName: formatStudentName(currentEnrollment),
+        billingDate: useExistingBilling
+            ? normalizeDate(existingBilling.billing_date)
+            : period.billingDate,
+        paymentMethodId: useExistingBilling ? existingBilling.payment_method_id : paymentMethod.payment_method_id,
+        paymentMethodCode: useExistingBilling ? existingBilling.payment_method_code : paymentMethod.payment_method_code,
+        paymentMethodName: useExistingBilling ? existingBilling.payment_method_name : paymentMethod.payment_method_name,
+        totalAmount,
+        discountAmount,
+        netAmount,
+        billingMonth: period.billingMonth,
+        billingYear: period.billingYear,
+        center: {
+            centerId: center.center_id,
+            centerName: center.center_name,
+            instructor: center.instructor
+        },
+        details: detailRows
+    };
+}
+
+export async function previewReceipt(payload) {
+    const receipt = await buildReceiptPreview({
+        enrollmentId: payload?.enrollmentId,
+        billingDate: payload?.billingDate,
+        billingMonth: payload?.billingMonth,
+        billingYear: payload?.billingYear,
+        paymentMethodId: payload?.paymentMethodId,
+        existingBillingId: payload?.existingBillingId
+    });
+    const paymentMethodsResult = await pool.query(`
+        SELECT payment_method_id, payment_method_code, payment_method_name
+        FROM ${TABLE_SCHEMA}.payment_method_master
+        ORDER BY payment_method_id
+    `);
+
+    return {
+        success: true,
+        receipt,
+        paymentMethods: paymentMethodsResult.rows.map((row) => ({
+            paymentMethodId: row.payment_method_id,
+            paymentMethodCode: row.payment_method_code,
+            paymentMethodName: row.payment_method_name
+        }))
+    };
+}
+
+export async function receiveReceiptPayment(payload) {
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const receipt = await buildReceiptPreview({
+            enrollmentId: payload?.enrollmentId,
+            billingDate: payload?.billingDate,
+            billingMonth: payload?.billingMonth,
+            billingYear: payload?.billingYear,
+            paymentMethodId: payload?.paymentMethodId,
+            client
+        });
+
+        if (receipt.alreadyPaid) {
+            throw httpError(
+                409,
+                `น้องคนนี้จ่ายเงินค่าเรียนเดือน ${formatBillingPeriod(receipt)} แล้ว`
+            );
+        }
+        const insertBilling = await client.query(`
+            INSERT INTO ${TABLE_SCHEMA}.billing (
+                receipt_book,
+                receipt_no,
+                student_id,
+                billing_date,
+                payment_method_id,
+                total_amount,
+                discount_amount,
+                net_amount,
+                billing_month,
+                billing_year
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING billing_id
+        `, [
+            receipt.receiptBook,
+            receipt.receiptNo,
+            receipt.studentId,
+            receipt.billingDate,
+            receipt.paymentMethodId,
+            receipt.totalAmount,
+            receipt.discountAmount,
+            receipt.netAmount,
+            receipt.billingMonth,
+            receipt.billingYear
+        ]);
+        const billingId = insertBilling.rows[0].billing_id;
+
+        for (const detail of receipt.details) {
+            await client.query(`
+                INSERT INTO ${TABLE_SCHEMA}.billing_detail (
+                    billing_id,
+                    enrollment_id,
+                    current_level_master_id,
+                    current_zun_level_master_id,
+                    status_group1_id,
+                    status_group2_id,
+                    tuition_fee,
+                    registration_fee,
+                    additional_fee,
+                    discount_amount,
+                    net_amount
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            `, [
+                billingId,
+                detail.enrollmentId,
+                detail.currentLevelMasterId,
+                detail.currentZunLevelMasterId,
+                detail.statusGroup1Id,
+                detail.statusGroup2Id,
+                detail.tuitionFee,
+                detail.registrationFee,
+                detail.additionalFee,
+                detail.discountAmount,
+                detail.netAmount
+            ]);
+        }
+        const enrollmentStatusHistoryInserted = await insertPaymentEnrollmentStatusHistory(client, receipt);
+        const enrollmentStatusesUpdated = await normalizeEnrollmentStatusesAfterPayment(client, receipt);
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            billingId,
+            enrollmentStatusHistoryInserted,
+            enrollmentStatusesUpdated,
+            receipt: {
+                ...receipt,
+                billingId
+            }
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function receiveCd(payload) {
+    const enrollmentId = Number(payload?.enrollmentId);
+    const cdMasterId = Number(payload?.cdMasterId);
+    const cpcd = payload?.cpcd === false ? false : true;
+
+    if (!Number.isInteger(enrollmentId) || enrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    if (!Number.isInteger(cdMasterId) || cdMasterId < 1) {
+        throw httpError(400, "CD ไม่ถูกต้อง");
+    }
+
+    const cdDate = assertIsoDate(payload?.cdDate || normalizeDate(new Date()), "CD date");
+    const { month, year } = dateParts(cdDate);
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const masterResult = await client.query(`
+            SELECT
+                e.enrollment_id,
+                e.current_level_master_id,
+                cd_master.cd_master_id,
+                cd_master.cd_no
+            FROM ${TABLE_SCHEMA}.enrollment e
+            JOIN ${TABLE_SCHEMA}.status_master status
+                ON status.status_id = e.current_status_group1_id
+            JOIN ${TABLE_SCHEMA}.cd_master cd_master
+                ON cd_master.level_master_id = e.current_level_master_id
+               AND cd_master.cd_master_id = $2
+            WHERE e.enrollment_id = $1
+              AND status.status_code = ANY($3::text[])
+            FOR UPDATE OF e
+        `, [
+            enrollmentId,
+            cdMasterId,
+            ACTIVE_STATUS_CODES
+        ]);
+        const master = masterResult.rows[0];
+
+        if (!master) {
+            throw httpError(400, "CD นี้ไม่ตรงกับ level ปัจจุบัน");
+        }
+
+        const existingResult = await client.query(`
+            SELECT cd_used_id, cpcd
+            FROM ${TABLE_SCHEMA}.cd_used
+            WHERE enrollment_id = $1
+              AND cd_master_id = $2
+            ORDER BY cd_used_id DESC
+            LIMIT 1
+        `, [enrollmentId, cdMasterId]);
+
+        if (existingResult.rows[0]) {
+            await client.query("COMMIT");
+
+            return {
+                success: true,
+                inserted: false,
+                cdUsedId: existingResult.rows[0].cd_used_id,
+                cdMasterId,
+                cdNo: master.cd_no,
+                cpcd: existingResult.rows[0].cpcd
+            };
+        }
+
+        const insertResult = await client.query(`
+            INSERT INTO ${TABLE_SCHEMA}.cd_used (
+                enrollment_id,
+                cd_master_id,
+                cd_date,
+                cd_month,
+                cd_year,
+                cpcd,
+                is_stock_processed
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, FALSE)
+            RETURNING cd_used_id
+        `, [
+            enrollmentId,
+            cdMasterId,
+            cdDate,
+            month,
+            year,
+            cpcd
+        ]);
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            inserted: true,
+            cdUsedId: insertResult.rows[0].cd_used_id,
+            cdMasterId,
+            cdNo: master.cd_no,
+            cpcd
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+async function getCurrentAtMaster(client, enrollmentId) {
+    const result = await client.query(`
+        SELECT
+            e.enrollment_id,
+            e.current_level_master_id,
+            at_master.at_master_id,
+            at_master.max_score,
+            at_master.max_time,
+            level.level_code,
+            level.next_level_master_id,
+            next_level.level_code AS next_level_code
+        FROM ${TABLE_SCHEMA}.enrollment e
+        JOIN ${TABLE_SCHEMA}.level_master level
+            ON level.level_master_id = e.current_level_master_id
+        LEFT JOIN ${TABLE_SCHEMA}.level_master next_level
+            ON next_level.level_master_id = level.next_level_master_id
+        JOIN ${TABLE_SCHEMA}.at_master at_master
+            ON at_master.subject_id = e.subject_id
+           AND at_master.level_master_id = e.current_level_master_id
+        WHERE e.enrollment_id = $1
+        FOR UPDATE OF e
+    `, [enrollmentId]);
+
+    return result.rows[0] || null;
+}
+
+async function getEditableAtAttempt(client, {
+    enrollmentId,
+    atUsedId
+}) {
+    const result = await client.query(`
+        SELECT
+            at_used.at_used_id,
+            at_used.enrollment_id,
+            at_used.at_master_id,
+            at_used.at_date,
+            at_used.score,
+            at_used.used_time,
+            at_used.at_group,
+            at_used.is_pass,
+            at_master.level_master_id,
+            at_master.max_score,
+            at_master.max_time,
+            level.level_code,
+            level.next_level_master_id,
+            next_level.level_code AS next_level_code,
+            enrollment.current_level_master_id
+        FROM ${TABLE_SCHEMA}.at_used at_used
+        JOIN ${TABLE_SCHEMA}.at_master at_master
+            ON at_master.at_master_id = at_used.at_master_id
+        JOIN ${TABLE_SCHEMA}.level_master level
+            ON level.level_master_id = at_master.level_master_id
+        LEFT JOIN ${TABLE_SCHEMA}.level_master next_level
+            ON next_level.level_master_id = level.next_level_master_id
+        JOIN ${TABLE_SCHEMA}.enrollment enrollment
+            ON enrollment.enrollment_id = at_used.enrollment_id
+        WHERE at_used.at_used_id = $1
+          AND at_used.enrollment_id = $2
+        FOR UPDATE OF at_used, enrollment
+    `, [atUsedId, enrollmentId]);
+
+    return result.rows[0] || null;
+}
+
+function validateAtValues({
+    score,
+    usedTime,
+    atGroup,
+    maxScore,
+    maxTime
+}) {
+    if (score <= 0) {
+        throw httpError(400, "Score ต้องมากกว่า 0");
+    }
+
+    if (score > Number(maxScore)) {
+        throw httpError(400, `Score ต้องไม่เกิน ${maxScore}`);
+    }
+
+    if (usedTime <= 0) {
+        throw httpError(400, "Time ต้องมากกว่า 0");
+    }
+
+    if (usedTime > Number(maxTime)) {
+        throw httpError(400, `Time ต้องไม่เกิน ${maxTime}`);
+    }
+
+    if (atGroup < 1 || atGroup > 5) {
+        throw httpError(400, "Group ต้องอยู่ระหว่าง 1-5");
+    }
+}
+
+export async function saveAtCompletion(payload) {
+    const enrollmentId = Number(payload?.enrollmentId);
+    const atUsedId = payload?.atUsedId ? Number(payload.atUsedId) : null;
+
+    if (!Number.isInteger(enrollmentId) || enrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    if (atUsedId !== null && (!Number.isInteger(atUsedId) || atUsedId < 1)) {
+        throw httpError(400, "AT record ไม่ถูกต้อง");
+    }
+
+    const atDate = assertIsoDate(payload.atDate, "Date AT");
+    const score = normalizeSmallInt(payload.score, "Score", { min: 0 });
+    const usedTime = normalizeSmallInt(payload.usedTime, "Time", { min: 0 });
+    const atGroup = normalizeSmallInt(payload.atGroup, "Group", { min: 1, max: 5 });
+    const isPass = normalizeBoolean(payload.isPass, "Pass");
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        let savedAtUsedId = atUsedId;
+        let levelMasterId = null;
+        let nextLevelMasterId = null;
+
+        if (atUsedId) {
+            const attempt = await getEditableAtAttempt(client, {
+                enrollmentId,
+                atUsedId
+            });
+
+            if (!attempt) {
+                throw httpError(404, "ไม่พบ AT record ของ enrollment นี้");
+            }
+
+            validateAtValues({
+                score,
+                usedTime,
+                atGroup,
+                maxScore: attempt.max_score,
+                maxTime: attempt.max_time
+            });
+
+            await client.query(`
+                UPDATE ${TABLE_SCHEMA}.at_used
+                SET
+                    at_date = $1,
+                    score = $2,
+                    used_time = $3,
+                    at_group = $4,
+                    is_pass = $5
+                WHERE at_used_id = $6
+                  AND enrollment_id = $7
+            `, [
+                atDate,
+                score,
+                usedTime,
+                atGroup,
+                isPass,
+                atUsedId,
+                enrollmentId
+            ]);
+
+            levelMasterId = Number(attempt.level_master_id);
+            nextLevelMasterId = attempt.next_level_master_id
+                ? Number(attempt.next_level_master_id)
+                : null;
+
+            if (isPass && nextLevelMasterId) {
+                await client.query(`
+                    UPDATE ${TABLE_SCHEMA}.enrollment
+                    SET
+                        current_level_master_id = $1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE enrollment_id = $2
+                      AND current_level_master_id = $3
+                `, [nextLevelMasterId, enrollmentId, levelMasterId]);
+            }
+
+            if (!isPass && nextLevelMasterId && attempt.is_pass) {
+                await client.query(`
+                    UPDATE ${TABLE_SCHEMA}.enrollment
+                    SET
+                        current_level_master_id = $1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE enrollment_id = $2
+                      AND current_level_master_id = $3
+                `, [levelMasterId, enrollmentId, nextLevelMasterId]);
+            }
+        } else {
+            const atMaster = await getCurrentAtMaster(client, enrollmentId);
+
+            if (!atMaster) {
+                throw httpError(400, "Level ปัจจุบันไม่มี AT master");
+            }
+
+            validateAtValues({
+                score,
+                usedTime,
+                atGroup,
+                maxScore: atMaster.max_score,
+                maxTime: atMaster.max_time
+            });
+
+            const insertResult = await client.query(`
+                INSERT INTO ${TABLE_SCHEMA}.at_used (
+                    enrollment_id,
+                    at_master_id,
+                    at_date,
+                    score,
+                    used_time,
+                    at_group,
+                    is_pass
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
+                RETURNING at_used_id
+            `, [
+                enrollmentId,
+                atMaster.at_master_id,
+                atDate,
+                score,
+                usedTime,
+                atGroup,
+                isPass
+            ]);
+
+            savedAtUsedId = insertResult.rows[0].at_used_id;
+            levelMasterId = Number(atMaster.current_level_master_id);
+            nextLevelMasterId = atMaster.next_level_master_id
+                ? Number(atMaster.next_level_master_id)
+                : null;
+
+            if (isPass) {
+                if (!nextLevelMasterId) {
+                    throw httpError(400, "Level นี้ไม่มี next level ให้เลื่อน");
+                }
+
+                await client.query(`
+                    UPDATE ${TABLE_SCHEMA}.enrollment
+                    SET
+                        current_level_master_id = $1,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE enrollment_id = $2
+                      AND current_level_master_id = $3
+                `, [nextLevelMasterId, enrollmentId, levelMasterId]);
+            }
+        }
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            atUsedId: savedAtUsedId,
+            enrollmentId,
+            levelMasterId,
+            nextLevelMasterId,
+            isPass
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function completeZunLevel(payload) {
+    const enrollmentId = Number(payload?.enrollmentId);
+
+    if (!Number.isInteger(enrollmentId) || enrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const result = await client.query(`
+            SELECT
+                e.enrollment_id,
+                e.current_zun_level_master_id,
+                current_zun.level_code AS current_zun_level_code,
+                current_zun.next_level_master_id,
+                next_zun.level_code AS next_zun_level_code,
+                EXISTS (
+                    SELECT 1
+                    FROM ${TABLE_SCHEMA}.worksheet_used wu
+                    JOIN ${TABLE_SCHEMA}.worksheet_master wm
+                        ON wm.worksheet_master_id = wu.worksheet_master_id
+                    WHERE wu.enrollment_id = e.enrollment_id
+                      AND wm.level_master_id = e.current_zun_level_master_id
+                      AND wm.worksheet_no = 91
+                      AND wu.cpws = TRUE
+                ) AS can_complete_zun_level
+            FROM ${TABLE_SCHEMA}.enrollment e
+            JOIN ${TABLE_SCHEMA}.status_master status
+                ON status.status_id = e.current_status_group1_id
+            LEFT JOIN ${TABLE_SCHEMA}.level_master current_zun
+                ON current_zun.level_master_id = e.current_zun_level_master_id
+            LEFT JOIN ${TABLE_SCHEMA}.level_master next_zun
+                ON next_zun.level_master_id = current_zun.next_level_master_id
+            WHERE e.enrollment_id = $1
+              AND status.status_code = ANY($2::text[])
+            FOR UPDATE OF e
+        `, [enrollmentId, ACTIVE_STATUS_CODES]);
+        const row = result.rows[0];
+
+        if (!row) {
+            throw httpError(404, "ไม่พบ enrollment ที่ยังใช้งานอยู่");
+        }
+
+        if (!row.current_zun_level_master_id) {
+            throw httpError(400, "Enrollment นี้ไม่มี Zun level ให้จบ");
+        }
+
+        if (!row.can_complete_zun_level) {
+            throw httpError(400, "ยังจบ Zun Level ไม่ได้ ต้องมีชุด 91 ก่อน");
+        }
+
+        const nextZunLevelMasterId = row.next_level_master_id || null;
+
+        await client.query(`
+            UPDATE ${TABLE_SCHEMA}.enrollment
+            SET
+                current_zun_level_master_id = $1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE enrollment_id = $2
+        `, [nextZunLevelMasterId, enrollmentId]);
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            enrollmentId,
+            previousZunLevelMasterId: row.current_zun_level_master_id,
+            previousZunLevelCode: row.current_zun_level_code,
+            nextZunLevelMasterId,
+            nextZunLevelCode: row.next_zun_level_code || null,
+            isFinal: !nextZunLevelMasterId
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function deleteWorksheetEntry({
+    enrollmentId,
+    worksheetUsedId
+}) {
+    const normalizedEnrollmentId = Number(enrollmentId);
+    const normalizedWorksheetUsedId = Number(worksheetUsedId);
+
+    if (!Number.isInteger(normalizedEnrollmentId) || normalizedEnrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    if (!Number.isInteger(normalizedWorksheetUsedId) || normalizedWorksheetUsedId < 1) {
+        throw httpError(400, "Worksheet record ไม่ถูกต้อง");
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const result = await client.query(`
+            SELECT
+                worksheet_used_id,
+                enrollment_id,
+                is_stock_processed
+            FROM ${TABLE_SCHEMA}.worksheet_used
+            WHERE worksheet_used_id = $1
+            FOR UPDATE
+        `, [normalizedWorksheetUsedId]);
+        const row = result.rows[0];
+
+        if (!row || Number(row.enrollment_id) !== normalizedEnrollmentId) {
+            throw httpError(404, "ไม่พบ worksheet record ของ enrollment นี้");
+        }
+
+        if (row.is_stock_processed) {
+            throw httpError(409, "ลบไม่ได้ เพราะ record นี้ตัด stock แล้ว");
+        }
+
+        await client.query(`
+            DELETE FROM ${TABLE_SCHEMA}.worksheet_used
+            WHERE worksheet_used_id = $1
+              AND enrollment_id = $2
+              AND is_stock_processed = FALSE
+        `, [normalizedWorksheetUsedId, normalizedEnrollmentId]);
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            worksheetUsedId: normalizedWorksheetUsedId
         };
     } catch (error) {
         await client.query("ROLLBACK");

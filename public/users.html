@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Users</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/users.css">
+</head>
+<body>
+  <main class="users-page">
+    <aside class="users-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link" href="/">Tables</a>
+        <a class="home-link" href="/worksheet.html">WS Input</a>
+        <a class="home-link" href="/student-manager.html">Students</a>
+        <a class="home-link" href="/payment.html">Payment</a>
+        <a class="home-link active" href="/users.html">Users</a>
+      </nav>
+
+      <div class="side-header">
+        <h1>Users</h1>
+        <div class="subtle">จัดการบัญชี Admin / Staff</div>
+      </div>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="users-workspace">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Account Management</div>
+          <div class="subtle">Guest ไม่มีบัญชีในนี้ — ใช้ชื่อ + PIN ร่วม (ตั้งค่าใน .env)</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="panel create-panel">
+        <div class="panel-header">
+          <div class="panel-title">สร้าง / รีเซ็ตรหัสผ่าน</div>
+        </div>
+        <form id="createForm" class="create-form">
+          <label>
+            <span>Username</span>
+            <input name="username" type="text" autocomplete="off" required>
+          </label>
+          <label>
+            <span>Password</span>
+            <input name="password" type="text" autocomplete="off" minlength="6" required>
+          </label>
+          <label>
+            <span>ชื่อที่แสดง</span>
+            <input name="displayName" type="text" autocomplete="off">
+          </label>
+          <label>
+            <span>Role</span>
+            <select name="role">
+              <option value="admin">Admin</option>
+              <option value="staff">Staff</option>
+            </select>
+          </label>
+          <button type="submit" class="primary-button" id="createSubmit">💾 บันทึก</button>
+        </form>
+        <div class="form-hint">ใช้ username เดิมเพื่อรีเซ็ตรหัสผ่าน/เปลี่ยนชื่อ/role ของบัญชีนั้นได้เลย</div>
+        <div class="form-message hidden" id="createMessage"></div>
+      </section>
+
+      <section class="panel list-panel">
+        <div class="panel-header">
+          <div class="panel-title">บัญชีทั้งหมด</div>
+          <div class="subtle" id="listSubtitle">กำลังโหลด...</div>
+        </div>
+        <div class="users-table-wrap" id="usersTableWrap">
+          <div class="empty-state">กำลังโหลด...</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/js/authClient.js"></script>
+  <script src="/js/users.js"></script>
+</body>
+</html>

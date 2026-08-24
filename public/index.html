@@ -6,34 +6,84 @@
 
   <title>KumonDB Table Explorer</title>
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+
   <style>
     :root {
-      --bg: #f6f8fb;
+      --bg: #eef1f8;
       --surface: #ffffff;
-      --surface-soft: #f9fafb;
-      --text: #111827;
-      --muted: #667085;
-      --line: #e5e7eb;
-      --blue: #2563eb;
-      --blue-soft: #eff6ff;
-      --red: #dc2626;
+      --surface-soft: #f6f8fc;
+      --text: #141b26;
+      --muted: #5f6d84;
+      --line: #dde3ee;
+      --rail: #0e1e33;
+      --blue: #2f5fe6;
+      --blue-soft: #e9f0ff;
+      --red: #dc3545;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.07);
+      --ease: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+      --font-sans: "Inter", "Sarabun", "Segoe UI", Arial, sans-serif;
     }
 
     * {
       box-sizing: border-box;
     }
 
+    html {
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: #b7c3d9 transparent;
+    }
+
+    ::-webkit-scrollbar {
+      width: 9px;
+      height: 9px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #b7c3d9;
+      border-radius: 999px;
+    }
+
     body {
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
       margin: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: Arial, "Segoe UI", sans-serif;
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
     }
 
-    .page {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 24px;
+    .table-page {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .table-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      overflow: hidden;
+      padding: 10px;
+      background: var(--rail);
+      color: #e5eef7;
     }
 
     .topbar {
@@ -41,7 +91,7 @@
       justify-content: space-between;
       gap: 16px;
       align-items: flex-start;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
 
     h1 {
@@ -50,27 +100,131 @@
       line-height: 1.2;
     }
 
-    .subtitle {
+    .subtitle,
+    .table-sidebar .subtle {
       margin-top: 5px;
       color: var(--muted);
       font-size: 13px;
     }
 
-    .layout {
+    .table-sidebar .subtle {
+      color: #a9b8cc;
+    }
+
+    .side-nav {
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr);
-      gap: 18px;
-      align-items: start;
+      gap: 9px;
+      margin-bottom: 10px;
+    }
+
+    .home-link {
+      display: block;
+      min-height: 34px;
+      border: 1px solid rgba(226, 232, 240, 0.14);
+      border-radius: 7px;
+      padding: 8px 10px;
+      color: #dbeafe;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 800;
+      transition: background-color var(--ease), border-color var(--ease), color var(--ease);
+    }
+
+    .home-link:hover,
+    .home-link.active {
+      border-color: #dbeafe;
+      background: #eaf2ff;
+      color: var(--blue);
+    }
+
+    .side-header {
+      margin: 8px 0 2px;
+    }
+
+    .side-header h1 {
+      margin: 0;
+      color: #ffffff;
+      font-size: 24px;
+      line-height: 1.15;
+    }
+
+    .tables-panel {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: auto;
+    }
+
+    .auth-bar {
+      display: grid;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .auth-user {
+      display: flex;
+      gap: 7px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .auth-role {
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .auth-role-admin {
+      background: var(--blue-soft);
+      color: #1d4ed8;
+    }
+
+    .auth-role-guest {
+      background: #fff6db;
+      color: #8a5c08;
+    }
+
+    .auth-name {
+      overflow: hidden;
+      color: #dbe4f3;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .auth-logout {
+      min-height: 30px;
+      border-color: rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.06);
+      color: #dbe4f3;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .auth-logout:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.12);
+      color: #ffffff;
+    }
+
+    .table-workspace {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      padding: 18px;
     }
 
     .panel {
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 10px;
-    }
-
-    .sidebar {
-      padding: 16px;
     }
 
     .section + .section {
@@ -81,9 +235,9 @@
 
     .section-title {
       margin-bottom: 10px;
-      color: var(--muted);
+      color: #a9b8cc;
       font-size: 12px;
-      font-weight: 700;
+      font-weight: 800;
       text-transform: uppercase;
     }
 
@@ -103,6 +257,18 @@
       background: var(--surface);
       color: var(--text);
       cursor: pointer;
+      transition: background-color var(--ease), border-color var(--ease), box-shadow var(--ease), transform var(--ease);
+    }
+
+    button:hover:not(:disabled) {
+      border-color: #c1cce0;
+      box-shadow: var(--shadow-sm);
+      transform: translateY(-1px);
+    }
+
+    button:active:not(:disabled) {
+      box-shadow: none;
+      transform: translateY(0);
     }
 
     button:disabled {
@@ -112,24 +278,37 @@
 
     .table-button {
       width: 100%;
-      padding: 9px 10px;
+      min-height: 34px;
+      padding: 8px 10px;
       text-align: left;
+      overflow: hidden;
+      border-color: rgba(226, 232, 240, 0.14);
+      background: transparent;
+      color: #dbeafe;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
+      text-overflow: ellipsis;
     }
 
     .table-button.active {
-      border-color: #bfdbfe;
-      background: var(--blue-soft);
+      border-color: #dbeafe;
+      background: #eaf2ff;
       color: var(--blue);
+      box-shadow: var(--shadow-sm);
     }
 
     .content {
+      display: flex;
+      flex: 1 1 auto;
+      flex-direction: column;
+      min-height: 0;
       min-width: 0;
+      overflow: hidden;
       padding: 16px;
     }
 
     .result-header {
+      flex: 0 0 auto;
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
@@ -139,7 +318,7 @@
 
     .table-title {
       font-size: 20px;
-      font-weight: 750;
+      font-weight: 600;
     }
 
     .showing {
@@ -193,6 +372,7 @@
       border-color: var(--blue);
       background: var(--blue);
       color: #ffffff;
+      box-shadow: 0 6px 14px rgba(47, 95, 230, 0.28);
     }
 
     .ellipsis {
@@ -201,8 +381,10 @@
     }
 
     .table-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
       width: 100%;
-      overflow-x: auto;
+      overflow: auto;
       border: 1px solid var(--line);
       border-radius: 10px;
     }
@@ -228,7 +410,11 @@
       position: sticky;
       top: 0;
       background: var(--surface-soft);
-      font-weight: 750;
+      font-weight: 600;
+    }
+
+    tbody tr {
+      transition: background-color var(--ease);
     }
 
     tbody tr:hover {
@@ -248,12 +434,12 @@
     }
 
     @media (max-width: 900px) {
-      .page {
-        padding: 16px;
+      .table-page {
+        grid-template-columns: 1fr;
       }
 
-      .layout {
-        grid-template-columns: 1fr;
+      .table-sidebar {
+        min-height: auto;
       }
 
       .result-header {
@@ -269,23 +455,39 @@
 </head>
 
 <body>
-  <main class="page">
-    <header class="topbar">
-      <div>
-        <h1>KumonDB Table Explorer</h1>
-        <div class="subtitle">Browse master and transaction data</div>
+  <main class="table-page">
+    <aside class="table-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link active" href="/">Tables</a>
+        <a class="home-link" href="/worksheet.html">WS Input</a>
+        <a class="home-link" href="/student-manager.html">Students</a>
+        <a class="home-link" href="/payment.html">Payment</a>
+        <a class="home-link" href="/users.html">Users</a>
+      </nav>
+
+      <div class="side-header">
+        <h1>Tables</h1>
+        <div class="subtle">Master / transaction data</div>
       </div>
-    </header>
 
-    <div class="layout">
-      <aside class="panel sidebar" id="tablesPanel">
+      <div class="tables-panel" id="tablesPanel">
         <div class="loading">กำลังโหลดตาราง...</div>
-      </aside>
+      </div>
 
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="table-workspace">
+      <header class="topbar">
+        <div>
+          <h1>KumonDB Table Explorer</h1>
+          <div class="subtitle">Browse master and transaction data</div>
+        </div>
+      </header>
       <section class="panel content" id="result">
         <div class="empty">เลือกตารางเพื่อดูข้อมูล</div>
       </section>
-    </div>
+    </section>
   </main>
 
   <script>
@@ -659,5 +861,6 @@
 
     loadTables();
   </script>
+  <script src="/js/authClient.js"></script>
 </body>
 </html>

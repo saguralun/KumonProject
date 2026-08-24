@@ -42,14 +42,48 @@ export const worksheetApi = {
         );
     },
 
-    async getHistory(enrollmentId, limit = 20) {
+    async getHistory(enrollmentId, limit = 30, {
+        billingDate
+    } = {}) {
         const params = new URLSearchParams({
             limit: String(limit)
         });
 
+        if (billingDate) {
+            params.set("billingDate", billingDate);
+        }
+
         return requestJson(
             `/api/worksheet/enrollments/${encodeURIComponent(enrollmentId)}/history?${params.toString()}`
         );
+    },
+
+    async getWorksheetSummary(enrollmentId, {
+        billingDate,
+        billingMonth,
+        billingYear
+    } = {}) {
+        const params = new URLSearchParams();
+
+        if (billingDate) {
+            params.set("billingDate", billingDate);
+        }
+
+        if (billingMonth) {
+            params.set("billingMonth", String(billingMonth));
+        }
+
+        if (billingYear) {
+            params.set("billingYear", String(billingYear));
+        }
+
+        return requestJson(
+            `/api/worksheet/enrollments/${encodeURIComponent(enrollmentId)}/worksheet-summary?${params.toString()}`
+        );
+    },
+
+    async getIncompleteWorksheets() {
+        return requestJson("/api/worksheet/incomplete-ws");
     },
 
     async saveEntries(payload) {
@@ -57,5 +91,39 @@ export const worksheetApi = {
             method: "POST",
             body: JSON.stringify(payload)
         });
+    },
+
+    async saveAtCompletion(payload) {
+        return requestJson("/api/worksheet/at-completion", {
+            method: "POST",
+            body: JSON.stringify(payload)
+        });
+    },
+
+    async completeZunLevel(payload) {
+        return requestJson("/api/worksheet/zun-completion", {
+            method: "POST",
+            body: JSON.stringify(payload)
+        });
+    },
+
+    async receiveCd(payload) {
+        return requestJson("/api/worksheet/cd/receive", {
+            method: "POST",
+            body: JSON.stringify(payload)
+        });
+    },
+
+    async deleteEntry({
+        enrollmentId,
+        worksheetUsedId
+    }) {
+        return requestJson(
+            `/api/worksheet/entries/${encodeURIComponent(worksheetUsedId)}`,
+            {
+                method: "DELETE",
+                body: JSON.stringify({ enrollmentId })
+            }
+        );
     }
 };

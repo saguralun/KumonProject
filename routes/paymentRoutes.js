@@ -1,0 +1,37 @@
+import express from "express";
+import { getPaymentStatus } from "../services/paymentService.js";
+
+const router = express.Router();
+
+function sendError(res, error) {
+    const statusCode = error.statusCode || 500;
+
+    if (statusCode >= 500) {
+        console.error(error);
+    }
+
+    res.status(statusCode).json({
+        success: false,
+        error: error.message || "Unexpected payment error"
+    });
+}
+
+router.get("/status", async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            ...(await getPaymentStatus({
+                billingMonth: req.query.billingMonth,
+                billingYear: req.query.billingYear,
+                subject: req.query.subject,
+                status: req.query.status,
+                query: req.query.query,
+                limit: req.query.limit
+            }))
+        });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+export default router;

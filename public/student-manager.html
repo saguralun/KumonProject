@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Student Manager</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/student-manager.css">
+</head>
+<body>
+  <main class="student-page">
+    <aside class="student-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link" href="/" data-admin-only>Tables</a>
+        <a class="home-link" href="/worksheet.html">WS Input</a>
+        <a class="home-link active" href="/student-manager.html">Students</a>
+        <a class="home-link" href="/payment.html" data-staff-up>Payment</a>
+        <a class="home-link" href="/users.html" data-admin-only>Users</a>
+      </nav>
+
+      <div class="side-header">
+        <div>
+          <h1>Student Manager</h1>
+          <div class="subtle">เพิ่ม / แก้ไขเด็กและวิชา</div>
+        </div>
+        <button type="button" class="primary-button compact" id="newStudentButton" data-staff-up>+ Student</button>
+      </div>
+
+      <div class="search-box">
+        <input id="studentSearch" type="text" autocomplete="off" placeholder="ค้นหา ID / ชื่อ / ชื่อเล่น / เบอร์">
+        <select id="statusFilter" aria-label="Status filter">
+          <option value="active">Active</option>
+          <option value="kc">KC</option>
+          <option value="new">New</option>
+          <option value="absent">Absent/OT</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+
+      <div class="student-list" id="studentList">
+        <div class="empty-state">กำลังโหลดรายชื่อ...</div>
+      </div>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="student-workspace">
+      <header class="topbar">
+        <div>
+          <div class="page-title" id="pageTitle">เลือกนักเรียน</div>
+          <div class="subtle" id="pageSubtitle">หรือกด + Student เพื่อเพิ่มเด็กใหม่</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="form-grid">
+        <form class="panel student-panel" id="studentForm">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">ข้อมูลนักเรียน</div>
+              <div class="subtle" id="studentFormSubtitle">Student Profile</div>
+            </div>
+            <div class="panel-actions">
+              <button type="button" class="danger-button hidden" id="deleteStudentButton" data-staff-up>🗑️ Delete</button>
+              <button type="submit" class="primary-button" id="saveStudentButton" data-staff-up>💾 Save Student</button>
+            </div>
+          </div>
+
+          <div class="fields-grid student-fields">
+            <label class="student-prefix-field">
+              <span>คำนำหน้า</span>
+              <select name="prefixId" required></select>
+            </label>
+            <label class="student-first-name-field">
+              <span>ชื่อ</span>
+              <input name="firstName" type="text" required>
+            </label>
+            <label class="student-last-name-field">
+              <span>นามสกุล</span>
+              <input name="lastName" type="text" required>
+            </label>
+            <label class="student-gender-field">
+              <span>เพศ</span>
+              <select name="genderId"></select>
+            </label>
+            <label class="student-nickname-field">
+              <span>ชื่อเล่น</span>
+              <input name="nickname" type="text">
+            </label>
+            <label class="student-birth-field">
+              <span>วันเกิด</span>
+              <input name="birthDate" type="date">
+            </label>
+            <label class="student-phone-field">
+              <span>เบอร์โทร</span>
+              <input name="mobile" type="text" inputmode="numeric" maxlength="12" placeholder="000-000-0000">
+            </label>
+            <label class="student-class-field">
+              <span>ชั้น</span>
+              <select name="schoolGradeId"></select>
+            </label>
+            <label class="student-school-field">
+              <span>โรงเรียน</span>
+              <input name="schoolName" type="text" list="schoolNameHints">
+            </label>
+            <label class="student-email-field">
+              <span>Email</span>
+              <input name="email" type="email">
+            </label>
+          </div>
+
+          <details class="address-details">
+            <summary>ที่อยู่ / หมายเหตุ</summary>
+            <div class="fields-grid address-grid">
+              <label><span>เลขที่</span><input name="addressNumber" type="text"></label>
+              <label><span>หมู่บ้าน</span><input name="addressVillage" type="text"></label>
+              <label><span>ซอย</span><input name="addressAlley" type="text"></label>
+              <label><span>ถนน</span><input name="addressRoad" type="text"></label>
+              <label><span>ตำบล</span><input name="addressSubdistrict" type="text"></label>
+              <label><span>อำเภอ</span><input name="addressDistrict" type="text"></label>
+              <label><span>จังหวัด</span><input name="addressProvince" type="text"></label>
+              <label><span>รหัสไปรษณีย์</span><input name="addressZipcode" type="text" inputmode="numeric" maxlength="5"></label>
+              <label class="wide-field"><span>หมายเหตุ</span><input name="remark" type="text"></label>
+            </div>
+          </details>
+        </form>
+
+        <section class="panel enrollment-panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Enrollment / วิชา</div>
+              <div class="subtle" id="enrollmentSubtitle">เลือกเด็กก่อน</div>
+            </div>
+            <button type="button" class="secondary-button" id="newEnrollmentButton" disabled data-staff-up>+ Subject</button>
+          </div>
+
+          <div class="enrollment-tabs" id="enrollmentTabs"></div>
+
+          <form class="enrollment-form hidden" id="enrollmentForm">
+            <div class="fields-grid enrollment-fields">
+              <label>
+                <span>Enrollment ID</span>
+                <input name="enrollmentId" type="text" readonly placeholder="DB default">
+              </label>
+              <label>
+                <span>Subject</span>
+                <select name="subjectId" required></select>
+              </label>
+              <label>
+                <span>Kumon ID</span>
+                <input name="kumonStudentId" type="text">
+              </label>
+              <label class="checkbox-field">
+                <span>KC</span>
+                <input name="isKumonConnect" type="checkbox" value="true">
+              </label>
+              <label>
+                <span>Start Date</span>
+                <input name="enStartDate" type="date" required>
+              </label>
+              <label>
+                <span>Current Level</span>
+                <select name="currentLevelMasterId" required></select>
+              </label>
+              <label>
+                <span>Zun Level</span>
+                <select name="currentZunLevelMasterId"></select>
+              </label>
+              <label>
+                <span>Start Worksheet</span>
+                <select name="startingWorksheetMasterId" required></select>
+              </label>
+              <label>
+                <span>Status</span>
+                <select name="currentStatusGroup1Id" required></select>
+              </label>
+              <label>
+                <span>Special Status</span>
+                <select name="currentStatusGroup2Id"></select>
+              </label>
+              <label>
+                <span>Schedule 1</span>
+                <select name="openingScheduleId1"></select>
+              </label>
+              <label>
+                <span>Schedule 2</span>
+                <select name="openingScheduleId2"></select>
+              </label>
+              <label class="wide-field">
+                <span>Remark</span>
+                <textarea name="remark" rows="2"></textarea>
+              </label>
+            </div>
+            <div class="form-actions">
+              <div class="enrollment-action-bar hidden" id="enrollmentActionBar" data-staff-up>
+                <button type="button" class="danger-button compact" id="enrollmentAbsentButton">Absent</button>
+                <button type="button" class="danger-button compact" id="enrollmentOtButton">OT</button>
+                <button type="button" class="secondary-button compact" id="enrollmentResumeButton">Resume</button>
+                <button type="button" class="secondary-button compact hidden" id="enrollmentCompleterButton">Complete</button>
+                <button type="button" class="danger-button compact hidden" id="deleteEnrollmentButton">Delete</button>
+              </div>
+              <button type="submit" class="primary-button" id="saveEnrollmentButton" data-staff-up>💾 Save Enrollment</button>
+            </div>
+          </form>
+
+          <div class="empty-state" id="enrollmentEmpty">ยังไม่มี enrollment ที่เลือก</div>
+        </section>
+      </section>
+
+      <section class="panel history-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">History</div>
+            <div class="subtle" id="historySubtitle">โหลดเฉพาะ tab ที่เลือก</div>
+          </div>
+          <button type="button" class="secondary-button compact" id="wsGraphButton" disabled>📈 WS Graph</button>
+          <div class="history-tabs" id="historyTabs">
+            <button type="button" class="history-tab active" data-history="ws">WS</button>
+            <button type="button" class="history-tab" data-history="cd">CD</button>
+            <button type="button" class="history-tab" data-history="at">AT</button>
+            <button type="button" class="history-tab" data-history="dt">DT</button>
+            <button type="button" class="history-tab" data-history="billing">Billing</button>
+            <button type="button" class="history-tab" data-history="status">Status</button>
+          </div>
+        </div>
+        <div class="history-table-wrap" id="historyTableWrap">
+          <div class="empty-state">เลือกเด็กเพื่อดูประวัติ</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div class="modal-backdrop hidden" id="addStudentModal" role="dialog" aria-modal="true" aria-labelledby="addStudentTitle">
+    <div class="student-modal-dialog">
+      <form id="addStudentForm" class="student-modal-form">
+        <div class="modal-header">
+          <div>
+            <div class="panel-title" id="addStudentTitle">Add Student</div>
+            <div class="subtle">เพิ่มข้อมูลเด็กใหม่ก่อนเพิ่มวิชา</div>
+          </div>
+          <button type="button" class="modal-close" id="addStudentCancel" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-message hidden" id="addStudentMessage"></div>
+
+        <div class="add-section">
+          <div class="section-label">ข้อมูลนักเรียน</div>
+          <div class="fields-grid add-student-profile-grid">
+            <label class="add-prefix-field">
+              <span>คำนำหน้า</span>
+              <select name="prefixId" required></select>
+            </label>
+            <label class="add-first-name-field">
+              <span>ชื่อ</span>
+              <input name="firstName" type="text" required>
+            </label>
+            <label class="add-last-name-field">
+              <span>นามสกุล</span>
+              <input name="lastName" type="text" required>
+            </label>
+            <label class="add-gender-field">
+              <span>เพศ</span>
+              <select name="genderId"></select>
+            </label>
+            <label class="add-nickname-field">
+              <span>ชื่อเล่น</span>
+              <input name="nickname" type="text">
+            </label>
+            <label class="add-birth-field">
+              <span>วันเกิด</span>
+              <input name="birthDate" type="date">
+            </label>
+            <label class="add-phone-field">
+              <span>เบอร์โทร</span>
+              <input name="mobile" type="text" inputmode="numeric" maxlength="12" placeholder="000-000-0000">
+            </label>
+            <label class="add-class-field">
+              <span>ชั้น</span>
+              <select name="schoolGradeId"></select>
+            </label>
+            <label class="add-school-field">
+              <span>โรงเรียน</span>
+              <input name="schoolName" type="text" list="schoolNameHints">
+            </label>
+            <label class="add-email-field">
+              <span>Email</span>
+              <input name="email" type="email">
+            </label>
+          </div>
+        </div>
+
+        <div class="add-section">
+          <div class="section-label">ที่อยู่ / หมายเหตุ</div>
+            <div class="fields-grid add-student-address-grid">
+            <label><span>รหัสไปรษณีย์</span><input name="addressZipcode" type="text" inputmode="numeric" maxlength="5" list="zipcodeHints"></label>
+            <label><span>จังหวัด</span><select name="addressProvince"></select></label>
+            <label><span>อำเภอ</span><select name="addressDistrict"></select></label>
+            <label><span>ตำบล</span><select name="addressSubdistrict"></select></label>
+            <label><span>เลขที่</span><input name="addressNumber" type="text"></label>
+            <label><span>หมู่บ้าน</span><input name="addressVillage" type="text"></label>
+            <label><span>ซอย</span><input name="addressAlley" type="text"></label>
+            <label><span>ถนน</span><input name="addressRoad" type="text" list="roadHints"></label>
+            <label class="wide-field"><span>หมายเหตุ</span><input name="remark" type="text"></label>
+          </div>
+          <div class="copy-address-tool">
+            <div class="copy-address-summary" id="copyAddressSummary">ฟังก์ชันเสริม: ค้นหานักเรียนเดิมเพื่อคัดลอกที่อยู่</div>
+            <label>
+              <span>คัดลอกที่อยู่จาก</span>
+              <input id="copyAddressSearch" type="text" placeholder="ค้นหาชื่อ / นามสกุล / ชื่อเล่น">
+            </label>
+            <button type="button" class="secondary-button" id="copyAddressSearchButton">🔎 ค้นหา</button>
+            <label>
+              <span>เลือกนักเรียน</span>
+              <select id="copyAddressStudentSelect" disabled>
+                <option value="">-</option>
+              </select>
+            </label>
+            <button type="button" class="secondary-button" id="copyAddressApplyButton" disabled>📋 คัดลอกที่อยู่</button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" id="addStudentClose">Cancel</button>
+          <button type="submit" class="primary-button" id="addStudentSave">💾 Add Student</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <datalist id="schoolNameHints"></datalist>
+  <datalist id="roadHints"></datalist>
+  <datalist id="subdistrictHints"></datalist>
+  <datalist id="districtHints"></datalist>
+  <datalist id="provinceHints"></datalist>
+  <datalist id="zipcodeHints"></datalist>
+
+  <div class="modal-backdrop hidden" id="addEnrollmentModal" role="dialog" aria-modal="true" aria-labelledby="addEnrollmentTitle">
+    <div class="add-enrollment-dialog">
+      <form id="addEnrollmentForm" class="add-enrollment-form">
+        <div class="modal-header">
+          <div>
+            <div class="panel-title" id="addEnrollmentTitle">Add Subject / Enrollment</div>
+            <div class="subtle" id="addEnrollmentSubtitle">เลือกวิชาที่เด็กยังไม่ได้เรียน</div>
+          </div>
+          <button type="button" class="modal-close" id="addEnrollmentCancel" aria-label="Close">✕</button>
+        </div>
+        <div class="modal-message hidden" id="addEnrollmentMessage"></div>
+
+        <div class="add-section">
+          <div class="section-label">Student</div>
+          <div class="fields-grid add-student-grid">
+            <label>
+              <span>Student ID</span>
+              <input name="studentId" type="text" readonly>
+            </label>
+            <label>
+              <span>Student Name</span>
+              <input name="studentName" type="text" readonly>
+            </label>
+          </div>
+        </div>
+
+        <div class="add-section">
+          <div class="section-label">วิชา การทดสอบและผล</div>
+          <div class="fields-grid add-fields add-academic-grid">
+            <label>
+              <span>Subject</span>
+              <select name="subjectId" required></select>
+            </label>
+            <label>
+              <span>DT Test</span>
+              <select name="dtMasterId"></select>
+            </label>
+            <label>
+              <span>Date DT</span>
+              <input name="dtDate" type="date">
+            </label>
+            <label>
+              <span>Score</span>
+              <input name="score" type="number" min="0" step="1">
+            </label>
+            <label>
+              <span>Max Score</span>
+              <input name="maxScore" type="number" readonly disabled>
+            </label>
+            <label>
+              <span>Time</span>
+              <input name="usedTime" type="number" min="1" step="1">
+            </label>
+            <label>
+              <span>Max Time</span>
+              <input name="maxTime" type="number" readonly disabled>
+            </label>
+            <label>
+              <span>Start Worksheet</span>
+              <select name="startingWorksheetMasterId" required></select>
+              <input name="currentLevelMasterId" type="hidden">
+            </label>
+            <label>
+              <span>Zun Level</span>
+              <select name="currentZunLevelMasterId"></select>
+            </label>
+          </div>
+          <div class="dt-help" id="addEnrollmentDtHelp">เลือก DT test เพื่อดู Max Score / Max Time</div>
+        </div>
+
+        <div class="add-section">
+          <div class="section-label">วันที่สมัครและเวลาเรียน</div>
+          <div class="fields-grid add-fields add-schedule-grid">
+            <label class="start-date-kc-field">
+              <span>Starting Date</span>
+              <div class="start-date-kc-control">
+                <input name="enStartDate" type="date" required>
+                <span class="inline-checkbox">
+                  <input name="isKumonConnect" type="checkbox" value="true">
+                  <span>KC</span>
+                </span>
+              </div>
+            </label>
+            <label>
+              <span>Status</span>
+              <select name="currentStatusGroup1Id" required></select>
+            </label>
+            <label>
+              <span>Special Status</span>
+              <select name="currentStatusGroup2Id"></select>
+            </label>
+            <label>
+              <span>Date Open 1</span>
+              <select name="openingDay1"></select>
+            </label>
+            <label>
+              <span>Time 1</span>
+              <select name="openingTime1"></select>
+            </label>
+            <label>
+              <span>Schedule 1</span>
+              <select name="openingScheduleId1" disabled></select>
+            </label>
+            <label>
+              <span>Date Open 2</span>
+              <select name="openingDay2"></select>
+            </label>
+            <label>
+              <span>Time 2</span>
+              <select name="openingTime2"></select>
+            </label>
+            <label>
+              <span>Schedule 2</span>
+              <select name="openingScheduleId2" disabled></select>
+            </label>
+            <label class="wide-field">
+              <span>Remark</span>
+              <input name="remark" type="text">
+            </label>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="secondary-button" id="addEnrollmentClose">Cancel</button>
+          <button type="submit" class="primary-button" id="addEnrollmentSave">💾 Add Subject</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop hidden" id="wsGraphModal" role="dialog" aria-modal="true" aria-labelledby="wsGraphTitle">
+    <div class="ws-graph-dialog">
+      <div class="modal-header">
+        <div>
+          <div class="panel-title" id="wsGraphTitle">WS Graph</div>
+          <div class="subtle" id="wsGraphSubtitle">โหลดเมื่อกดดูเท่านั้น</div>
+        </div>
+        <button type="button" class="modal-close" id="wsGraphClose" aria-label="Close">✕</button>
+      </div>
+      <div class="ws-graph-toolbar">
+        <button type="button" class="history-tab" data-ws-graph-range="3">3 เดือน</button>
+        <button type="button" class="history-tab" data-ws-graph-range="6">6 เดือน</button>
+        <button type="button" class="history-tab active" data-ws-graph-range="12">12 เดือน</button>
+        <button type="button" class="history-tab" data-ws-graph-range="all">ทั้งหมด</button>
+      </div>
+      <div class="ws-graph-wrap" id="wsGraphWrap">
+        <div class="empty-state">กด WS Graph เพื่อดูกราฟ</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/authClient.js"></script>
+  <script type="module" src="/js/student-manager.js"></script>
+</body>
+</html>

@@ -85,6 +85,8 @@ CREATE TABLE enrollment (
 
   kumon_student_id VARCHAR(20),
 
+  is_kumon_connect BOOLEAN NOT NULL DEFAULT FALSE,
+
   current_level_master_id SMALLINT NOT NULL,
 
   current_zun_level_master_id SMALLINT,
