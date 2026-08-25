@@ -1808,7 +1808,19 @@ async function buildReceiptPreview({
         throw httpError(400, "Payment method ไม่ถูกต้อง");
     }
 
-    const existingBillingResult = await client.query(`
+    // A student can have more than one billing record in the same period
+    // (e.g. each subject paid on a different day via separate receipts).
+    // When the caller names a specific billing (the normal case — every
+    // row in the Payment Center carries its own billingId), look that
+    // exact record up rather than always fetching "the latest for this
+    // student+period" and hoping it happens to match: with two+ billings,
+    // only the newest one could ever match that way, so any older bill's
+    // row would wrongly fall through to the fresh-receipt code path
+    // instead of reprint/cancel mode.
+    const normalizedExistingBillingId = Number.isInteger(Number(existingBillingId)) && Number(existingBillingId) > 0
+        ? Number(existingBillingId)
+        : null;
+    const existingBillingQuery = `
         SELECT
             billing.billing_id,
             billing.receipt_book,
@@ -1825,22 +1837,41 @@ async function buildReceiptPreview({
         FROM ${TABLE_SCHEMA}.billing
         JOIN ${TABLE_SCHEMA}.payment_method_master payment
             ON payment.payment_method_id = billing.payment_method_id
+        WHERE billing.student_id = $1
+    `;
+    const existingBillingResult = normalizedExistingBillingId
+        ? await client.query(`${existingBillingQuery} AND billing.billing_id = $2`, [
+            currentEnrollment.student_id,
+            normalizedExistingBillingId
+        ])
+        : existingBillingId === true
+            ? await client.query(`
+                ${existingBillingQuery}
+                  AND billing.billing_month = $2
+                  AND billing.billing_year = $3
+                ORDER BY billing.billing_date DESC, billing.billing_id DESC
+                LIMIT 1
+            `, [currentEnrollment.student_id, period.billingMonth, period.billingYear])
+            : { rows: [] };
+    const existingBilling = existingBillingResult.rows[0] || null;
+    const useExistingBilling = Boolean(existingBilling);
+
+    // Separate from the specific-billing lookup above: a cheap hint for
+    // "is there *a* billing for this student+period at all" (regardless of
+    // which one, if any, the caller actually requested), used by callers to
+    // retry with a concrete existingBillingId once they learn everything is
+    // already paid. Not used to decide useExistingBilling itself.
+    const latestBillingIdResult = await client.query(`
+        SELECT billing_id
+        FROM ${TABLE_SCHEMA}.billing
         WHERE student_id = $1
           AND billing_month = $2
           AND billing_year = $3
         ORDER BY billing_date DESC, billing_id DESC
         LIMIT 1
-    `, [
-        currentEnrollment.student_id,
-        period.billingMonth,
-        period.billingYear
-    ]);
-    const latestExistingBilling = existingBillingResult.rows[0] || null;
-    const useExistingBilling = latestExistingBilling && (
-        existingBillingId === true
-        || Number(existingBillingId) === Number(latestExistingBilling.billing_id)
-    );
-    const existingBilling = useExistingBilling ? latestExistingBilling : null;
+    `, [currentEnrollment.student_id, period.billingMonth, period.billingYear]);
+    const latestBillingIdForPeriod = latestBillingIdResult.rows[0]?.billing_id || null;
+
     const paidDetailsByEnrollmentId = new Map();
     const reprintDetailsByEnrollmentId = new Map();
 
@@ -2020,7 +2051,7 @@ async function buildReceiptPreview({
         billingId: useExistingBilling ? existingBilling.billing_id : null,
         alreadyPaid: detailRows.every((row) => row.isPaid),
         partiallyPaid: detailRows.some((row) => row.isPaid) && detailRows.some((row) => !row.isPaid),
-        existingBillingId: latestExistingBilling?.billing_id || null,
+        existingBillingId: latestBillingIdForPeriod,
         receiptBook: receiptNo.receiptBook,
         receiptNo: receiptNo.receiptNo,
         studentId: currentEnrollment.student_id,

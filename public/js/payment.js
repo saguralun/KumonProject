@@ -545,8 +545,15 @@ async function refreshReceiptPreview({
 function openReceipt(row) {
     state.selectedRow = row;
     state.receipt = null;
+    // row.billingId is the billing record for whatever HAS been paid this
+    // period — for a fully-paid row that's the whole receipt (reprint/cancel
+    // it), but for a partial row it only covers the already-paid subject.
+    // Passing it through unconditionally made buildReceiptPreview treat a
+    // partial row as "existing receipt" too, which locks every subject
+    // (including the still-unpaid one) and hides the pay button behind a
+    // "Cancel Receipt"-only view. Only reuse it when the row is fully paid.
     refreshReceiptPreview({
-        existingBillingId: row.billingId || null
+        existingBillingId: row.isPaid ? (row.billingId || null) : null
     });
 }
 
