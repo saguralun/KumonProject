@@ -264,7 +264,7 @@ html[data-role="staff"] [data-staff-up] {
 .summary-grid {
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 12px;
   margin: 16px 0;
 }
@@ -291,6 +291,10 @@ html[data-role="staff"] [data-staff-up] {
 
 .summary-card.is-paid strong {
   color: var(--green);
+}
+
+.summary-card.is-partial strong {
+  color: var(--blue);
 }
 
 .summary-card.is-unpaid strong {
@@ -369,6 +373,7 @@ html[data-role="staff"] [data-staff-up] {
 
 .secondary-button,
 .save-button,
+.danger-button,
 .icon-button,
 .receipt-button {
   min-height: 36px;
@@ -384,6 +389,12 @@ html[data-role="staff"] [data-staff-up] {
   border-color: #059669;
   background: #059669;
   color: #ffffff;
+}
+
+.danger-button {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: #b91c1c;
 }
 
 .receipt-button {
@@ -430,6 +441,10 @@ html[data-role="staff"] [data-staff-up] {
   background: #fffaf0;
 }
 
+.payment-table tbody tr.is-partial {
+  background: #f8fbff;
+}
+
 .payment-table tbody tr:hover {
   background: var(--blue-soft);
 }
@@ -444,6 +459,7 @@ html[data-role="staff"] [data-staff-up] {
 .subject-badge {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   min-height: 24px;
   border: 1px solid #cfe0f5;
   border-radius: 999px;
@@ -452,6 +468,17 @@ html[data-role="staff"] [data-staff-up] {
   font-size: 12px;
   font-weight: 800;
   color: #334155;
+}
+
+.subject-badge.is-paid {
+  border-color: #bbf7d0;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.subject-badge small {
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .status-pill {
@@ -473,6 +500,11 @@ html[data-role="staff"] [data-staff-up] {
 .status-pill.is-unpaid {
   background: var(--orange-soft);
   color: var(--orange);
+}
+
+.status-pill.is-partial {
+  background: var(--blue-soft);
+  color: var(--blue);
 }
 
 .empty-state {
@@ -497,10 +529,14 @@ html[data-role="staff"] [data-staff-up] {
   display: none;
 }
 
+.hidden {
+  display: none !important;
+}
+
 .receipt-dialog {
   display: grid;
   gap: 12px;
-  width: min(380px, calc(100vw - 24px));
+  width: min(780px, calc(100vw - 24px));
   max-height: calc(100vh - 32px);
   overflow: hidden;
   border: 1px solid var(--line);
@@ -510,10 +546,97 @@ html[data-role="staff"] [data-staff-up] {
   box-shadow: var(--shadow);
 }
 
+.receipt-modal-body {
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) minmax(320px, 1.1fr);
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.receipt-control-panel,
+.receipt-paper-panel {
+  min-height: 0;
+  overflow: auto;
+}
+
+.receipt-control-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.receipt-paper-panel {
+  display: grid;
+  justify-items: center;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f8fbff;
+  padding: 10px;
+}
+
 .receipt-period-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
+}
+
+.receipt-subject-picker {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 9px;
+}
+
+.receipt-picker-title {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+
+.receipt-picker-list {
+  display: grid;
+  gap: 6px;
+}
+
+.receipt-subject-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #ffffff;
+  padding: 7px 8px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.receipt-subject-option input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.receipt-subject-option span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.receipt-subject-option strong {
+  color: var(--green);
+}
+
+.receipt-subject-option.is-paid {
+  color: var(--muted);
+}
+
+.receipt-subject-option.is-paid strong {
+  color: var(--muted);
 }
 
 .receipt-actions {
@@ -524,7 +647,7 @@ html[data-role="staff"] [data-staff-up] {
   width: 80mm;
   max-width: 100%;
   justify-self: center;
-  overflow: auto;
+  overflow: visible;
   border: 1px dashed #aab6c3;
   background: #ffffff;
   padding: 8mm 5mm;
@@ -585,6 +708,15 @@ html[data-role="staff"] [data-staff-up] {
     grid-template-columns: 1fr;
   }
 
+  .receipt-dialog {
+    width: min(420px, calc(100vw - 24px));
+  }
+
+  .receipt-modal-body {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
   .table-header {
     align-items: flex-start;
     flex-direction: column;
@@ -605,6 +737,7 @@ html[data-role="staff"] [data-staff-up] {
   .payment-page,
   .receipt-dialog-header,
   .receipt-period-controls,
+  .receipt-subject-picker,
   .receipt-actions {
     display: none !important;
   }

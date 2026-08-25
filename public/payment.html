@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/payment.css">
+  <link rel="stylesheet" href="/css/app-scale.css">
 </head>
 <body>
   <main class="payment-page">
@@ -48,6 +49,7 @@
           <select id="paymentStatus">
             <option value="all">ทั้งหมด</option>
             <option value="unpaid">ยังไม่จ่าย</option>
+            <option value="partial">จ่ายบางส่วน</option>
             <option value="paid">จ่ายแล้ว</option>
           </select>
         </label>
@@ -74,6 +76,10 @@
           <span>จ่ายแล้ว</span>
           <strong id="paidStudents">0</strong>
         </div>
+        <div class="summary-card is-partial">
+          <span>จ่ายบางส่วน</span>
+          <strong id="partialStudents">0</strong>
+        </div>
         <div class="summary-card is-unpaid">
           <span>ยังไม่จ่าย</span>
           <strong id="unpaidStudents">0</strong>
@@ -95,6 +101,7 @@
       <section class="search-panel" aria-label="Payment search">
         <div class="quick-filter-row" aria-label="Quick payment filters">
           <button type="button" class="quick-filter-button" data-status-filter="unpaid">ยังไม่จ่าย</button>
+          <button type="button" class="quick-filter-button" data-status-filter="partial">จ่ายบางส่วน</button>
           <button type="button" class="quick-filter-button" data-status-filter="paid">จ่ายแล้ว</button>
           <button type="button" class="quick-filter-button" data-status-filter="all">ทั้งหมด</button>
         </div>
@@ -133,18 +140,26 @@
         <button type="button" class="icon-button" id="receiptClose" aria-label="Close">✕</button>
       </div>
 
-      <div class="receipt-period-controls">
-        <label>
-          <span>Payment</span>
-          <select id="receiptPaymentMethod"></select>
-        </label>
-      </div>
+      <div class="receipt-modal-body">
+        <div class="receipt-control-panel">
+          <div class="receipt-period-controls" id="receiptPaymentControls">
+            <label>
+              <span>Payment</span>
+              <select id="receiptPaymentMethod"></select>
+            </label>
+          </div>
+          <div class="receipt-subject-picker" id="receiptSubjectPicker"></div>
+        </div>
 
-      <div class="receipt-paper" id="receiptPaper">
-        <div class="empty-state">ยังไม่มีใบเสร็จ</div>
+        <div class="receipt-paper-panel">
+          <div class="receipt-paper" id="receiptPaper">
+            <div class="empty-state">ยังไม่มีใบเสร็จ</div>
+          </div>
+        </div>
       </div>
 
       <div class="receipt-actions">
+        <button type="button" class="danger-button hidden" id="receiptCancelPayment">↩️ Cancel Receipt</button>
         <button type="button" class="secondary-button" id="receiptPrint">🖨️ Print</button>
         <button type="button" class="save-button" id="receiptReceivePayment">💵 รับเงิน</button>
       </div>

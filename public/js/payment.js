@@ -9,6 +9,7 @@ const els = {
     statusLine: document.getElementById("statusLine"),
     totalStudents: document.getElementById("totalStudents"),
     paidStudents: document.getElementById("paidStudents"),
+    partialStudents: document.getElementById("partialStudents"),
     unpaidStudents: document.getElementById("unpaidStudents"),
     totalNetAmount: document.getElementById("totalNetAmount"),
     expectedNetAmount: document.getElementById("expectedNetAmount"),
@@ -20,8 +21,11 @@ const els = {
     receiptModal: document.getElementById("receiptModal"),
     receiptModalSubtitle: document.getElementById("receiptModalSubtitle"),
     receiptClose: document.getElementById("receiptClose"),
+    receiptPaymentControls: document.getElementById("receiptPaymentControls"),
     receiptPaymentMethod: document.getElementById("receiptPaymentMethod"),
+    receiptSubjectPicker: document.getElementById("receiptSubjectPicker"),
     receiptPaper: document.getElementById("receiptPaper"),
+    receiptCancelPayment: document.getElementById("receiptCancelPayment"),
     receiptPrint: document.getElementById("receiptPrint"),
     receiptReceivePayment: document.getElementById("receiptReceivePayment")
 };
@@ -32,7 +36,8 @@ const state = {
     selectedRow: null,
     receipt: null,
     paymentMethods: [],
-    isReceivingPayment: false
+    isReceivingPayment: false,
+    isCancellingPayment: false
 };
 
 function escapeHtml(value) {
@@ -153,6 +158,7 @@ function selectedPeriod() {
 function renderSummary(summary) {
     els.totalStudents.textContent = summary.totalStudents || 0;
     els.paidStudents.textContent = summary.paidStudents || 0;
+    els.partialStudents.textContent = summary.partialStudents || 0;
     els.unpaidStudents.textContent = summary.unpaidStudents || 0;
     els.totalNetAmount.textContent = formatMoney(summary.totalNetAmount || 0);
     els.expectedNetAmount.textContent = formatMoney(summary.expectedNetAmount || 0);
@@ -166,7 +172,27 @@ function syncQuickFilterButtons() {
 }
 
 function rowNetAmount(row) {
-    return row.isPaid ? row.netAmount : row.expectedNetAmount;
+    if (row.isPaid) {
+        return row.netAmount;
+    }
+
+    return row.isPartial ? row.unpaidNetAmount : row.expectedNetAmount;
+}
+
+function paymentStateText(row) {
+    if (row.isPaid) {
+        return "จ่ายแล้ว";
+    }
+
+    return row.isPartial ? "จ่ายบางส่วน" : "ยังไม่จ่าย";
+}
+
+function receiptButtonText(row) {
+    if (row.isPaid) {
+        return "🖨️ พิมพ์ซ้ำ";
+    }
+
+    return row.isPartial ? "💵 รับเงินเพิ่ม" : "💵 รับเงิน";
 }
 
 function renderSubjectBadges(subjects) {
@@ -181,7 +207,16 @@ function renderSubjectBadges(subjects) {
 
     return `
         <div class="subject-badges">
-            ${values.map((subject) => `<span class="subject-badge">${escapeHtml(subject)}</span>`).join("")}
+            ${values.map((subject) => {
+                const isPaid = subject.endsWith(" paid");
+                const label = isPaid ? subject.slice(0, -" paid".length) : subject;
+
+                return `
+                    <span class="subject-badge ${isPaid ? "is-paid" : ""}">
+                        ${escapeHtml(label)}${isPaid ? ` <small>จ่ายแล้ว</small>` : ""}
+                    </span>
+                `;
+            }).join("")}
         </div>
     `;
 }
@@ -221,11 +256,11 @@ function renderRows(rows) {
                 </tr>
             </thead>
             <tbody>
-                ${rows.map((row) => `
-                    <tr class="${row.isPaid ? "is-paid" : "is-unpaid"}">
+                ${rows.map((row, index) => `
+                    <tr class="is-${escapeHtml(row.paymentState || (row.isPaid ? "paid" : "unpaid"))}">
                         <td>
-                            <span class="status-pill ${row.isPaid ? "is-paid" : "is-unpaid"}">
-                                ${row.isPaid ? "จ่ายแล้ว" : "ยังไม่จ่าย"}
+                            <span class="status-pill is-${escapeHtml(row.paymentState || (row.isPaid ? "paid" : "unpaid"))}">
+                                ${paymentStateText(row)}
                             </span>
                         </td>
                         <td>
@@ -238,16 +273,17 @@ function renderRows(rows) {
                         <td>${escapeHtml(row.paymentMethodName || "-")}</td>
                         <td>
                             <strong>${formatMoney(rowNetAmount(row))}</strong>
-                            ${!row.isPaid ? `<div class="subtle">ยอดที่ควรเก็บ</div>` : ""}
+                            ${row.isPartial ? `<div class="subtle">ยอดค้าง ${formatMoney(row.unpaidNetAmount || 0)} • จ่ายแล้ว ${formatMoney(row.netAmount || 0)}</div>` : ""}
+                            ${!row.isPaid && !row.isPartial ? `<div class="subtle">ยอดที่ควรเก็บ</div>` : ""}
                             ${renderLatestBilling(row)}
                         </td>
                         <td>
                             <button
                                 type="button"
                                 class="receipt-button"
-                                data-receipt-student-id="${escapeHtml(row.studentId)}"
+                                data-receipt-row-index="${escapeHtml(index)}"
                             >
-                                ${row.isPaid ? "🖨️ พิมพ์ซ้ำ" : "💵 รับเงิน"}
+                                ${receiptButtonText(row)}
                             </button>
                         </td>
                     </tr>
@@ -309,6 +345,64 @@ function renderPaymentMethods(paymentMethods, selectedPaymentMethodId) {
     `).join("");
 }
 
+function selectedReceiptEnrollmentIds() {
+    return Array.from(els.receiptSubjectPicker.querySelectorAll("[data-receipt-enrollment]:checked:not(:disabled)"))
+        .map((checkbox) => Number(checkbox.value))
+        .filter((id) => Number.isInteger(id) && id > 0);
+}
+
+function recalculateReceiptTotals(receipt) {
+    const selectedIds = new Set(selectedReceiptEnrollmentIds());
+
+    receipt.details = (receipt.details || []).map((detail) => ({
+        ...detail,
+        isSelected: detail.isPaid ? false : selectedIds.has(Number(detail.enrollmentId))
+    }));
+    receipt.receiptDetails = receipt.details.filter((detail) => detail.isSelected);
+    receipt.discountAmount = receipt.receiptDetails.reduce((sum, detail) => sum + Number(detail.discountAmount || 0), 0);
+    receipt.netAmount = receipt.receiptDetails.reduce((sum, detail) => sum + Number(detail.netAmount || 0), 0);
+    receipt.totalAmount = receipt.netAmount + receipt.discountAmount;
+}
+
+function renderReceiptSubjectPicker(receipt) {
+    const hasBilling = Boolean(receipt.billingId);
+
+    if (!receipt.details?.length) {
+        els.receiptSubjectPicker.innerHTML = "";
+        return;
+    }
+
+    els.receiptSubjectPicker.innerHTML = `
+        <div class="receipt-picker-title">เลือกวิชาที่รับเงิน</div>
+        <div class="receipt-picker-list">
+            ${receipt.details.map((detail) => {
+                const checked = detail.isPaid || detail.isSelected;
+                const disabled = hasBilling || detail.isPaid;
+                const note = detail.isPaid
+                    ? `จ่ายแล้ว ${detail.paidReceiptBook ? `(${detail.paidReceiptBook}/${detail.paidReceiptNo})` : ""}`
+                    : formatMoney(detail.netAmount);
+
+                return `
+                    <label class="receipt-subject-option ${detail.isPaid ? "is-paid" : ""}">
+                        <input
+                            type="checkbox"
+                            data-receipt-enrollment
+                            value="${escapeHtml(detail.enrollmentId)}"
+                            ${checked ? "checked" : ""}
+                            ${disabled ? "disabled" : ""}
+                        >
+                        <span>
+                            ${escapeHtml(detail.subjectCode)}
+                            (#${escapeHtml(detail.enrollmentId)} • ${escapeHtml(detail.subjectName)} level ${escapeHtml(detail.currentLevelCode)})
+                        </span>
+                        <strong>${escapeHtml(note)}</strong>
+                    </label>
+                `;
+            }).join("")}
+        </div>
+    `;
+}
+
 function renderReceipt(receipt) {
     const paidText = receipt.billingId
         ? `<div class="receipt-paid-stamp">PAID • Billing #${escapeHtml(receipt.billingId)}</div>`
@@ -318,8 +412,17 @@ function renderReceipt(receipt) {
         : "";
 
     els.receiptModalSubtitle.textContent = `เล่ม ${receipt.receiptBook} เลขที่ ${receipt.receiptNo}${latestText}`;
-    els.receiptReceivePayment.disabled = Boolean(receipt.billingId) || state.isReceivingPayment;
+    const hasBilling = Boolean(receipt.billingId);
+
+    els.receiptCancelPayment.classList.toggle("hidden", !hasBilling);
+    els.receiptCancelPayment.disabled = !hasBilling || state.isCancellingPayment;
+    els.receiptCancelPayment.textContent = state.isCancellingPayment ? "⏳ กำลังยกเลิก" : "↩️ Cancel Receipt";
+    els.receiptPaymentControls.classList.toggle("hidden", hasBilling);
+    els.receiptSubjectPicker.classList.toggle("hidden", hasBilling);
+    els.receiptReceivePayment.classList.toggle("hidden", hasBilling);
+    els.receiptReceivePayment.disabled = hasBilling || state.isReceivingPayment || !receipt.receiptDetails?.length;
     els.receiptReceivePayment.textContent = receipt.billingId ? "✅ รับเงินแล้ว" : "💵 รับเงิน";
+    renderReceiptSubjectPicker(receipt);
     els.receiptPaper.innerHTML = `
         <div class="receipt-center">
             <div class="receipt-title">KUMON</div>
@@ -340,7 +443,7 @@ function renderReceipt(receipt) {
         <div>Tuition: ${escapeHtml(monthName(receipt.billingMonth))} ${escapeHtml(receipt.billingYear)}</div>
         <div>Payment: ${escapeHtml(receipt.paymentMethodName)}</div>
         <div class="receipt-line"></div>
-        ${receipt.details.map((detail) => `
+        ${(receipt.receiptDetails || []).map((detail) => `
             <div class="receipt-item">
                 <div class="receipt-item-name">
                     ${escapeHtml(detail.subjectCode)}
@@ -375,6 +478,7 @@ function renderReceipt(receipt) {
                 </div>
             </div>
         `).join("")}
+        ${!(receipt.receiptDetails || []).length ? `<div class="empty-state">เลือกอย่างน้อย 1 วิชาที่ยังไม่ได้จ่าย</div>` : ""}
         <div class="receipt-line"></div>
         <div class="receipt-row">
             <span>Total</span>
@@ -396,7 +500,7 @@ function renderReceipt(receipt) {
 
 async function refreshReceiptPreview({
     existingBillingId = null,
-    skipPaidConfirm = false
+    selectedEnrollmentIds = null
 } = {}) {
     if (!state.selectedRow) {
         return;
@@ -415,23 +519,15 @@ async function refreshReceiptPreview({
                 billingMonth: period.billingMonth,
                 billingYear: period.billingYear,
                 paymentMethodId: els.receiptPaymentMethod.value || undefined,
-                existingBillingId
+                existingBillingId,
+                selectedEnrollmentIds
             })
         });
 
-        if (data.receipt.alreadyPaid && !data.receipt.billingId && !skipPaidConfirm) {
-            const shouldReprint = window.confirm(
-                `น้องคนนี้จ่ายเงินค่าเรียนเดือน ${monthName(data.receipt.billingMonth)} ${data.receipt.billingYear} แล้ว ต้องการ print ใหม่ไหม?`
-            );
-
-            if (!shouldReprint) {
-                setStatus("ยกเลิกการพิมพ์ซ้ำ");
-                return;
-            }
-
+        if (data.receipt.alreadyPaid && !data.receipt.billingId) {
             await refreshReceiptPreview({
                 existingBillingId: data.receipt.existingBillingId,
-                skipPaidConfirm: true
+                selectedEnrollmentIds
             });
             return;
         }
@@ -449,7 +545,9 @@ async function refreshReceiptPreview({
 function openReceipt(row) {
     state.selectedRow = row;
     state.receipt = null;
-    refreshReceiptPreview();
+    refreshReceiptPreview({
+        existingBillingId: row.billingId || null
+    });
 }
 
 function closeReceipt() {
@@ -465,6 +563,7 @@ async function receivePayment() {
         "รับเงินและบันทึกใบเสร็จนี้ใช่ไหม?",
         `นักเรียน: ${state.receipt.studentName}`,
         `ค่าเรียน: ${monthName(state.receipt.billingMonth)} ${state.receipt.billingYear}`,
+        `จำนวนวิชา: ${state.receipt.receiptDetails?.length || 0}`,
         `ยอดสุทธิ: ${formatMoney(state.receipt.netAmount)}`,
         `วิธีจ่าย: ${els.receiptPaymentMethod.options[els.receiptPaymentMethod.selectedIndex]?.textContent || state.receipt.paymentMethodName}`
     ].join("\n");
@@ -485,7 +584,8 @@ async function receivePayment() {
                 billingDate: state.receipt.billingDate,
                 billingMonth: state.receipt.billingMonth,
                 billingYear: state.receipt.billingYear,
-                paymentMethodId: els.receiptPaymentMethod.value || state.receipt.paymentMethodId
+                paymentMethodId: els.receiptPaymentMethod.value || state.receipt.paymentMethodId,
+                selectedEnrollmentIds: selectedReceiptEnrollmentIds()
             })
         });
 
@@ -498,6 +598,47 @@ async function receivePayment() {
     } finally {
         state.isReceivingPayment = false;
         renderReceipt(state.receipt);
+    }
+}
+
+async function cancelPayment() {
+    if (!state.selectedRow || !state.receipt?.billingId || state.isCancellingPayment) {
+        return;
+    }
+
+    const confirmMessage = [
+        "ยกเลิกใบเสร็จนี้ใช่ไหม?",
+        `ใบเสร็จ: ${state.receipt.receiptBook}/${state.receipt.receiptNo}`,
+        `นักเรียน: ${state.receipt.studentName}`,
+        `ค่าเรียน: ${monthName(state.receipt.billingMonth)} ${state.receipt.billingYear}`,
+        "ระบบจะลบใบเสร็จนี้, ลบ history status ของรอบนี้ และคืน status enrollment กลับ"
+    ].join("\n");
+
+    if (!window.confirm(confirmMessage)) {
+        return;
+    }
+
+    state.isCancellingPayment = true;
+    renderReceipt(state.receipt);
+
+    try {
+        const data = await requestJson("/api/worksheet/receipt/cancel", {
+            method: "POST",
+            body: JSON.stringify({
+                billingId: state.receipt.billingId
+            })
+        });
+
+        setStatus(`ยกเลิกใบเสร็จ ${data.receiptBook}/${data.receiptNo} แล้ว`);
+        closeReceipt();
+        await loadPaymentStatus();
+    } catch (error) {
+        setStatus(error.message, "error");
+    } finally {
+        state.isCancellingPayment = false;
+        if (state.receipt?.billingId) {
+            renderReceipt(state.receipt);
+        }
     }
 }
 
@@ -534,7 +675,7 @@ function exportUnpaidCsv() {
             row.studentName,
             row.nickname ? `น้อง${row.nickname}` : "",
             row.subjects || "",
-            formatMoney(row.expectedNetAmount || 0),
+            formatMoney(row.isPartial ? row.unpaidNetAmount : row.expectedNetAmount || 0),
             row.latestReceiptBook ? `${row.latestReceiptBook}/${row.latestReceiptNo}` : "",
             row.latestBillingMonth ? `${monthName(row.latestBillingMonth)} ${row.latestBillingYear}` : ""
         ].map(csvCell).join(","))
@@ -605,7 +746,7 @@ function printUnpaidList() {
                             <td>#${escapeHtml(row.studentId)}</td>
                             <td>${escapeHtml(row.studentName)}${row.nickname ? `<br>น้อง${escapeHtml(row.nickname)}` : ""}</td>
                             <td>${escapeHtml(row.subjects || "-")}</td>
-                            <td class="money">${formatMoney(row.expectedNetAmount || 0)}</td>
+                            <td class="money">${formatMoney(row.isPartial ? row.unpaidNetAmount : row.expectedNetAmount || 0)}</td>
                             <td>${row.latestReceiptBook ? `${escapeHtml(monthName(row.latestBillingMonth))} ${escapeHtml(row.latestBillingYear)} • ${escapeHtml(row.latestReceiptBook)}/${escapeHtml(row.latestReceiptNo)}` : "-"}</td>
                         </tr>
                     `).join("")}
@@ -645,13 +786,13 @@ function bindEvents() {
         });
     });
     els.paymentTableWrap.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-receipt-student-id]");
+        const button = event.target.closest("[data-receipt-row-index]");
 
         if (!button) {
             return;
         }
 
-        const row = state.rows.find((item) => Number(item.studentId) === Number(button.dataset.receiptStudentId));
+        const row = state.rows[Number(button.dataset.receiptRowIndex)];
 
         if (row) {
             openReceipt(row);
@@ -664,8 +805,25 @@ function bindEvents() {
         }
     });
     els.receiptPrint.addEventListener("click", () => window.print());
+    els.receiptCancelPayment.addEventListener("click", cancelPayment);
     els.receiptReceivePayment.addEventListener("click", receivePayment);
-    els.receiptPaymentMethod.addEventListener("change", () => refreshReceiptPreview({ skipPaidConfirm: true }));
+    els.receiptSubjectPicker.addEventListener("change", (event) => {
+        if (!event.target.matches("[data-receipt-enrollment]") || !state.receipt?.details) {
+            return;
+        }
+
+        recalculateReceiptTotals(state.receipt);
+        renderReceipt(state.receipt);
+    });
+    els.receiptPaymentMethod.addEventListener("change", () => {
+        if (state.receipt?.billingId) {
+            return;
+        }
+
+        refreshReceiptPreview({
+            selectedEnrollmentIds: selectedReceiptEnrollmentIds()
+        });
+    });
 }
 
 function init() {

@@ -7,6 +7,7 @@ import {
     getHistory,
     getIncompleteWorksheetStudents,
     getWorksheetMonthSummary,
+    cancelReceiptPayment,
     previewReceipt,
     receiveCd,
     receiveReceiptPayment,
@@ -168,6 +169,16 @@ router.post("/receipt/preview", async (req, res) => {
 router.post("/receipt/payment", async (req, res) => {
     try {
         const result = await receiveReceiptPayment(req.body);
+
+        res.json(result);
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.post("/receipt/cancel", async (req, res) => {
+    try {
+        const result = await cancelReceiptPayment(req.body);
 
         res.json(result);
     } catch (error) {

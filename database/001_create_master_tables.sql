@@ -434,14 +434,16 @@ CREATE TABLE opening_schedule (
 );
 
 -- =========================================================
--- Helper Function to get worksheet_master_id by level_code and worksheet_no
+-- Helper Function to get worksheet_master_id by subject, level_code and worksheet_no
 -- =========================================================
 
 -- Get Worksheet Master ID
 
 DROP FUNCTION IF EXISTS fn_get_worksheet_master_id(VARCHAR, INTEGER);
+DROP FUNCTION IF EXISTS fn_get_worksheet_master_id(VARCHAR, VARCHAR, INTEGER);
 
 CREATE FUNCTION fn_get_worksheet_master_id(
+	p_subject_code VARCHAR,
 	p_level_code VARCHAR,
 	p_worksheet_no INTEGER
 )
@@ -452,7 +454,10 @@ AS $$
 	FROM worksheet_master wm
 	JOIN level_master lm
 		ON lm.level_master_id = wm.level_master_id
+	JOIN subject_master sm
+		ON sm.subject_id = lm.subject_id
 	WHERE lm.level_code = p_level_code
+		AND sm.subject_code = p_subject_code
 		AND wm.worksheet_no = p_worksheet_no;
 $$;
 

@@ -31,6 +31,11 @@ const els = {
     datePrev: document.getElementById("datePrev"),
     dateNext: document.getElementById("dateNext"),
     patternButtons: document.getElementById("patternButtons"),
+    worksheetProgressRing: document.getElementById("worksheetProgressRing"),
+    worksheetProgressTabs: document.getElementById("worksheetProgressTabs"),
+    worksheetProgressLevel: document.getElementById("worksheetProgressLevel"),
+    worksheetProgressValue: document.getElementById("worksheetProgressValue"),
+    worksheetProgressCaption: document.getElementById("worksheetProgressCaption"),
     worksheetInputs: document.getElementById("worksheetInputs"),
     previewCount: document.getElementById("previewCount"),
     previewList: document.getElementById("previewList"),
@@ -42,6 +47,7 @@ const els = {
     historyLimit: document.getElementById("historyLimit"),
     historySubtitle: document.getElementById("historySubtitle"),
     historyMonthSummary: document.getElementById("historyMonthSummary"),
+    worksheetPacketSummary: document.getElementById("worksheetPacketSummary"),
     historyTableWrap: document.getElementById("historyTableWrap"),
     atModal: document.getElementById("atModal"),
     atForm: document.getElementById("atForm"),
@@ -75,9 +81,11 @@ const state = {
     searchTimer: null,
     context: null,
     history: [],
+    worksheetPacketSummary: null,
     worksheetMonthSummary: null,
     patterns: [],
     patternCode: "daily10",
+    progressKind: "main",
     isSaving: false,
     isCompletingZun: false,
     atModal: {
@@ -119,6 +127,12 @@ function weekdayLabelFromIsoDate(dateText) {
 
 function updateReceiveWeekday() {
     els.receiveWeekday.textContent = weekdayLabelFromIsoDate(els.receiveDate.value);
+}
+
+function setReceiveDate(dateText) {
+    els.receiveDate.value = dateText;
+    updatePreview();
+    refreshWorksheetMonthSummary();
 }
 
 function readWorksheetNos(kind) {
@@ -266,6 +280,133 @@ function renderPatternButtons() {
             ${escapeHtml(pattern.shortLabel)}
         </button>
     `).join("");
+}
+
+function progressTargetForKind(context, kind) {
+    const enrollment = context?.enrollment;
+
+    if (!enrollment) {
+        return null;
+    }
+
+    if (kind === "zun") {
+        return enrollment.currentZunLevelMasterId
+            ? {
+                levelMasterId: enrollment.currentZunLevelMasterId,
+                levelCode: enrollment.currentZunLevelCode,
+                maxWorksheetNo: 100
+            }
+            : null;
+    }
+
+    return {
+        levelMasterId: enrollment.currentLevelMasterId,
+        levelCode: enrollment.currentLevelCode,
+        maxWorksheetNo: 200
+    };
+}
+
+function fallbackWorksheetProgressFromHistory(context, kind) {
+    const target = progressTargetForKind(context, kind);
+
+    if (!target?.levelMasterId) {
+        return null;
+    }
+
+    const rows = (context.history || []).filter((row) => (
+        row.cpws === true
+        && Number(row.levelMasterId) === Number(target.levelMasterId)
+        && row.worksheetDate
+    ));
+
+    if (!rows.length) {
+        return null;
+    }
+
+    const latestDateText = rows.reduce((latest, row) => (
+        row.worksheetDate > latest ? row.worksheetDate : latest
+    ), rows[0].worksheetDate);
+    const [year, month, day] = latestDateText.split("-").map(Number);
+    const cutoffDate = new Date(year, month - 1, day);
+    cutoffDate.setMonth(cutoffDate.getMonth() - 12);
+    const cutoffText = [
+        cutoffDate.getFullYear(),
+        String(cutoffDate.getMonth() + 1).padStart(2, "0"),
+        String(cutoffDate.getDate()).padStart(2, "0")
+    ].join("-");
+    const actualWorksheetNo = rows
+        .filter((row) => row.worksheetDate >= cutoffText)
+        .reduce((maxValue, row) => Math.max(maxValue, Number(row.actualWorksheetNo || 0)), 0);
+
+    if (!actualWorksheetNo) {
+        return null;
+    }
+
+    const displayWorksheetNo = Math.min(target.maxWorksheetNo, actualWorksheetNo + 9);
+
+    return {
+        levelCode: target.levelCode,
+        actualWorksheetNo,
+        displayWorksheetNo,
+        maxWorksheetNo: target.maxWorksheetNo,
+        percent: Math.round((displayWorksheetNo / target.maxWorksheetNo) * 100)
+    };
+}
+
+function progressForKind(context, kind) {
+    const rawProgress = context?.worksheetProgress;
+
+    if (rawProgress?.main || rawProgress?.zun) {
+        return rawProgress[kind] || null;
+    }
+
+    return kind === "main" ? rawProgress : null;
+}
+
+function normalizeWorksheetProgress(progress, context, kind) {
+    const target = progressTargetForKind(context, kind);
+    const sourceProgress = progress?.actualWorksheetNo || progress?.displayWorksheetNo
+        ? progress
+        : fallbackWorksheetProgressFromHistory(context, kind);
+    const maxWorksheetNo = Number(sourceProgress?.maxWorksheetNo || target?.maxWorksheetNo || 200);
+    const displayWorksheetNo = Math.max(0, Math.min(maxWorksheetNo, Number(sourceProgress?.displayWorksheetNo || 0)));
+    const percent = Math.max(0, Math.min(100, Number(sourceProgress?.percent || Math.round((displayWorksheetNo / maxWorksheetNo) * 100))));
+
+    return {
+        levelCode: sourceProgress?.levelCode || target?.levelCode || "-",
+        actualWorksheetNo: sourceProgress?.actualWorksheetNo || null,
+        displayWorksheetNo,
+        maxWorksheetNo,
+        percent
+    };
+}
+
+function renderWorksheetProgress() {
+    const zunLevelMasterId = Number(state.context?.enrollment?.currentZunLevelMasterId || 0);
+    const hasZunProgress = Number.isInteger(zunLevelMasterId) && zunLevelMasterId > 0;
+
+    if (!hasZunProgress) {
+        state.progressKind = "main";
+    }
+
+    els.worksheetProgressTabs.classList.toggle("hidden", !hasZunProgress);
+    els.worksheetProgressTabs.setAttribute("aria-hidden", hasZunProgress ? "false" : "true");
+    els.worksheetProgressTabs.querySelectorAll("[data-progress-kind]").forEach((button) => {
+        button.disabled = !hasZunProgress;
+        button.classList.toggle("active", button.dataset.progressKind === state.progressKind);
+    });
+
+    const progress = normalizeWorksheetProgress(
+        progressForKind(state.context, state.progressKind),
+        state.context,
+        state.progressKind
+    );
+    const offset = Math.max(0, Math.min(100, 100 - progress.percent));
+
+    els.worksheetProgressRing.style.setProperty("--progress-offset", String(offset));
+    els.worksheetProgressLevel.textContent = progress.levelCode;
+    els.worksheetProgressValue.textContent = String(progress.displayWorksheetNo);
+    els.worksheetProgressCaption.textContent = `${progress.percent}%`;
 }
 
 function focusWorksheetControl(input) {
@@ -487,6 +628,7 @@ function renderWorksheetInputs({ preserve = false } = {}) {
 
     els.worksheetInputs.innerHTML = sections.join("");
     els.worksheetInputs.querySelectorAll("[data-ws-input]").forEach((input) => {
+        input.addEventListener("input", updatePreview);
         input.addEventListener("change", updatePreview);
         input.addEventListener("focus", () => focusWorksheetControl(input));
     });
@@ -537,17 +679,34 @@ function updatePreview() {
     });
     const cdRequirement = currentCdRequirement();
     const cdReady = !cdRequirement || cdRequirement.hasReceived;
+    const mainReady = requiredMainReady(pattern, mainWorksheetNos);
     const canSave = Boolean(
         state.context
         && !state.isSaving
         && els.receiveDate.value
-        && requiredMainReady(pattern, mainWorksheetNos)
+        && mainReady
         && cdReady
     );
 
     els.previewCount.textContent = `${records.length} records`;
     els.saveButton.disabled = !canSave;
+
+    if (!state.context) {
+        setStatus("พร้อมใช้งาน");
+    } else if (state.isSaving) {
+        setStatus("กำลังบันทึก WS...");
+    } else if (!els.receiveDate.value) {
+        setStatus("กรุณาเลือก Receive Date", "error");
+    } else if (!mainReady) {
+        setStatus("กรุณาเลือก WS ก่อนบันทึก", "error");
+    } else if (!cdReady) {
+        setStatus("กรุณารับ CD ก่อนบันทึก WS", "error");
+    } else {
+        setStatus("พร้อมบันทึก WS", "success");
+    }
+
     renderPreviewList(records);
+    renderWorksheetPacketSummary(state.worksheetPacketSummary);
     updateSecondaryActions();
 }
 
@@ -560,6 +719,106 @@ function renderHistoryTable({ scrollToTop = false } = {}) {
     }
 }
 
+function worksheetPacketSummaryForKind(summary, kind) {
+    if (summary?.main || summary?.zun) {
+        return summary[kind] || null;
+    }
+
+    return kind === "main" ? summary : null;
+}
+
+function graphHasCompletionPacket(kind) {
+    const target = progressTargetForKind(state.context, kind);
+    const summary = worksheetPacketSummaryForKind(state.worksheetPacketSummary, kind);
+    const completionPacketNo = target?.maxWorksheetNo === 100 ? 91 : 191;
+
+    return Boolean(
+        target?.levelMasterId
+        && summary?.rows?.some((row) => (
+            Number(row.packetWorksheetNo) === completionPacketNo
+            && Number(row.count || 0) > 0
+        ))
+    );
+}
+
+function formatThaiPeriod(period) {
+    if (!period) {
+        return "";
+    }
+
+    const months = Number(period.months || 0);
+    const days = Number(period.days || 0);
+    const parts = [];
+
+    if (months) {
+        parts.push(`${months} เดือน`);
+    }
+
+    if (days || !parts.length) {
+        parts.push(`${days} วัน`);
+    }
+
+    return parts.join(" ");
+}
+
+function renderWorksheetPacketSummary(summary) {
+    const target = progressTargetForKind(state.context, state.progressKind);
+    const activeSummary = worksheetPacketSummaryForKind(summary, state.progressKind);
+    let rows = activeSummary?.rows || [];
+    let levelCode = activeSummary?.levelCode || target?.levelCode || "-";
+    const historyContent = els.worksheetPacketSummary.closest(".history-content");
+    const countByPacket = new Map(rows.map((row) => [
+        Number(row.packetWorksheetNo),
+        Number(row.count || 0)
+    ]));
+    const shouldShowChart = Boolean(state.context?.enrollment && target?.levelMasterId);
+
+    historyContent?.classList.toggle("has-packet-summary", shouldShowChart);
+    els.worksheetPacketSummary.classList.toggle("hidden", !shouldShowChart);
+
+    if (!shouldShowChart) {
+        els.worksheetPacketSummary.innerHTML = "";
+        return;
+    }
+
+    const packetCount = target?.maxWorksheetNo === 100 ? 10 : 20;
+    const packetNumbers = Array.from({ length: packetCount }, (_, index) => (index * 10) + 1);
+    const packetRows = packetNumbers.map((packetWorksheetNo) => ({
+        packetWorksheetNo,
+        count: countByPacket.get(packetWorksheetNo) || 0
+    }));
+    const maxCount = Math.max(...packetRows.map((row) => row.count), 1);
+    const totalCpwsSets = packetRows.reduce((sum, row) => sum + row.count, 0);
+    const periodLabel = formatThaiPeriod(activeSummary?.period);
+    const packetSummaryText = periodLabel
+        ? `(${periodLabel}) • CPWS ${totalCpwsSets} ชุด`
+        : `CPWS ${totalCpwsSets} ชุด`;
+
+    els.worksheetPacketSummary.innerHTML = `
+        <div class="packet-summary-header">
+            <div class="panel-title">Level ${escapeHtml(levelCode)}</div>
+            <div class="subtle">${escapeHtml(packetSummaryText)}</div>
+        </div>
+        <div class="packet-summary-body">
+            <div class="packet-bar-chart" aria-label="Worksheet packet chart">
+                ${packetRows.map((row) => {
+                    const height = row.count ? Math.max(8, Math.round((row.count / maxCount) * 100)) : 0;
+
+                    return `
+                        <div class="packet-bar-item" title="${escapeHtml(row.packetWorksheetNo)}: ${escapeHtml(row.count)} ea">
+                            <div class="packet-bar-value">${escapeHtml(row.count)}</div>
+                            <div class="packet-bar-track">
+                                <div class="packet-bar-fill" style="height:${height}%"></div>
+                            </div>
+                            <div class="packet-bar-label">${escapeHtml(row.packetWorksheetNo)}</div>
+                        </div>
+                    `;
+                }).join("")}
+            </div>
+        </div>
+    `;
+}
+
 function setActionButton(button, icon, text) {
     button.innerHTML = `<span class="button-icon">${escapeHtml(icon)}</span><span>${escapeHtml(text)}</span>`;
 }
@@ -569,22 +828,27 @@ function updateSecondaryActions() {
 
     if (!context) {
         els.completeWsLevel.disabled = true;
+        els.completeWsLevel.classList.add("hidden");
         els.completeZunLevel.disabled = true;
         els.receiveCd.disabled = true;
+        els.receiveCd.classList.add("hidden");
         return;
     }
 
-    const canCompleteAt = Boolean(context.completionState?.atCompletion?.canComplete);
-    const canEditLatestAt = Boolean(
-        context.completionState?.latestAtCompletion
-        && context.completionState.latestAtCompletion.isPass === false
+    const atCompletion = context.completionState?.atCompletion;
+    const canCompleteAt = Boolean(atCompletion?.canComplete);
+    const hasCompletionPacket = Boolean(
+        atCompletion?.bypassWorksheet191
+        || graphHasCompletionPacket("main")
     );
+    const canUseAtButton = state.progressKind === "main" && canCompleteAt && hasCompletionPacket;
 
-    els.completeWsLevel.disabled = !canCompleteAt && !canEditLatestAt;
+    els.completeWsLevel.disabled = !canUseAtButton;
+    els.completeWsLevel.classList.toggle("hidden", !canUseAtButton);
     setActionButton(
         els.completeWsLevel,
-        canCompleteAt ? "📝" : "🔁",
-        canCompleteAt ? "สอบ AT" : "สอบ AT ล่าสุด"
+        "📝",
+        "สอบ AT"
     );
     const canCompleteZun = Boolean(context.completionState?.zunCompletion?.canComplete);
 
@@ -592,7 +856,10 @@ function updateSecondaryActions() {
     setActionButton(els.completeZunLevel, "🎯", "จบ Zun");
 
     const cdRequirement = currentCdRequirement();
-    els.receiveCd.disabled = !cdRequirement || cdRequirement.hasReceived;
+    const shouldShowCdButton = Boolean(cdRequirement && !cdRequirement.hasReceived);
+
+    els.receiveCd.disabled = !shouldShowCdButton;
+    els.receiveCd.classList.toggle("hidden", !shouldShowCdButton);
     setActionButton(
         els.receiveCd,
         "💿",
@@ -1063,9 +1330,11 @@ async function loadEnrollmentContext(enrollmentId) {
 
         state.context = context;
         state.history = context.history || [];
+        state.worksheetPacketSummary = context.worksheetPacketSummary || null;
         state.worksheetMonthSummary = context.worksheetMonthSummary || null;
         state.patterns = context.patterns || state.patterns;
         state.patternCode = context.defaults.patternCode || "daily10";
+        state.progressKind = "main";
         els.receiveDate.disabled = false;
         els.datePrev.disabled = false;
         els.dateNext.disabled = false;
@@ -1074,12 +1343,13 @@ async function loadEnrollmentContext(enrollmentId) {
 
         populateStudentStrip(context);
         renderPatternButtons();
+        renderWorksheetProgress();
         renderWorksheetInputs();
         await refreshWorksheetMonthSummary();
         renderHistoryTable({ scrollToTop: true });
+        renderWorksheetPacketSummary(state.worksheetPacketSummary);
         updateSecondaryActions();
         updateHistorySubtitle();
-        setStatus("พร้อมบันทึก WS", "success");
         window.setTimeout(() => focusFirstMainInput(), 30);
     } catch (error) {
         setStatus(error.message, "error");
@@ -1107,6 +1377,7 @@ async function refreshHistory() {
         state.history = data.history || [];
         state.worksheetMonthSummary = data.worksheetMonthSummary || state.worksheetMonthSummary;
         renderHistoryTable({ scrollToTop: true });
+        renderWorksheetPacketSummary(state.worksheetPacketSummary);
         renderWorksheetMonthSummary(state.worksheetMonthSummary);
         updateHistorySubtitle();
     } catch (error) {
@@ -1159,9 +1430,7 @@ function shiftDate(days) {
         return;
     }
 
-    els.receiveDate.value = addDays(els.receiveDate.value, days);
-    updatePreview();
-    refreshWorksheetMonthSummary();
+    setReceiveDate(addDays(els.receiveDate.value, days));
 }
 
 function setSaving(isSaving) {
@@ -1197,10 +1466,15 @@ async function saveEntries() {
         );
         state.context.history = state.history;
         state.context.completionState = result.completionState;
+        state.context.worksheetProgress = result.worksheetProgress || state.context.worksheetProgress;
+        state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
+        state.worksheetPacketSummary = state.context.worksheetPacketSummary;
         els.receiveDate.value = result.nextReceiveDate;
         await refreshWorksheetMonthSummary();
 
         renderHistoryTable({ scrollToTop: true });
+        renderWorksheetProgress();
+        renderWorksheetPacketSummary(state.worksheetPacketSummary);
         updateSecondaryActions();
         setStatus(`บันทึก ${result.records.length} records แล้ว`, "success");
         window.setTimeout(() => focusFirstMainInput(), 30);
@@ -1233,7 +1507,7 @@ async function deleteHistoryRecord(worksheetUsedId) {
     }
 
     try {
-        await worksheetApi.deleteEntry({
+        const result = await worksheetApi.deleteEntry({
             enrollmentId: state.context.enrollment.enrollmentId,
             worksheetUsedId: recordId
         });
@@ -1242,8 +1516,15 @@ async function deleteHistoryRecord(worksheetUsedId) {
             Number(item.worksheetUsedId) !== recordId
         );
         state.context.history = state.history;
+        state.context.completionState = result.completionState || state.context.completionState;
+        state.context.worksheetProgress = result.worksheetProgress || state.context.worksheetProgress;
+        state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
+        state.worksheetPacketSummary = state.context.worksheetPacketSummary;
         await refreshWorksheetMonthSummary();
         renderHistoryTable();
+        renderWorksheetProgress();
+        renderWorksheetPacketSummary(state.worksheetPacketSummary);
+        updateSecondaryActions();
         updateHistorySubtitle();
         setStatus("ลบ record แล้ว", "success");
     } catch (error) {
@@ -1357,6 +1638,19 @@ function bindEvents() {
         focusFirstMainInput();
     });
 
+    els.worksheetProgressTabs.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-progress-kind]");
+
+        if (!button) {
+            return;
+        }
+
+        state.progressKind = button.dataset.progressKind;
+        renderWorksheetProgress();
+        renderWorksheetPacketSummary(state.worksheetPacketSummary);
+        updateSecondaryActions();
+    });
+
     els.receiveDate.addEventListener("input", () => {
         updatePreview();
         refreshWorksheetMonthSummary();
@@ -1444,6 +1738,7 @@ function init() {
     bindFourDigitYearDateInputs(document);
     els.datePrev.disabled = true;
     els.dateNext.disabled = true;
+    renderWorksheetProgress();
     bindEvents();
     runSearch();
     els.studentSearch.focus();

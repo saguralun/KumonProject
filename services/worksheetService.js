@@ -140,6 +140,44 @@ function dateParts(dateText) {
     };
 }
 
+function monthsDaysBetween(startDateText, endDateText) {
+    if (!startDateText || !endDateText) {
+        return {
+            months: 0,
+            days: 0,
+            label: ""
+        };
+    }
+
+    const [startYear, startMonth, startDay] = startDateText.split("-").map(Number);
+    const [endYear, endMonth, endDay] = endDateText.split("-").map(Number);
+    let months = ((endYear - startYear) * 12) + (endMonth - startMonth);
+    let anchor = new Date(startYear, startMonth - 1 + months, startDay);
+    const endDate = new Date(endYear, endMonth - 1, endDay);
+
+    if (anchor > endDate) {
+        months -= 1;
+        anchor = new Date(startYear, startMonth - 1 + months, startDay);
+    }
+
+    const days = Math.max(0, Math.round((endDate - anchor) / 86400000));
+    const parts = [];
+
+    if (months) {
+        parts.push(`${months} ${months === 1 ? "month" : "months"}`);
+    }
+
+    if (days || !parts.length) {
+        parts.push(`${days} ${days === 1 ? "day" : "days"}`);
+    }
+
+    return {
+        months,
+        days,
+        label: parts.join(" ")
+    };
+}
+
 function formatStudentName(row) {
     const firstName = row.first_name || "";
     const lastName = row.last_name || "";
@@ -610,6 +648,112 @@ export async function getHistory(enrollmentId, limit = DEFAULT_HISTORY_LIMIT) {
     return result.rows.map(mapHistoryRow);
 }
 
+async function getWorksheetPacketSummaryForLevel({
+    enrollment,
+    levelMasterId,
+    levelCode,
+    maxWorksheetNo
+}) {
+    if (!enrollment?.enrollmentId || !levelMasterId) {
+        return {
+            levelMasterId: levelMasterId || null,
+            levelCode: levelCode || "-",
+            maxWorksheetNo,
+            rows: [],
+            totalRecords: 0
+        };
+    }
+
+    const result = await pool.query(`
+        WITH level_rows AS (
+            SELECT
+                wu.worksheet_date,
+                wm.worksheet_no AS packet_worksheet_no
+            FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm
+                ON wm.worksheet_master_id = wu.worksheet_master_id
+            WHERE wu.enrollment_id = $1
+              AND wm.level_master_id = $2
+              AND wu.cpws = TRUE
+        ),
+        bounds AS (
+            SELECT MAX(worksheet_date) AS latest_worksheet_date
+            FROM level_rows
+        ),
+        ranged AS (
+            SELECT level_rows.*
+            FROM level_rows
+            CROSS JOIN bounds
+            WHERE bounds.latest_worksheet_date IS NOT NULL
+              AND level_rows.worksheet_date > bounds.latest_worksheet_date - INTERVAL '1 year'
+              AND level_rows.worksheet_date <= bounds.latest_worksheet_date
+        ),
+        range_bounds AS (
+            SELECT
+                MIN(worksheet_date) AS first_worksheet_date,
+                MAX(worksheet_date) AS latest_worksheet_date
+            FROM ranged
+        )
+        SELECT
+            ranged.packet_worksheet_no,
+            COUNT(*)::int AS record_count,
+            range_bounds.first_worksheet_date,
+            range_bounds.latest_worksheet_date
+        FROM ranged
+        CROSS JOIN range_bounds
+        GROUP BY
+            ranged.packet_worksheet_no,
+            range_bounds.first_worksheet_date,
+            range_bounds.latest_worksheet_date
+        ORDER BY ranged.packet_worksheet_no
+    `, [
+        enrollment.enrollmentId,
+        levelMasterId
+    ]);
+    const firstWorksheetDate = normalizeDate(result.rows[0]?.first_worksheet_date);
+    const latestWorksheetDate = normalizeDate(result.rows[0]?.latest_worksheet_date);
+    const period = monthsDaysBetween(firstWorksheetDate, latestWorksheetDate);
+    const rows = result.rows.map((row) => ({
+        packetWorksheetNo: Number(row.packet_worksheet_no),
+        count: Number(row.record_count)
+    }));
+
+    return {
+        levelMasterId,
+        levelCode: levelCode || "-",
+        maxWorksheetNo,
+        firstWorksheetDate,
+        latestWorksheetDate,
+        period,
+        rows,
+        totalRecords: rows.reduce((sum, row) => sum + row.count, 0)
+    };
+}
+
+async function getWorksheetPacketSummary(enrollment) {
+    const [main, zun] = await Promise.all([
+        getWorksheetPacketSummaryForLevel({
+            enrollment,
+            levelMasterId: enrollment.currentLevelMasterId,
+            levelCode: enrollment.currentLevelCode,
+            maxWorksheetNo: 200
+        }),
+        getWorksheetPacketSummaryForLevel({
+            enrollment,
+            levelMasterId: enrollment.currentZunLevelMasterId,
+            levelCode: enrollment.currentZunLevelCode,
+            maxWorksheetNo: 100
+        })
+    ]);
+
+    return {
+        active: "main",
+        ...main,
+        main,
+        zun: enrollment.currentZunLevelMasterId ? zun : null
+    };
+}
+
 export async function getWorksheetMonthSummary({
     enrollmentId,
     billingDate,
@@ -661,6 +805,83 @@ export async function getWorksheetMonthSummary({
         totalRecords: Number(row.total_records || 0),
         usedDays: Number(row.used_days || 0),
         cpwsRecords: Number(row.cpws_records || 0)
+    };
+}
+
+async function getWorksheetProgressForLevel({
+    enrollment,
+    levelMasterId,
+    levelCode,
+    maxWorksheetNo
+}) {
+    if (!enrollment?.enrollmentId || !levelMasterId) {
+        return {
+            levelCode: levelCode || "-",
+            actualWorksheetNo: null,
+            displayWorksheetNo: 0,
+            maxWorksheetNo,
+            percent: 0
+        };
+    }
+
+    const result = await pool.query(`
+        WITH level_cpws AS (
+            SELECT
+                wu.actual_worksheet_no,
+                wu.worksheet_date
+            FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm
+                ON wm.worksheet_master_id = wu.worksheet_master_id
+            WHERE wu.enrollment_id = $1
+              AND wm.level_master_id = $2
+              AND wu.cpws = TRUE
+        ),
+        latest AS (
+            SELECT MAX(worksheet_date) AS latest_worksheet_date
+            FROM level_cpws
+        )
+        SELECT MAX(level_cpws.actual_worksheet_no)::int AS max_actual_worksheet_no
+        FROM level_cpws
+        CROSS JOIN latest
+        WHERE level_cpws.worksheet_date >= latest.latest_worksheet_date - INTERVAL '12 months'
+    `, [
+        enrollment.enrollmentId,
+        levelMasterId
+    ]);
+    const actualWorksheetNo = result.rows[0]?.max_actual_worksheet_no || null;
+    const displayWorksheetNo = actualWorksheetNo
+        ? Math.min(maxWorksheetNo, Number(actualWorksheetNo) + 9)
+        : 0;
+
+    return {
+        levelCode: levelCode || "-",
+        actualWorksheetNo,
+        displayWorksheetNo,
+        maxWorksheetNo,
+        percent: Math.round((displayWorksheetNo / maxWorksheetNo) * 100)
+    };
+}
+
+async function getWorksheetProgress(enrollment) {
+    const [main, zun] = await Promise.all([
+        getWorksheetProgressForLevel({
+            enrollment,
+            levelMasterId: enrollment.currentLevelMasterId,
+            levelCode: enrollment.currentLevelCode,
+            maxWorksheetNo: 200
+        }),
+        getWorksheetProgressForLevel({
+            enrollment,
+            levelMasterId: enrollment.currentZunLevelMasterId,
+            levelCode: enrollment.currentZunLevelCode,
+            maxWorksheetNo: 100
+        })
+    ]);
+
+    return {
+        active: enrollment.currentZunLevelMasterId ? "main" : "main",
+        main,
+        zun: enrollment.currentZunLevelMasterId ? zun : null
     };
 }
 
@@ -915,7 +1136,9 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
         mainWorksheetOptions,
         zunWorksheetOptions,
         history,
+        worksheetPacketSummary,
         worksheetMonthSummary,
+        worksheetProgress,
         defaultReceiveDate,
         completionState,
         cdState
@@ -924,9 +1147,11 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
         getWorksheetOptions(enrollment.currentLevelMasterId),
         getWorksheetOptions(enrollment.currentZunLevelMasterId),
         getHistory(enrollment.enrollmentId, historyLimit),
+        getWorksheetPacketSummary(enrollment),
         getWorksheetMonthSummary({
             enrollmentId: enrollment.enrollmentId
         }),
+        getWorksheetProgress(enrollment),
         getDefaultReceiveDate(enrollment.enrollmentId),
         getLevelCompletionState(enrollment),
         getCdState(enrollment)
@@ -957,7 +1182,9 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
             zun: zunWorksheetOptions
         },
         history,
+        worksheetPacketSummary,
         worksheetMonthSummary,
+        worksheetProgress,
         completionState,
         cdState
     };
@@ -1222,13 +1449,19 @@ export async function saveWorksheetEntries(payload) {
                 ? record.worksheetDate
                 : latestDate
         ), receiveDate);
-        const completionState = await getLevelCompletionState(enrollment);
+        const [completionState, worksheetProgress, worksheetPacketSummary] = await Promise.all([
+            getLevelCompletionState(enrollment),
+            getWorksheetProgress(enrollment),
+            getWorksheetPacketSummary(enrollment)
+        ]);
 
         return {
             success: true,
             records: savedRecords,
             nextReceiveDate: addDays(latestSavedDate, 1),
-            completionState
+            completionState,
+            worksheetProgress,
+            worksheetPacketSummary
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -1322,7 +1555,9 @@ function formatBillingPeriod({
 async function insertPaymentEnrollmentStatusHistory(client, receipt) {
     let inserted = 0;
 
-    for (const detail of receipt.details) {
+    const paymentDetails = receipt.receiptDetails || receipt.details;
+
+    for (const detail of paymentDetails) {
         const statusCode = String(detail.statusGroup1Code || "").toUpperCase();
 
         if (!detail.statusGroup1Id || ["C", "CP"].includes(statusCode)) {
@@ -1362,8 +1597,9 @@ async function insertPaymentEnrollmentStatusHistory(client, receipt) {
 }
 
 async function normalizeEnrollmentStatusesAfterPayment(client, receipt) {
+    const paymentDetails = receipt.receiptDetails || receipt.details;
     const enrollmentIds = [
-        ...new Set(receipt.details.map((detail) => Number(detail.enrollmentId)).filter(Number.isInteger))
+        ...new Set(paymentDetails.map((detail) => Number(detail.enrollmentId)).filter(Number.isInteger))
     ];
 
     if (!enrollmentIds.length) {
@@ -1411,20 +1647,26 @@ function calculateReceiptDetailFee({
     enrollment
 }) {
     const fullTuition = money(center.full_tuition);
+    const fullRegistrationFee = money(center.registration_fee);
     const fullAdditionalFee = enrollment.additionFee
         ? money(center.addition_full_tuition)
         : 0;
+    const statusGroup1Code = enrollment.statusGroup1Code || null;
     const statusGroup2Code = enrollment.statusGroup2Code || null;
     const isFree = ["F", "FS", "FSH"].includes(statusGroup2Code);
     const isHalfMonth = ["H", "FSH"].includes(statusGroup2Code);
+    const isNewEnrollment = statusGroup1Code === "N";
+    const isFreeRegistration = statusGroup2Code === "FRG";
+    const registrationFee = isNewEnrollment ? fullRegistrationFee : 0;
+    const registrationDiscount = isNewEnrollment && isFreeRegistration ? fullRegistrationFee : 0;
 
     if (isFree) {
         return {
             tuitionFee: 0,
-            registrationFee: 0,
+            registrationFee,
             additionalFee: 0,
-            discountAmount: 0,
-            netAmount: 0
+            discountAmount: registrationDiscount,
+            netAmount: money(registrationFee - registrationDiscount)
         };
     }
 
@@ -1434,13 +1676,14 @@ function calculateReceiptDetailFee({
     const additionalFee = isHalfMonth
         ? money(fullAdditionalFee / 2)
         : fullAdditionalFee;
-    const netAmount = money(tuitionFee + additionalFee);
+    const discountAmount = registrationDiscount;
+    const netAmount = money(tuitionFee + registrationFee + additionalFee - discountAmount);
 
     return {
         tuitionFee,
-        registrationFee: 0,
+        registrationFee,
         additionalFee,
-        discountAmount: 0,
+        discountAmount,
         netAmount
     };
 }
@@ -1493,6 +1736,7 @@ async function buildReceiptPreview({
     billingYear,
     paymentMethodId,
     existingBillingId = null,
+    selectedEnrollmentIds = null,
     client = pool
 }) {
     const normalizedEnrollmentId = Number(enrollmentId);
@@ -1565,16 +1809,45 @@ async function buildReceiptPreview({
         period.billingMonth,
         period.billingYear
     ]);
-    const existingBilling = existingBillingResult.rows[0] || null;
-    const useExistingBilling = existingBilling && (
+    const latestExistingBilling = existingBillingResult.rows[0] || null;
+    const useExistingBilling = latestExistingBilling && (
         existingBillingId === true
-        || Number(existingBillingId) === Number(existingBilling.billing_id)
+        || Number(existingBillingId) === Number(latestExistingBilling.billing_id)
     );
-    const shouldShowExistingReceiptNumber = Boolean(existingBilling);
-    const existingDetailsByEnrollmentId = new Map();
+    const existingBilling = useExistingBilling ? latestExistingBilling : null;
+    const paidDetailsByEnrollmentId = new Map();
+    const reprintDetailsByEnrollmentId = new Map();
 
-    if (shouldShowExistingReceiptNumber) {
-        const existingDetailsResult = await client.query(`
+    const paidDetailsResult = await client.query(`
+        SELECT DISTINCT ON (detail.enrollment_id)
+            detail.enrollment_id,
+            billing.billing_id,
+            billing.receipt_book,
+            billing.receipt_no,
+            detail.tuition_fee,
+            detail.registration_fee,
+            detail.additional_fee,
+            detail.discount_amount,
+            detail.net_amount
+        FROM ${TABLE_SCHEMA}.billing billing
+        JOIN ${TABLE_SCHEMA}.billing_detail detail
+            ON detail.billing_id = billing.billing_id
+        WHERE billing.student_id = $1
+          AND billing.billing_month = $2
+          AND billing.billing_year = $3
+        ORDER BY detail.enrollment_id, billing.billing_date DESC, billing.billing_id DESC
+    `, [
+        currentEnrollment.student_id,
+        period.billingMonth,
+        period.billingYear
+    ]);
+
+    paidDetailsResult.rows.forEach((row) => {
+        paidDetailsByEnrollmentId.set(Number(row.enrollment_id), row);
+    });
+
+    if (useExistingBilling) {
+        const reprintDetailsResult = await client.query(`
             SELECT
                 enrollment_id,
                 tuition_fee,
@@ -1586,11 +1859,11 @@ async function buildReceiptPreview({
             WHERE billing_id = $1
         `, [existingBilling.billing_id]);
 
-        existingDetailsResult.rows.forEach((row) => {
-            existingDetailsByEnrollmentId.set(Number(row.enrollment_id), row);
+        reprintDetailsResult.rows.forEach((row) => {
+            reprintDetailsByEnrollmentId.set(Number(row.enrollment_id), row);
         });
     }
-    const receiptNo = shouldShowExistingReceiptNumber
+    const receiptNo = useExistingBilling
         ? {
             receiptBook: existingBilling.receipt_book,
             receiptNo: existingBilling.receipt_no
@@ -1643,19 +1916,39 @@ async function buildReceiptPreview({
         currentEnrollment.student_id,
         ACTIVE_STATUS_CODES
     ]);
+    const requestedSelection = Array.isArray(selectedEnrollmentIds)
+        ? new Set(selectedEnrollmentIds.map(Number).filter((id) => Number.isInteger(id) && id > 0))
+        : null;
     const detailRows = enrollmentsResult.rows.map((row) => {
         const fee = calculateReceiptDetailFee({
             center,
             enrollment: {
                 additionFee: row.addition_fee,
+                statusGroup1Code: row.status_group1_code,
                 statusGroup2Code: row.status_group2_code
             }
         });
 
-        const existingDetail = existingDetailsByEnrollmentId.get(Number(row.enrollment_id));
+        const enrollmentKey = Number(row.enrollment_id);
+        const paidDetail = paidDetailsByEnrollmentId.get(enrollmentKey);
+        const reprintDetail = reprintDetailsByEnrollmentId.get(enrollmentKey);
+        const isPaid = Boolean(paidDetail);
+        const isReprintDetail = Boolean(reprintDetail);
+        const selected = useExistingBilling
+            ? isReprintDetail
+            : requestedSelection
+                ? requestedSelection.has(enrollmentKey) && !isPaid
+                : !isPaid;
+        const displayDetail = reprintDetail || paidDetail;
 
         return {
             enrollmentId: row.enrollment_id,
+            isPaid,
+            isSelected: selected,
+            isLocked: isPaid || useExistingBilling,
+            paidBillingId: paidDetail?.billing_id || null,
+            paidReceiptBook: paidDetail?.receipt_book || null,
+            paidReceiptNo: paidDetail?.receipt_no || null,
             subjectCode: row.subject_code,
             subjectName: row.subject_name,
             currentLevelMasterId: row.current_level_master_id,
@@ -1668,12 +1961,12 @@ async function buildReceiptPreview({
             statusGroup2Id: row.current_status_group2_id,
             statusGroup2Code: row.status_group2_code,
             statusGroup2Name: row.status_group2_name,
-            ...(existingDetail ? {
-                tuitionFee: money(existingDetail.tuition_fee),
-                registrationFee: money(existingDetail.registration_fee),
-                additionalFee: money(existingDetail.additional_fee),
-                discountAmount: money(existingDetail.discount_amount),
-                netAmount: money(existingDetail.net_amount)
+            ...(displayDetail ? {
+                tuitionFee: money(displayDetail.tuition_fee),
+                registrationFee: money(displayDetail.registration_fee),
+                additionalFee: money(displayDetail.additional_fee),
+                discountAmount: money(displayDetail.discount_amount),
+                netAmount: money(displayDetail.net_amount)
             } : fee)
         };
     });
@@ -1682,8 +1975,10 @@ async function buildReceiptPreview({
         throw httpError(400, "ไม่มี enrollment ที่รับเงินได้");
     }
 
-    const computedDiscountAmount = money(detailRows.reduce((sum, row) => sum + row.discountAmount, 0));
-    const computedNetAmount = money(detailRows.reduce((sum, row) => sum + row.netAmount, 0));
+    const receiptDetails = detailRows.filter((row) => row.isSelected);
+
+    const computedDiscountAmount = money(receiptDetails.reduce((sum, row) => sum + row.discountAmount, 0));
+    const computedNetAmount = money(receiptDetails.reduce((sum, row) => sum + row.netAmount, 0));
     const computedTotalAmount = money(computedNetAmount + computedDiscountAmount);
     const discountAmount = useExistingBilling
         ? money(existingBilling.discount_amount)
@@ -1697,8 +1992,9 @@ async function buildReceiptPreview({
 
     return {
         billingId: useExistingBilling ? existingBilling.billing_id : null,
-        alreadyPaid: Boolean(existingBilling),
-        existingBillingId: existingBilling?.billing_id || null,
+        alreadyPaid: detailRows.every((row) => row.isPaid),
+        partiallyPaid: detailRows.some((row) => row.isPaid) && detailRows.some((row) => !row.isPaid),
+        existingBillingId: latestExistingBilling?.billing_id || null,
         receiptBook: receiptNo.receiptBook,
         receiptNo: receiptNo.receiptNo,
         studentId: currentEnrollment.student_id,
@@ -1720,7 +2016,8 @@ async function buildReceiptPreview({
             centerName: center.center_name,
             instructor: center.instructor
         },
-        details: detailRows
+        details: detailRows,
+        receiptDetails
     };
 }
 
@@ -1731,7 +2028,8 @@ export async function previewReceipt(payload) {
         billingMonth: payload?.billingMonth,
         billingYear: payload?.billingYear,
         paymentMethodId: payload?.paymentMethodId,
-        existingBillingId: payload?.existingBillingId
+        existingBillingId: payload?.existingBillingId,
+        selectedEnrollmentIds: payload?.selectedEnrollmentIds
     });
     const paymentMethodsResult = await pool.query(`
         SELECT payment_method_id, payment_method_code, payment_method_name
@@ -1762,13 +2060,14 @@ export async function receiveReceiptPayment(payload) {
             billingMonth: payload?.billingMonth,
             billingYear: payload?.billingYear,
             paymentMethodId: payload?.paymentMethodId,
+            selectedEnrollmentIds: payload?.selectedEnrollmentIds,
             client
         });
 
-        if (receipt.alreadyPaid) {
+        if (!receipt.receiptDetails.length) {
             throw httpError(
                 409,
-                `น้องคนนี้จ่ายเงินค่าเรียนเดือน ${formatBillingPeriod(receipt)} แล้ว`
+                `น้องคนนี้จ่ายเงินค่าเรียนเดือน ${formatBillingPeriod(receipt)} ครบแล้ว`
             );
         }
         const insertBilling = await client.query(`
@@ -1800,7 +2099,7 @@ export async function receiveReceiptPayment(payload) {
         ]);
         const billingId = insertBilling.rows[0].billing_id;
 
-        for (const detail of receipt.details) {
+        for (const detail of receipt.receiptDetails) {
             await client.query(`
                 INSERT INTO ${TABLE_SCHEMA}.billing_detail (
                     billing_id,
@@ -1844,6 +2143,119 @@ export async function receiveReceiptPayment(payload) {
                 ...receipt,
                 billingId
             }
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function cancelReceiptPayment(payload) {
+    const billingId = Number(payload?.billingId);
+
+    if (!Number.isInteger(billingId) || billingId < 1) {
+        throw httpError(400, "Billing ID ไม่ถูกต้อง");
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const billingResult = await client.query(`
+            SELECT
+                billing_id,
+                receipt_book,
+                receipt_no,
+                student_id,
+                billing_month,
+                billing_year
+            FROM ${TABLE_SCHEMA}.billing
+            WHERE billing_id = $1
+            FOR UPDATE
+        `, [billingId]);
+        const billing = billingResult.rows[0];
+
+        if (!billing) {
+            throw httpError(404, "ไม่พบใบเสร็จนี้");
+        }
+
+        const detailsResult = await client.query(`
+            SELECT
+                detail.billing_detail_id,
+                detail.enrollment_id,
+                detail.status_group1_id,
+                detail.status_group2_id,
+                status1.status_code AS status_group1_code,
+                status1.status_name AS status_group1_name,
+                status2.status_code AS status_group2_code,
+                status2.status_name AS status_group2_name
+            FROM ${TABLE_SCHEMA}.billing_detail detail
+            JOIN ${TABLE_SCHEMA}.status_master status1
+                ON status1.status_id = detail.status_group1_id
+            LEFT JOIN ${TABLE_SCHEMA}.status_master status2
+                ON status2.status_id = detail.status_group2_id
+            WHERE detail.billing_id = $1
+            ORDER BY detail.billing_detail_id
+            FOR UPDATE OF detail
+        `, [billingId]);
+        const details = detailsResult.rows;
+
+        if (!details.length) {
+            throw httpError(409, "ใบเสร็จนี้ไม่มีรายละเอียดให้ยกเลิก");
+        }
+
+        let deletedStatusHistory = 0;
+
+        for (const detail of details) {
+            const deleteHistoryResult = await client.query(`
+                DELETE FROM ${TABLE_SCHEMA}.enrollment_status
+                WHERE enrollment_id = $1
+                  AND status_month = $2
+                  AND status_year = $3
+            `, [
+                detail.enrollment_id,
+                billing.billing_month,
+                billing.billing_year
+            ]);
+
+            deletedStatusHistory += deleteHistoryResult.rowCount;
+
+            await client.query(`
+                UPDATE ${TABLE_SCHEMA}.enrollment
+                SET current_status_group1_id = $1,
+                    current_status_group2_id = $2,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE enrollment_id = $3
+            `, [
+                detail.status_group1_id,
+                detail.status_group2_id,
+                detail.enrollment_id
+            ]);
+        }
+
+        await client.query(`
+            DELETE FROM ${TABLE_SCHEMA}.billing_detail
+            WHERE billing_id = $1
+        `, [billingId]);
+        await client.query(`
+            DELETE FROM ${TABLE_SCHEMA}.billing
+            WHERE billing_id = $1
+        `, [billingId]);
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            billingId,
+            receiptBook: billing.receipt_book,
+            receiptNo: billing.receipt_no,
+            billingMonth: billing.billing_month,
+            billingYear: billing.billing_year,
+            restoredEnrollments: details.length,
+            deletedStatusHistory
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -2349,10 +2761,22 @@ export async function deleteWorksheetEntry({
         `, [normalizedWorksheetUsedId, normalizedEnrollmentId]);
 
         await client.query("COMMIT");
+        const rawEnrollment = await getEnrollmentRow(normalizedEnrollmentId);
+        const refreshedEnrollment = rawEnrollment ? mapEnrollment(rawEnrollment) : null;
+        const [completionState, worksheetProgress, worksheetPacketSummary] = refreshedEnrollment
+            ? await Promise.all([
+                getLevelCompletionState(refreshedEnrollment),
+                getWorksheetProgress(refreshedEnrollment),
+                getWorksheetPacketSummary(refreshedEnrollment)
+            ])
+            : [null, null, null];
 
         return {
             success: true,
-            worksheetUsedId: normalizedWorksheetUsedId
+            worksheetUsedId: normalizedWorksheetUsedId,
+            completionState,
+            worksheetProgress,
+            worksheetPacketSummary
         };
     } catch (error) {
         await client.query("ROLLBACK");

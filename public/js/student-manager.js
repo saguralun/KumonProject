@@ -644,13 +644,15 @@ function refreshLevelSelects({
 
 function updateAddEnrollmentDerivedFields() {
     const form = els.addEnrollmentForm;
+    const subjectId = addFormSubjectId();
     const worksheet = worksheetById(form.elements.startingWorksheetMasterId.value);
     const level = worksheet ? levelById(worksheet.levelMasterId) : null;
     const dtMaster = (state.masters?.dtMasters || []).find((item) =>
         Number(item.id) === Number(form.elements.dtMasterId.value)
     );
+    const levelMatchesSubject = !level || Number(level.subjectId) === Number(subjectId);
 
-    setFormValue(form, "currentLevelMasterId", level?.id || "");
+    setFormValue(form, "currentLevelMasterId", levelMatchesSubject ? (level?.id || "") : "");
 
     if (dtMaster) {
         form.elements.score.max = dtMaster.maxScore;
@@ -817,6 +819,13 @@ function getAddEnrollmentChecks() {
     const scoreWithinMax = scoreIsValidBase
         && (!values.dtMasterId || !Number.isFinite(maxScore) || score <= maxScore);
     const usedTime = Number(values.usedTime);
+    const startingWorksheet = worksheetById(values.startingWorksheetMasterId);
+    const startingLevel = startingWorksheet ? levelById(startingWorksheet.levelMasterId) : null;
+    const startWorksheetMatchesSubject = Boolean(
+        values.startingWorksheetMasterId
+        && startingLevel
+        && Number(startingLevel.subjectId) === Number(values.subjectId)
+    );
 
     addCheck({
         fieldName: "subjectId",
@@ -868,6 +877,13 @@ function getAddEnrollmentChecks() {
         label: "Start Worksheet",
         message: "กรุณาเลือก Start Worksheet",
         ok: Boolean(values.startingWorksheetMasterId)
+    });
+    addCheck({
+        fieldName: "startingWorksheetMasterId",
+        fieldNames: ["startingWorksheetMasterId"],
+        label: "Start Worksheet",
+        message: "Start Worksheet ต้องตรงกับวิชาที่เลือก",
+        ok: startWorksheetMatchesSubject
     });
     addCheck({
         fieldName: "currentStatusGroup1Id",
@@ -1510,7 +1526,7 @@ function refreshAddStartingWorksheetFromDt() {
         value: (row) => row.id,
         label: (row) => `${levelById(row.levelMasterId)?.code || "-"}${row.worksheetNo}`,
         includeBlank: !dtMasterId || !worksheets.length,
-        blankLabel: dtMasterId ? "ไม่พบ start worksheet" : "เลือก DT ก่อน"
+        blankLabel: dtMasterId ? "ไม่พบ start worksheet ของวิชานี้" : "เลือก DT ก่อน"
     });
     form.elements.startingWorksheetMasterId.disabled = !dtMasterId || !worksheets.length;
     setAutoFilled(form, "startingWorksheetMasterId", Boolean(dtMasterId && worksheets.length));

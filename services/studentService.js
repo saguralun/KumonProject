@@ -361,7 +361,7 @@ async function assertEnrollmentMasters(client, data) {
     }
 
     if (Number(row.current_level_subject_id) !== Number(data.subjectId)) {
-        throw httpError(400, "Current level ไม่ตรงกับวิชา");
+        throw httpError(400, "Start Worksheet / Current level ไม่ตรงกับวิชา");
     }
 
     if (Number(row.current_level_type) !== 1) {
@@ -1011,8 +1011,9 @@ export async function createEnrollment(studentId, payload) {
             const dtResult = await client.query(`
                 SELECT 1
                 FROM ${TABLE_SCHEMA}.dt_result_master
-                WHERE dt_master_id = $1
-                  AND worksheet_master_id = $2
+                WHERE dt_result_master.dt_master_id = $1
+                  AND dt_result_master.worksheet_master_id = $2
+                LIMIT 1
             `, [dtData.dtMasterId, data.startingWorksheetMasterId]);
 
             if (!dtResult.rows[0]) {

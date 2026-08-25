@@ -9,7 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/worksheet.css">
+  <link rel="stylesheet" href="/css/worksheet.css?v=20260825-progress-at-hidden">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260825-progress-at-hidden">
 </head>
 
 <body>
@@ -57,9 +58,17 @@
           >
           <div class="search-results hidden" id="searchResults" role="listbox"></div>
         </div>
+
+        <button type="button" class="find-incomplete-ws-button" id="findIncompleteWs">
+          <span class="button-icon">🔎</span><span>หา WS ค้าง</span>
+        </button>
       </section>
 
       <section class="student-strip is-empty" id="studentStrip" aria-live="polite">
+        <div class="pattern-control student-pattern-control">
+          <span class="field-label">WS/day</span>
+          <div class="pattern-buttons" id="patternButtons"></div>
+        </div>
         <div class="student-primary">
           <div class="student-name" id="studentName">ยังไม่ได้เลือกเด็ก</div>
           <div class="student-meta" id="studentMeta">เลือกจากช่องค้นหาด้านบน</div>
@@ -71,9 +80,25 @@
       </section>
 
       <section class="input-layout">
-        <div class="pattern-control">
-          <span class="field-label">WS/day</span>
-          <div class="pattern-buttons" id="patternButtons"></div>
+        <div class="worksheet-progress-card" aria-label="Worksheet progress">
+          <div class="worksheet-progress-percent" id="worksheetProgressCaption">0%</div>
+          <div class="worksheet-progress-tabs hidden" id="worksheetProgressTabs" aria-label="Worksheet progress mode">
+            <button type="button" class="worksheet-progress-tab active" data-progress-kind="main"><span>Main</span></button>
+            <button type="button" class="worksheet-progress-tab" data-progress-kind="zun"><span>Zun</span></button>
+          </div>
+          <div class="worksheet-progress-ring" id="worksheetProgressRing">
+            <svg class="worksheet-progress-svg" viewBox="0 0 120 120" aria-hidden="true">
+              <circle class="worksheet-progress-track" cx="60" cy="60" r="52" pathLength="100"></circle>
+              <circle class="worksheet-progress-bar" cx="60" cy="60" r="52" pathLength="100"></circle>
+            </svg>
+            <div class="worksheet-progress-core">
+              <div class="worksheet-progress-level" id="worksheetProgressLevel">-</div>
+              <div class="worksheet-progress-value" id="worksheetProgressValue">0</div>
+              <button type="button" class="progress-at-button hidden" id="completeWsLevel" disabled>
+                <span class="button-icon">📝</span><span>สอบ AT</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div class="date-control">
@@ -98,7 +123,12 @@
               <div class="panel-title">Preview</div>
               <div class="subtle" id="previewCount">0 records</div>
             </div>
-            <button type="button" class="save-button" id="saveButton" disabled>💾 Save</button>
+            <div class="preview-actions">
+              <button type="button" class="receive-cd-button hidden" id="receiveCd" disabled>
+                <span class="button-icon">💿</span><span>รับ CD</span>
+              </button>
+              <button type="button" class="save-button" id="saveButton" disabled>💾 Save</button>
+            </div>
           </div>
           <div class="preview-list" id="previewList">
             <div class="empty-state">ยังไม่มีรายการ</div>
@@ -106,12 +136,7 @@
         </aside>
       </section>
 
-      <section class="secondary-actions">
-        <button type="button" id="completeWsLevel" disabled><span class="button-icon">📝</span><span>สอบ AT</span></button>
-        <button type="button" id="completeZunLevel" disabled><span class="button-icon">🎯</span><span>จบ Zun</span></button>
-        <button type="button" id="receiveCd" disabled><span class="button-icon">💿</span><span>รับ CD</span></button>
-        <button type="button" id="findIncompleteWs"><span class="button-icon">🔎</span><span>หา WS ค้าง</span></button>
-      </section>
+      <button type="button" class="hidden" id="completeZunLevel" disabled aria-hidden="true"></button>
 
       <section class="history-panel">
         <div class="history-header">
@@ -130,8 +155,13 @@
             </select>
           </label>
         </div>
-        <div class="history-table-wrap" id="historyTableWrap">
-          <div class="empty-state">เลือกเด็กเพื่อดู history</div>
+        <div class="history-content">
+          <aside class="worksheet-packet-summary" id="worksheetPacketSummary">
+            <div class="empty-state">เลือกเด็กเพื่อดู graph</div>
+          </aside>
+          <div class="history-table-wrap" id="historyTableWrap">
+            <div class="empty-state">เลือกเด็กเพื่อดู history</div>
+          </div>
         </div>
       </section>
     </section>
@@ -220,6 +250,6 @@
   </div>
 
   <script src="/js/authClient.js"></script>
-  <script type="module" src="/js/worksheet/worksheet.js"></script>
+  <script type="module" src="/js/worksheet/worksheet.js?v=20260825-native-date-picker"></script>
 </body>
 </html>
