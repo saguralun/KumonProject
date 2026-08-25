@@ -3,6 +3,11 @@ import pool from "../config/db.js";
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
 const HISTORY_LIMIT = 80;
+const COMPLETER_LEVEL_BY_SUBJECT = new Map([
+    ["ME", "O"],
+    ["EFL", "O"],
+    ["TRP", "III"]
+]);
 
 function httpError(statusCode, message) {
     const error = new Error(message);
@@ -166,6 +171,10 @@ function formatStudentName(row) {
     return `${row.first_name || ""} ${row.last_name || ""}${nickname}`.trim();
 }
 
+function isCompleterLevel(subjectCode, levelCode) {
+    return COMPLETER_LEVEL_BY_SUBJECT.get(subjectCode) === levelCode;
+}
+
 function mapStudent(row) {
     return {
         studentId: row.student_id,
@@ -219,7 +228,9 @@ function mapEnrollment(row) {
         currentStatusGroup2Id: row.current_status_group2_id,
         statusGroup2Code: row.status_group2_code,
         statusGroup2Name: row.status_group2_name,
-        canComplete: row.current_level_code === "O" && row.has_passed_current_level_at === true,
+        canComplete: isCompleterLevel(row.subject_code, row.current_level_code)
+            && row.status_group1_code !== "CP"
+            && row.has_passed_current_level_at === true,
         canDeleteEnrollment: row.has_delete_blocker !== true,
         isKumonConnect: row.is_kumon_connect === true,
         remark: row.remark
@@ -612,7 +623,7 @@ export async function searchStudents({
             JOIN ${TABLE_SCHEMA}.status_master status
                 ON status.status_id = e.current_status_group1_id
             WHERE e.student_id = student.student_id
-              AND status.status_code IN ('A', 'OT')
+              AND status.status_code IN ('A', 'OT', 'CP')
         )`);
     }
 
@@ -1290,6 +1301,7 @@ async function lockEnrollmentForAction(client, studentId, enrollmentId) {
     const result = await client.query(`
         SELECT
             e.*,
+            subject.subject_code,
             level.level_code AS current_level_code,
             EXISTS (
                 SELECT 1
@@ -1301,6 +1313,8 @@ async function lockEnrollmentForAction(client, studentId, enrollmentId) {
                   AND at_used.is_pass = TRUE
             ) AS has_passed_current_level_at
         FROM ${TABLE_SCHEMA}.enrollment e
+        JOIN ${TABLE_SCHEMA}.subject_master subject
+            ON subject.subject_id = e.subject_id
         JOIN ${TABLE_SCHEMA}.level_master level
             ON level.level_master_id = e.current_level_master_id
         WHERE e.student_id = $1
@@ -1402,8 +1416,9 @@ export async function applyEnrollmentStatusAction(studentId, enrollmentId, paylo
             ]);
             message = `Resume แล้ว: status ${resumeStatusCode}, เดือนคิดเงิน ${resumePeriod.month}/${resumePeriod.year}, หยุด ${missedMonths} เดือน${halfMonthStatusId ? ", Half Month" : ""}${shouldUpdateStartDate ? ", อัปเดต start date" : ""}`;
         } else if (action === "completer") {
-            if (enrollment.current_level_code !== "O" || enrollment.has_passed_current_level_at !== true) {
-                throw httpError(400, "Completer ใช้ได้เฉพาะ level O ที่สอบ AT ผ่านแล้ว");
+            if (!isCompleterLevel(enrollment.subject_code, enrollment.current_level_code)
+                || enrollment.has_passed_current_level_at !== true) {
+                throw httpError(400, "Completer ใช้ได้เฉพาะ ME/EFL level O หรือ TRP level III ที่สอบ AT ผ่านแล้ว");
             }
 
             statusCode = "CP";

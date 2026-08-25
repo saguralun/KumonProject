@@ -87,6 +87,7 @@ const state = {
     patternCode: "daily10",
     progressKind: "main",
     isSaving: false,
+    isCompletingLevel: false,
     isCompletingZun: false,
     atModal: {
         editingAtUsedId: null,
@@ -836,19 +837,30 @@ function updateSecondaryActions() {
     }
 
     const atCompletion = context.completionState?.atCompletion;
+    const freeLevelCompletion = context.completionState?.freeLevelCompletion;
     const canCompleteAt = Boolean(atCompletion?.canComplete);
+    const canCompleteFreeLevel = Boolean(freeLevelCompletion?.canComplete);
     const hasCompletionPacket = Boolean(
         atCompletion?.bypassWorksheet191
         || graphHasCompletionPacket("main")
     );
-    const canUseAtButton = state.progressKind === "main" && canCompleteAt && hasCompletionPacket;
+    const canUseFreeLevelButton = Boolean(
+        state.progressKind === "main"
+        && canCompleteFreeLevel
+    );
+    const canUseAtButton = Boolean(
+        state.progressKind === "main"
+        && canCompleteAt
+        && hasCompletionPacket
+    );
+    const canUseMainCompleteButton = canUseAtButton || canUseFreeLevelButton;
 
-    els.completeWsLevel.disabled = !canUseAtButton;
-    els.completeWsLevel.classList.toggle("hidden", !canUseAtButton);
+    els.completeWsLevel.disabled = !canUseMainCompleteButton || state.isCompletingLevel;
+    els.completeWsLevel.classList.toggle("hidden", !canUseMainCompleteButton);
     setActionButton(
         els.completeWsLevel,
-        "📝",
-        "สอบ AT"
+        canUseFreeLevelButton ? "🎯" : "📝",
+        canUseFreeLevelButton ? "จบ Level" : "สอบ AT"
     );
     const canCompleteZun = Boolean(context.completionState?.zunCompletion?.canComplete);
 
@@ -1156,6 +1168,52 @@ function updateAtSaveState() {
     els.atSaveButton.disabled = !isAtFormReady();
 }
 
+function focusAndSelect(input) {
+    input.focus();
+
+    if (typeof input.select === "function") {
+        input.select();
+    }
+}
+
+function moveAtFocus(event, nextElement) {
+    if (event.key !== "Enter" && event.key !== "Tab") {
+        return;
+    }
+
+    if (event.key === "Tab" && event.shiftKey) {
+        return;
+    }
+
+    event.preventDefault();
+    focusAndSelect(nextElement);
+}
+
+function changeAtGroup(delta) {
+    const current = Number.parseInt(els.atGroup.value, 10);
+    const baseValue = Number.isInteger(current) ? current : 1;
+    const nextValue = Math.min(5, Math.max(1, baseValue + delta));
+
+    els.atGroup.value = String(nextValue);
+    updateAtSaveState();
+}
+
+function handleAtGroupKeydown(event) {
+    if (event.key === "ArrowUp") {
+        event.preventDefault();
+        changeAtGroup(1);
+        return;
+    }
+
+    if (event.key === "ArrowDown") {
+        event.preventDefault();
+        changeAtGroup(-1);
+        return;
+    }
+
+    moveAtFocus(event, els.atSaveButton);
+}
+
 function atAttemptLabel(atCompletion) {
     const attemptNo = Number(atCompletion?.nextAttemptNo || 1);
 
@@ -1284,7 +1342,12 @@ async function saveAtCompletion(event) {
 
         closeAtModal();
         await loadEnrollmentContext(result.enrollmentId);
-        setStatus(result.isPass ? "บันทึก AT ผ่าน และเลื่อน level แล้ว" : "บันทึก AT ไม่ผ่านแล้ว", "success");
+        setStatus(
+            result.isPass
+                ? (result.nextLevelMasterId ? "บันทึก AT ผ่าน และเลื่อน level แล้ว" : "บันทึก AT ผ่านแล้ว")
+                : "บันทึก AT ไม่ผ่านแล้ว",
+            "success"
+        );
     } catch (error) {
         setStatus(error.message, "error");
     } finally {
@@ -1315,6 +1378,40 @@ async function completeZunLevel() {
         setStatus(error.message, "error");
     } finally {
         state.isCompletingZun = false;
+        updateSecondaryActions();
+    }
+}
+
+async function completeWorksheetLevelWithoutAt() {
+    if (!state.context || state.isCompletingLevel || els.completeWsLevel.disabled) {
+        return;
+    }
+
+    const completion = state.context.completionState?.freeLevelCompletion;
+
+    if (!completion?.canComplete) {
+        return;
+    }
+
+    if (!window.confirm(`จบ Level ${completion.currentLevelCode} และเลื่อนเป็น ${completion.nextLevelCode} ใช่ไหม?`)) {
+        return;
+    }
+
+    state.isCompletingLevel = true;
+    updateSecondaryActions();
+    setStatus("กำลังจบ Level...");
+
+    try {
+        const result = await worksheetApi.completeWorksheetLevel({
+            enrollmentId: state.context.enrollment.enrollmentId
+        });
+
+        await loadEnrollmentContext(result.enrollmentId);
+        setStatus(`จบ ${result.previousLevelCode} แล้ว และเปลี่ยนเป็น ${result.nextLevelCode}`, "success");
+    } catch (error) {
+        setStatus(error.message, "error");
+    } finally {
+        state.isCompletingLevel = false;
         updateSecondaryActions();
     }
 }
@@ -1668,6 +1765,11 @@ function bindEvents() {
     });
 
     els.completeWsLevel.addEventListener("click", () => {
+        if (state.context?.completionState?.freeLevelCompletion?.canComplete) {
+            completeWorksheetLevelWithoutAt();
+            return;
+        }
+
         openAtModal();
     });
     els.completeZunLevel.addEventListener("click", () => {
@@ -1726,6 +1828,9 @@ function bindEvents() {
     ].forEach((input) => {
         input.addEventListener("input", updateAtSaveState);
     });
+    els.atScore.addEventListener("keydown", (event) => moveAtFocus(event, els.atTime));
+    els.atTime.addEventListener("keydown", (event) => moveAtFocus(event, els.atGroup));
+    els.atGroup.addEventListener("keydown", handleAtGroupKeydown);
 
     bindWorksheetKeyboard(document, {
         stepWorksheet,

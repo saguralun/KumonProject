@@ -2,6 +2,12 @@ import pool from "../config/db.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
+const FREE_COMPLETION_LEVEL_CODES = ["6A", "5A"];
+const COMPLETER_LEVEL_BY_SUBJECT = new Map([
+    ["ME", "O"],
+    ["EFL", "O"],
+    ["TRP", "III"]
+]);
 const DEFAULT_HISTORY_LIMIT = 30;
 const MAX_HISTORY_LIMIT = 100;
 
@@ -66,6 +72,10 @@ function httpError(statusCode, message) {
     error.statusCode = statusCode;
 
     return error;
+}
+
+function isCompleterLevel(subjectCode, levelCode) {
+    return COMPLETER_LEVEL_BY_SUBJECT.get(subjectCode) === levelCode;
 }
 
 function normalizeHistoryLimit(value) {
@@ -914,6 +924,7 @@ async function getLevelCompletionState(enrollment) {
             at_master.at_master_id,
             at_master.max_score,
             at_master.max_time,
+            current_level.level_code AS current_level_code,
             current_level.next_level_master_id,
             next_level.level_code AS next_level_code
         FROM ${TABLE_SCHEMA}.level_master current_level
@@ -1009,6 +1020,13 @@ async function getLevelCompletionState(enrollment) {
 
     const latestAnyAt = await getLatestAtAttempt(enrollment.enrollmentId);
     const hasWorksheet191 = Boolean(row.can_complete_ws_level);
+    const nextLevelMasterId = row.next_level_master_id ?? null;
+    const canCompleteWithoutAt = Boolean(
+        hasWorksheet191
+        && !atMasterId
+        && nextLevelMasterId
+        && FREE_COMPLETION_LEVEL_CODES.includes(row.current_level_code)
+    );
     const canCompleteWsLevel = Boolean(
         (hasWorksheet191 || enrollment.isKumonConnect)
         && atMasterId
@@ -1027,11 +1045,19 @@ async function getLevelCompletionState(enrollment) {
             atMasterId,
             maxScore: row.max_score ?? null,
             maxTime: row.max_time ?? null,
-            nextLevelMasterId: row.next_level_master_id ?? null,
+            nextLevelMasterId,
             nextLevelCode: row.next_level_code ?? null,
             attemptCount,
             nextAttemptNo: attemptCount + 1,
             latestAttempt
+        },
+        freeLevelCompletion: {
+            canComplete: canCompleteWithoutAt,
+            hasWorksheet191,
+            currentLevelMasterId: enrollment.currentLevelMasterId,
+            currentLevelCode: row.current_level_code ?? enrollment.currentLevelCode,
+            nextLevelMasterId,
+            nextLevelCode: row.next_level_code ?? null
         },
         zunCompletion,
         latestAtCompletion: latestAnyAt
@@ -2377,6 +2403,7 @@ async function getCurrentAtMaster(client, enrollmentId) {
         SELECT
             e.enrollment_id,
             e.current_level_master_id,
+            subject.subject_code,
             at_master.at_master_id,
             at_master.max_score,
             at_master.max_time,
@@ -2384,6 +2411,8 @@ async function getCurrentAtMaster(client, enrollmentId) {
             level.next_level_master_id,
             next_level.level_code AS next_level_code
         FROM ${TABLE_SCHEMA}.enrollment e
+        JOIN ${TABLE_SCHEMA}.subject_master subject
+            ON subject.subject_id = e.subject_id
         JOIN ${TABLE_SCHEMA}.level_master level
             ON level.level_master_id = e.current_level_master_id
         LEFT JOIN ${TABLE_SCHEMA}.level_master next_level
@@ -2599,17 +2628,19 @@ export async function saveAtCompletion(payload) {
 
             if (isPass) {
                 if (!nextLevelMasterId) {
-                    throw httpError(400, "Level นี้ไม่มี next level ให้เลื่อน");
+                    if (!isCompleterLevel(atMaster.subject_code, atMaster.level_code)) {
+                        throw httpError(400, "Level นี้ไม่มี next level ให้เลื่อน");
+                    }
+                } else {
+                    await client.query(`
+                        UPDATE ${TABLE_SCHEMA}.enrollment
+                        SET
+                            current_level_master_id = $1,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE enrollment_id = $2
+                          AND current_level_master_id = $3
+                    `, [nextLevelMasterId, enrollmentId, levelMasterId]);
                 }
-
-                await client.query(`
-                    UPDATE ${TABLE_SCHEMA}.enrollment
-                    SET
-                        current_level_master_id = $1,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE enrollment_id = $2
-                      AND current_level_master_id = $3
-                `, [nextLevelMasterId, enrollmentId, levelMasterId]);
             }
         }
 
@@ -2622,6 +2653,105 @@ export async function saveAtCompletion(payload) {
             levelMasterId,
             nextLevelMasterId,
             isPass
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function completeWorksheetLevelWithoutAt(payload) {
+    const enrollmentId = Number(payload?.enrollmentId);
+
+    if (!Number.isInteger(enrollmentId) || enrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const result = await client.query(`
+            SELECT
+                e.enrollment_id,
+                e.current_level_master_id,
+                current_level.level_code AS current_level_code,
+                current_level.next_level_master_id,
+                next_level.level_code AS next_level_code,
+                EXISTS (
+                    SELECT 1
+                    FROM ${TABLE_SCHEMA}.worksheet_used wu
+                    JOIN ${TABLE_SCHEMA}.worksheet_master wm
+                        ON wm.worksheet_master_id = wu.worksheet_master_id
+                    WHERE wu.enrollment_id = e.enrollment_id
+                      AND wm.level_master_id = e.current_level_master_id
+                      AND wm.worksheet_no = 191
+                      AND wu.cpws = TRUE
+                ) AS has_worksheet_191,
+                EXISTS (
+                    SELECT 1
+                    FROM ${TABLE_SCHEMA}.at_master at_master
+                    WHERE at_master.subject_id = e.subject_id
+                      AND at_master.level_master_id = e.current_level_master_id
+                ) AS has_at_master
+            FROM ${TABLE_SCHEMA}.enrollment e
+            JOIN ${TABLE_SCHEMA}.status_master status
+                ON status.status_id = e.current_status_group1_id
+            JOIN ${TABLE_SCHEMA}.level_master current_level
+                ON current_level.level_master_id = e.current_level_master_id
+            LEFT JOIN ${TABLE_SCHEMA}.level_master next_level
+                ON next_level.level_master_id = current_level.next_level_master_id
+            WHERE e.enrollment_id = $1
+              AND status.status_code = ANY($2::text[])
+            FOR UPDATE OF e
+        `, [enrollmentId, ACTIVE_STATUS_CODES]);
+        const row = result.rows[0];
+
+        if (!row) {
+            throw httpError(404, "ไม่พบ enrollment ที่ยังใช้งานอยู่");
+        }
+
+        if (!FREE_COMPLETION_LEVEL_CODES.includes(row.current_level_code)) {
+            throw httpError(400, "Level นี้ต้องสอบ AT ตามปกติ");
+        }
+
+        if (row.has_at_master) {
+            throw httpError(400, "Level นี้มี AT master ต้องสอบ AT ตามปกติ");
+        }
+
+        if (!row.has_worksheet_191) {
+            throw httpError(400, "ยังจบ Level ไม่ได้ ต้องมีชุด 191 ก่อน");
+        }
+
+        if (!row.next_level_master_id) {
+            throw httpError(400, "Level นี้ไม่มี next level ให้เลื่อน");
+        }
+
+        await client.query(`
+            UPDATE ${TABLE_SCHEMA}.enrollment
+            SET
+                current_level_master_id = $1,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE enrollment_id = $2
+              AND current_level_master_id = $3
+        `, [
+            row.next_level_master_id,
+            enrollmentId,
+            row.current_level_master_id
+        ]);
+
+        await client.query("COMMIT");
+
+        return {
+            success: true,
+            enrollmentId,
+            previousLevelMasterId: row.current_level_master_id,
+            previousLevelCode: row.current_level_code,
+            nextLevelMasterId: row.next_level_master_id,
+            nextLevelCode: row.next_level_code
         };
     } catch (error) {
         await client.query("ROLLBACK");

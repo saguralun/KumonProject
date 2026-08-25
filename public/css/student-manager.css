@@ -435,6 +435,28 @@ textarea:focus {
   background: #ffffff;
 }
 
+.complete-button {
+  border-color: #f59e0b;
+  background: linear-gradient(135deg, #fef3c7, #fde68a);
+  color: #78350f;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(245, 158, 11, 0.2);
+}
+
+.complete-button:hover:not(:disabled) {
+  border-color: #d97706;
+  background: linear-gradient(135deg, #fde68a, #fbbf24);
+  box-shadow: 0 12px 24px rgba(245, 158, 11, 0.28);
+  transform: translateY(-1px);
+}
+
+.complete-button:disabled {
+  border-color: #e2e8f0;
+  background: var(--surface-soft);
+  color: #94a3b8;
+  box-shadow: none;
+}
+
 .danger-button {
   border-color: #fecaca;
   background: #fff1f2;

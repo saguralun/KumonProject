@@ -1757,7 +1757,7 @@ function renderEnrollmentTabs() {
     state.selectedEnrollmentId = active.enrollmentId;
     const canLeave = active.statusGroup1Code === "C";
     const canResume = ["A", "OT"].includes(active.statusGroup1Code);
-    const canComplete = Boolean(active.canComplete);
+    const canComplete = Boolean(active.canComplete) && active.statusGroup1Code !== "CP";
     const canDeleteEnrollment = Boolean(active.canDeleteEnrollment);
 
     els.enrollmentAbsentButton.classList.toggle("hidden", !canLeave);

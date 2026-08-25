@@ -1,6 +1,7 @@
 import express from "express";
 import {
     WORKSHEET_PATTERNS,
+    completeWorksheetLevelWithoutAt,
     completeZunLevel,
     deleteWorksheetEntry,
     getEnrollmentContext,
@@ -149,6 +150,16 @@ router.post("/at-completion", async (req, res) => {
 router.post("/zun-completion", async (req, res) => {
     try {
         const result = await completeZunLevel(req.body);
+
+        res.json(result);
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.post("/level-completion", async (req, res) => {
+    try {
+        const result = await completeWorksheetLevelWithoutAt(req.body);
 
         res.json(result);
     } catch (error) {

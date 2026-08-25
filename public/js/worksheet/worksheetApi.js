@@ -107,6 +107,13 @@ export const worksheetApi = {
         });
     },
 
+    async completeWorksheetLevel(payload) {
+        return requestJson("/api/worksheet/level-completion", {
+            method: "POST",
+            body: JSON.stringify(payload)
+        });
+    },
+
     async receiveCd(payload) {
         return requestJson("/api/worksheet/cd/receive", {
             method: "POST",
