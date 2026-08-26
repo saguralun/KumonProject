@@ -211,7 +211,7 @@ textarea:focus {
 .student-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 5px;
   min-height: 0;
   overflow: auto;
   padding-right: 2px;
@@ -285,7 +285,7 @@ textarea:focus {
   border-color: rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.06);
   color: #edf6ff;
-  padding: 10px 11px;
+  padding: 8px 11px;
   text-align: left;
 }
 
@@ -307,16 +307,6 @@ textarea:focus {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
-}
-
-.student-item-meta {
-  margin-top: 5px;
-  color: #a9bdd2;
-  font-size: 12px;
-}
-
-.student-item.active .student-item-meta {
-  color: var(--muted);
 }
 
 .student-workspace {
@@ -401,6 +391,9 @@ textarea:focus {
 }
 
 .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-size: 16px;
   font-weight: 700;
 }
@@ -600,22 +593,6 @@ label span {
 
 .enrollment-form {
   margin-top: 10px;
-}
-
-.enrollment-fields {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.form-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.form-actions > .primary-button:last-child {
-  margin-left: auto;
 }
 
 .history-panel {
@@ -1133,7 +1110,7 @@ html[data-role="staff"] .hidden,
 
   .student-workspace {
     display: grid;
-    grid-template-rows: auto auto minmax(210px, 1fr);
+    grid-template-rows: auto auto auto minmax(210px, 1fr);
     gap: 8px;
     height: 100vh;
     min-height: 0;
@@ -1244,10 +1221,6 @@ html[data-role="staff"] .hidden,
 
   .enrollment-fields {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .form-actions {
-    margin-top: 7px;
   }
 
   .history-panel {

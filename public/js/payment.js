@@ -1,8 +1,6 @@
 const els = {
     billingMonth: document.getElementById("billingMonth"),
     billingYear: document.getElementById("billingYear"),
-    subjectFilter: document.getElementById("subjectFilter"),
-    paymentStatus: document.getElementById("paymentStatus"),
     paymentSearch: document.getElementById("paymentSearch"),
     refreshButton: document.getElementById("refreshButton"),
     pageSubtitle: document.getElementById("pageSubtitle"),
@@ -14,6 +12,9 @@ const els = {
     totalNetAmount: document.getElementById("totalNetAmount"),
     expectedNetAmount: document.getElementById("expectedNetAmount"),
     unpaidNetAmount: document.getElementById("unpaidNetAmount"),
+    progressPaidSegment: document.getElementById("progressPaidSegment"),
+    progressPartialSegment: document.getElementById("progressPartialSegment"),
+    progressUnpaidSegment: document.getElementById("progressUnpaidSegment"),
     resultSubtitle: document.getElementById("resultSubtitle"),
     paymentTableWrap: document.getElementById("paymentTableWrap"),
     printUnpaidButton: document.getElementById("printUnpaidButton"),
@@ -37,7 +38,11 @@ const state = {
     receipt: null,
     paymentMethods: [],
     isReceivingPayment: false,
-    isCancellingPayment: false
+    isCancellingPayment: false,
+    // The sidebar Subject/Status <select> filters were removed as
+    // unnecessary; status filtering still lives in the quick-filter
+    // buttons above the table, backed by this instead of a hidden select.
+    statusFilter: "all"
 };
 
 function selectInputText(input) {
@@ -152,6 +157,23 @@ function formatDateDisplay(dateText) {
     return `${day}/${month}/${Number(year) + 543}`;
 }
 
+function formatTimeDisplay(dateTimeText) {
+    const date = new Date(dateTimeText);
+
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+
+    return date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+// Only for the printed receipt — the plain formatMoney() below is used
+// all over the page (summary cards, table cells, CSV export) where a
+// "บาท" suffix isn't wanted.
+function formatReceiptMoney(value) {
+    return `${formatMoney(value)} บาท`;
+}
+
 function formatMoney(value) {
     return Number(value || 0).toLocaleString("th-TH", {
         minimumFractionDigits: 2,
@@ -182,18 +204,30 @@ function selectedPeriod() {
 }
 
 function renderSummary(summary) {
-    els.totalStudents.textContent = summary.totalStudents || 0;
-    els.paidStudents.textContent = summary.paidStudents || 0;
-    els.partialStudents.textContent = summary.partialStudents || 0;
-    els.unpaidStudents.textContent = summary.unpaidStudents || 0;
+    const total = summary.totalStudents || 0;
+    const paid = summary.paidStudents || 0;
+    const partial = summary.partialStudents || 0;
+    const unpaid = summary.unpaidStudents || 0;
+
+    els.totalStudents.textContent = total;
+    els.paidStudents.textContent = paid;
+    els.partialStudents.textContent = partial;
+    els.unpaidStudents.textContent = unpaid;
     els.totalNetAmount.textContent = formatMoney(summary.totalNetAmount || 0);
     els.expectedNetAmount.textContent = formatMoney(summary.expectedNetAmount || 0);
     els.unpaidNetAmount.textContent = formatMoney(summary.unpaidNetAmount || 0);
+
+    // At-a-glance payment-progress bar under the status cards.
+    const pct = (count) => (total > 0 ? `${(count / total) * 100}%` : "0%");
+
+    els.progressPaidSegment.style.width = pct(paid);
+    els.progressPartialSegment.style.width = pct(partial);
+    els.progressUnpaidSegment.style.width = pct(unpaid);
 }
 
 function syncQuickFilterButtons() {
     document.querySelectorAll("[data-status-filter]").forEach((button) => {
-        button.classList.toggle("is-active", button.dataset.statusFilter === els.paymentStatus.value);
+        button.classList.toggle("is-active", button.dataset.statusFilter === state.statusFilter);
     });
 }
 
@@ -324,8 +358,8 @@ async function loadPaymentStatus() {
     const params = new URLSearchParams({
         billingMonth: String(period.billingMonth),
         billingYear: String(period.billingYear),
-        subject: els.subjectFilter.value,
-        status: els.paymentStatus.value,
+        subject: "ALL",
+        status: state.statusFilter,
         query: els.paymentSearch.value.trim(),
         limit: "1000"
     });
@@ -462,7 +496,7 @@ function renderReceipt(receipt) {
         </div>
         <div class="receipt-row">
             <span>Date</span>
-            <strong>${escapeHtml(formatDateDisplay(receipt.billingDate))}</strong>
+            <strong>${escapeHtml(formatDateDisplay(receipt.billingDate))}${receipt.billingTime ? ` ${escapeHtml(formatTimeDisplay(receipt.billingTime))}` : ""}</strong>
         </div>
         <div>Student: ${escapeHtml(receipt.studentName)}</div>
         <div>Student ID: ${escapeHtml(receipt.studentId)}</div>
@@ -477,30 +511,30 @@ function renderReceipt(receipt) {
                 </div>
                 <div class="receipt-row">
                     <span>Tuition</span>
-                    <span>${formatMoney(detail.tuitionFee)}</span>
+                    <span>${formatReceiptMoney(detail.tuitionFee)}</span>
                 </div>
                 ${Number(detail.additionalFee) > 0 ? `
                     <div class="receipt-row">
                         <span>Additional</span>
-                        <span>${formatMoney(detail.additionalFee)}</span>
+                        <span>${formatReceiptMoney(detail.additionalFee)}</span>
                     </div>
                 ` : ""}
                 ${Number(detail.registrationFee) > 0 ? `
                     <div class="receipt-row">
                         <span>Registration</span>
-                        <span>${formatMoney(detail.registrationFee)}</span>
+                        <span>${formatReceiptMoney(detail.registrationFee)}</span>
                     </div>
                 ` : ""}
                 ${Number(detail.discountAmount) > 0 ? `
                     <div class="receipt-row">
                         <span>Discount</span>
-                        <span>-${formatMoney(detail.discountAmount)}</span>
+                        <span>-${formatReceiptMoney(detail.discountAmount)}</span>
                     </div>
                 ` : ""}
                 ${detail.statusGroup2Name ? `<div>${escapeHtml(detail.statusGroup2Name)}</div>` : ""}
                 <div class="receipt-row">
                     <span>Subtotal</span>
-                    <strong>${formatMoney(detail.netAmount)}</strong>
+                    <strong>${formatReceiptMoney(detail.netAmount)}</strong>
                 </div>
             </div>
         `).join("")}
@@ -508,15 +542,15 @@ function renderReceipt(receipt) {
         <div class="receipt-line"></div>
         <div class="receipt-row">
             <span>Total</span>
-            <span>${formatMoney(receipt.totalAmount)}</span>
+            <span>${formatReceiptMoney(receipt.totalAmount)}</span>
         </div>
         <div class="receipt-row">
             <span>Discount</span>
-            <span>${formatMoney(receipt.discountAmount)}</span>
+            <span>${formatReceiptMoney(receipt.discountAmount)}</span>
         </div>
         <div class="receipt-row receipt-total">
             <span>Net</span>
-            <span>${formatMoney(receipt.netAmount)}</span>
+            <span>${formatReceiptMoney(receipt.netAmount)}</span>
         </div>
         ${paidText}
         <div class="receipt-line"></div>
@@ -797,9 +831,7 @@ function printUnpaidList() {
 function bindEvents() {
     [
         els.billingMonth,
-        els.billingYear,
-        els.subjectFilter,
-        els.paymentStatus
+        els.billingYear
     ].forEach((element) => element.addEventListener("change", () => {
         syncQuickFilterButtons();
         loadPaymentStatus();
@@ -815,7 +847,8 @@ function bindEvents() {
     els.exportUnpaidButton.addEventListener("click", exportUnpaidCsv);
     document.querySelectorAll("[data-status-filter]").forEach((button) => {
         button.addEventListener("click", () => {
-            els.paymentStatus.value = button.dataset.statusFilter;
+            state.statusFilter = button.dataset.statusFilter;
+            syncQuickFilterButtons();
             loadPaymentStatus();
         });
     });

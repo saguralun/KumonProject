@@ -332,9 +332,17 @@ html[data-role="staff"] [data-staff-up] {
 .do-pick-row {
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.85fr) 130px;
+  gap: 10px;
   align-items: start;
+}
+
+.do-pick-row.level-hidden {
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.85fr);
+}
+
+.do-pick-row.level-hidden #levelField {
+  display: none;
 }
 
 .do-pick-field {
@@ -349,28 +357,24 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .do-pick-field select {
-  height: 38px;
+  height: 32px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--surface);
-  padding: 0 10px;
+  padding: 0 8px;
   color: var(--text);
   font-weight: 700;
+  font-size: 13px;
 }
 
 .subject-buttons {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
+  gap: 5px;
 }
 
 .subject-buttons.two-up {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  max-width: 220px;
-}
-
-.do-pick-row-type {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .type-badge {
@@ -395,12 +399,13 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .subject-button {
-  min-height: 38px;
+  min-height: 32px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--surface);
   color: var(--text);
   font-weight: 800;
+  font-size: 13px;
 }
 
 .subject-button.active {

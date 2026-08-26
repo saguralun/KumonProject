@@ -1595,25 +1595,22 @@ function renderStudentList() {
         return;
     }
 
-    els.studentList.innerHTML = state.students.map((student) => {
-        const meta = (student.enrollments || [])
-            .map((enrollment) =>
-                `${enrollment.subjectCode} #${enrollment.enrollmentId} ${enrollment.currentLevelCode}${enrollment.isKumonConnect ? " KC" : ""}`
-            )
-            .join(" • ") || "ยังไม่มีวิชา";
-
-        return `
+    els.studentList.innerHTML = state.students.map((student) => `
             <button
                 type="button"
                 class="student-item ${Number(student.studentId) === Number(state.selectedStudentId) ? "active" : ""}"
                 data-student-id="${escapeHtml(student.studentId)}"
                 data-preferred-enrollment-id="${escapeHtml(student.matchedEnrollmentId || "")}"
             >
-                <div class="student-item-name">#${escapeHtml(student.studentId)} ${escapeHtml(student.displayName)}</div>
-                <div class="student-item-meta">${escapeHtml(meta)}</div>
+                <div class="student-item-name">${escapeHtml(student.displayName)}</div>
             </button>
-        `;
-    }).join("");
+        `).join("");
+}
+
+function scrollSelectedStudentIntoView() {
+    const activeItem = els.studentList.querySelector(".student-item.active");
+
+    activeItem?.scrollIntoView({ block: "nearest" });
 }
 
 async function loadStudents() {
@@ -1788,7 +1785,6 @@ function renderProfile() {
     fillStudentForm(student);
     els.pageTitle.textContent = student.displayName;
     els.pageSubtitle.textContent = `Student ID #${student.studentId}`;
-    els.studentFormSubtitle.textContent = `Student ID #${student.studentId}`;
     els.newEnrollmentButton.disabled = (state.profile.enrollments || []).length >= 3;
     updateWsGraphButtonVisibility();
     els.newEnrollmentButton.textContent = els.newEnrollmentButton.disabled
@@ -1900,7 +1896,14 @@ async function saveNewStudent(event) {
         state.selectedEnrollmentId = null;
         closeAddStudentModal();
         renderProfile();
+        // A brand-new student has no enrollments yet, so the current status
+        // filter (e.g. "Active") would hide them from the sidebar list even
+        // though they're now the selected/loaded student — switch to "All"
+        // so they're actually visible, matching what got selected.
+        els.studentSearch.value = "";
+        els.statusFilter.value = "all";
         await loadStudents();
+        scrollSelectedStudentIntoView();
         await loadHistory();
         setStatus("เพิ่ม student แล้ว");
     } catch (error) {

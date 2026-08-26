@@ -19,6 +19,7 @@
         <a class="home-link" href="/student-manager.html">Students</a>
         <a class="home-link" href="/payment.html" data-staff-up>Payment</a>
         <a class="home-link active" href="/stock-receive.html" data-staff-up>Stock</a>
+        <a class="home-link" href="/report.html" data-staff-up>Report</a>
         <a class="home-link" href="/users.html" data-admin-only>Users</a>
       </nav>
 
@@ -84,19 +85,16 @@
               </label>
             </div>
 
-            <div class="do-pick-row do-pick-row-type">
-              <div class="do-pick-field">
-                <span class="field-label">ประเภท</span>
-                <div class="subject-buttons two-up" id="typeButtons"></div>
-              </div>
-            </div>
-
-            <div class="do-pick-row">
+            <div class="do-pick-row" id="subjectLevelRow">
               <div class="do-pick-field">
                 <span class="field-label">วิชา</span>
                 <div class="subject-buttons" id="subjectButtons"></div>
               </div>
-              <label class="do-pick-field">
+              <div class="do-pick-field">
+                <span class="field-label">ประเภท</span>
+                <div class="subject-buttons two-up" id="typeButtons"></div>
+              </div>
+              <label class="do-pick-field" id="levelField">
                 <span class="field-label">Level</span>
                 <select id="levelSelect">
                   <option value="">- เลือก Level -</option>

@@ -19,6 +19,7 @@
         <a class="home-link" href="/student-manager.html">Students</a>
         <a class="home-link active" href="/payment.html" data-staff-up>Payment</a>
         <a class="home-link" href="/stock-receive.html" data-staff-up>Stock</a>
+        <a class="home-link" href="/report.html" data-staff-up>Report</a>
         <a class="home-link" href="/users.html" data-admin-only>Users</a>
       </nav>
 
@@ -36,24 +37,6 @@
           <span>ปี</span>
           <input id="billingYear" type="number" min="2000" max="2600" step="1">
         </label>
-        <label>
-          <span>Subject</span>
-          <select id="subjectFilter">
-            <option value="ALL">ALL</option>
-            <option value="ME">ME</option>
-            <option value="EFL">EFL</option>
-            <option value="TRP">TRP</option>
-          </select>
-        </label>
-        <label>
-          <span>Status</span>
-          <select id="paymentStatus">
-            <option value="all">ทั้งหมด</option>
-            <option value="unpaid">ยังไม่จ่าย</option>
-            <option value="partial">จ่ายบางส่วน</option>
-            <option value="paid">จ่ายแล้ว</option>
-          </select>
-        </label>
       </section>
 
       <div class="auth-bar" id="authBar"></div>
@@ -68,34 +51,50 @@
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
-      <section class="summary-grid" aria-label="Payment summary">
-        <div class="summary-card">
-          <span>ทั้งหมด</span>
-          <strong id="totalStudents">0</strong>
+      <section class="summary-section" aria-label="Payment summary">
+        <div class="summary-group summary-group-status">
+          <div class="summary-group-title">สถานะการจ่าย</div>
+          <div class="summary-cards">
+            <div class="summary-card is-total">
+              <span>ทั้งหมด</span>
+              <strong id="totalStudents">0</strong>
+            </div>
+            <div class="summary-card is-paid">
+              <span>จ่ายแล้ว</span>
+              <strong id="paidStudents">0</strong>
+            </div>
+            <div class="summary-card is-partial">
+              <span>จ่ายบางส่วน</span>
+              <strong id="partialStudents">0</strong>
+            </div>
+            <div class="summary-card is-unpaid">
+              <span>ยังไม่จ่าย</span>
+              <strong id="unpaidStudents">0</strong>
+            </div>
+          </div>
+          <div class="summary-progress" role="img" aria-label="สัดส่วนสถานะการจ่ายเงิน">
+            <div class="summary-progress-segment is-paid" id="progressPaidSegment"></div>
+            <div class="summary-progress-segment is-partial" id="progressPartialSegment"></div>
+            <div class="summary-progress-segment is-unpaid" id="progressUnpaidSegment"></div>
+          </div>
         </div>
-        <div class="summary-card is-paid">
-          <span>จ่ายแล้ว</span>
-          <strong id="paidStudents">0</strong>
-        </div>
-        <div class="summary-card is-partial">
-          <span>จ่ายบางส่วน</span>
-          <strong id="partialStudents">0</strong>
-        </div>
-        <div class="summary-card is-unpaid">
-          <span>ยังไม่จ่าย</span>
-          <strong id="unpaidStudents">0</strong>
-        </div>
-        <div class="summary-card is-net">
-          <span>Total Net</span>
-          <strong id="totalNetAmount">0.00</strong>
-        </div>
-        <div class="summary-card is-expected">
-          <span>Expected Net</span>
-          <strong id="expectedNetAmount">0.00</strong>
-        </div>
-        <div class="summary-card is-unpaid-net">
-          <span>Unpaid Net</span>
-          <strong id="unpaidNetAmount">0.00</strong>
+
+        <div class="summary-group summary-group-money">
+          <div class="summary-group-title">ยอดเงิน</div>
+          <div class="summary-cards">
+            <div class="summary-card is-expected">
+              <span>ยอดที่ควรเก็บ</span>
+              <strong id="expectedNetAmount">0.00</strong>
+            </div>
+            <div class="summary-card is-net">
+              <span>เก็บได้แล้ว</span>
+              <strong id="totalNetAmount">0.00</strong>
+            </div>
+            <div class="summary-card is-unpaid-net">
+              <span>ค้างเก็บ</span>
+              <strong id="unpaidNetAmount">0.00</strong>
+            </div>
+          </div>
         </div>
       </section>
 

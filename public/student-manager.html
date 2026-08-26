@@ -19,6 +19,7 @@
         <a class="home-link active" href="/student-manager.html">Students</a>
         <a class="home-link" href="/payment.html" data-staff-up>Payment</a>
         <a class="home-link" href="/stock-receive.html" data-staff-up>Stock</a>
+        <a class="home-link" href="/report.html" data-staff-up>Report</a>
         <a class="home-link" href="/users.html" data-admin-only>Users</a>
       </nav>
 
@@ -27,18 +28,6 @@
           <h1>Student Manager</h1>
           <div class="subtle">เพิ่ม / แก้ไขเด็กและวิชา</div>
         </div>
-        <button type="button" class="primary-button compact" id="newStudentButton" data-staff-up>+ Student</button>
-      </div>
-
-      <div class="search-box">
-        <input id="studentSearch" type="text" autocomplete="off" placeholder="ค้นหา ID / ชื่อ / ชื่อเล่น / เบอร์">
-        <select id="statusFilter" aria-label="Status filter">
-          <option value="active">Active</option>
-          <option value="kc">KC</option>
-          <option value="new">New</option>
-          <option value="absent">Absent/OT/CP</option>
-          <option value="all">All</option>
-        </select>
       </div>
 
       <div class="student-list" id="studentList">
@@ -57,11 +46,27 @@
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
+      <section class="panel search-panel">
+        <div class="search-box">
+          <input id="studentSearch" type="text" autocomplete="off" placeholder="ค้นหา ID / ชื่อ / ชื่อเล่น / เบอร์">
+          <select id="statusFilter" aria-label="Status filter">
+            <option value="active">Active</option>
+            <option value="kc">KC</option>
+            <option value="new">New</option>
+            <option value="absent">Absent/OT/CP</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+      </section>
+
       <section class="form-grid">
         <form class="panel student-panel" id="studentForm">
           <div class="panel-header">
             <div>
-              <div class="panel-title">ข้อมูลนักเรียน</div>
+              <div class="panel-title">
+                ข้อมูลนักเรียน
+                <button type="button" class="secondary-button compact" id="newStudentButton" data-staff-up>+ Student</button>
+              </div>
               <div class="subtle" id="studentFormSubtitle">Student Profile</div>
             </div>
             <div class="panel-actions">
@@ -132,10 +137,16 @@
         <section class="panel enrollment-panel">
           <div class="panel-header">
             <div>
-              <div class="panel-title">Enrollment / วิชา</div>
+              <div class="panel-title">
+                Enrollment / วิชา
+                <button type="button" class="secondary-button compact" id="newEnrollmentButton" disabled data-staff-up>+ Subject</button>
+              </div>
               <div class="subtle" id="enrollmentSubtitle">เลือกเด็กก่อน</div>
             </div>
-            <button type="button" class="secondary-button" id="newEnrollmentButton" disabled data-staff-up>+ Subject</button>
+            <div class="panel-actions">
+              <button type="button" class="danger-button hidden" id="deleteEnrollmentButton" data-staff-up>🗑️ Delete</button>
+              <button type="submit" form="enrollmentForm" class="primary-button" id="saveEnrollmentButton" data-staff-up>💾 Save Enrollment</button>
+            </div>
           </div>
 
           <div class="enrollment-tabs" id="enrollmentTabs"></div>
@@ -151,16 +162,12 @@
                 <select name="subjectId" required></select>
               </label>
               <label>
-                <span>Kumon ID</span>
-                <input name="kumonStudentId" type="text">
+                <span>Start Date</span>
+                <input name="enStartDate" type="date" required>
               </label>
               <label class="checkbox-field">
                 <span>KC</span>
                 <input name="isKumonConnect" type="checkbox" value="true">
-              </label>
-              <label>
-                <span>Start Date</span>
-                <input name="enStartDate" type="date" required>
               </label>
               <label>
                 <span>Current Level</span>
@@ -171,10 +178,6 @@
                 <select name="currentZunLevelMasterId"></select>
               </label>
               <label>
-                <span>Start Worksheet</span>
-                <select name="startingWorksheetMasterId" required></select>
-              </label>
-              <label>
                 <span>Status</span>
                 <select name="currentStatusGroup1Id" required></select>
               </label>
@@ -182,29 +185,39 @@
                 <span>Special Status</span>
                 <select name="currentStatusGroup2Id"></select>
               </label>
-              <label>
-                <span>Schedule 1</span>
-                <select name="openingScheduleId1"></select>
-              </label>
-              <label>
-                <span>Schedule 2</span>
-                <select name="openingScheduleId2"></select>
-              </label>
-              <label class="wide-field">
-                <span>Remark</span>
-                <textarea name="remark" rows="2"></textarea>
-              </label>
             </div>
-            <div class="form-actions">
+
+            <details class="address-details enrollment-details">
+              <summary>รายละเอียดเพิ่มเติม</summary>
+              <div class="fields-grid enrollment-hidden-fields">
+                <label>
+                  <span>Kumon ID</span>
+                  <input name="kumonStudentId" type="text">
+                </label>
+                <label>
+                  <span>Start Worksheet</span>
+                  <select name="startingWorksheetMasterId" required></select>
+                </label>
+                <label>
+                  <span>Schedule 1</span>
+                  <select name="openingScheduleId1"></select>
+                </label>
+                <label>
+                  <span>Schedule 2</span>
+                  <select name="openingScheduleId2"></select>
+                </label>
+                <label class="wide-field">
+                  <span>Remark</span>
+                  <textarea name="remark" rows="2"></textarea>
+                </label>
+              </div>
               <div class="enrollment-action-bar hidden" id="enrollmentActionBar" data-staff-up>
                 <button type="button" class="danger-button compact" id="enrollmentAbsentButton">Absent</button>
                 <button type="button" class="danger-button compact" id="enrollmentOtButton">OT</button>
                 <button type="button" class="secondary-button compact" id="enrollmentResumeButton">Resume</button>
                 <button type="button" class="complete-button compact hidden" id="enrollmentCompleterButton">🏁 Complete</button>
-                <button type="button" class="danger-button compact hidden" id="deleteEnrollmentButton">Delete</button>
               </div>
-              <button type="submit" class="primary-button" id="saveEnrollmentButton" data-staff-up>💾 Save Enrollment</button>
-            </div>
+            </details>
           </form>
 
           <div class="empty-state" id="enrollmentEmpty">ยังไม่มี enrollment ที่เลือก</div>

@@ -79,6 +79,10 @@ const state = {
     activeResultIndex: -1,
     searchRequestId: 0,
     searchTimer: null,
+    // The page auto-focuses the search box on load for convenience, but
+    // that shouldn't pop the results dropdown open before the user has
+    // actually typed or clicked anything — skip just that one search.
+    suppressInitialSearch: false,
     context: null,
     history: [],
     worksheetPacketSummary: null,
@@ -1669,6 +1673,12 @@ function bindEvents() {
     els.studentSearch.addEventListener("input", queueSearch);
     els.studentSearch.addEventListener("focus", () => {
         selectStudentSearchText();
+
+        if (state.suppressInitialSearch) {
+            state.suppressInitialSearch = false;
+            return;
+        }
+
         queueSearch();
     });
     els.studentSearch.addEventListener("mousedown", (event) => {
@@ -1845,7 +1855,7 @@ function init() {
     els.dateNext.disabled = true;
     renderWorksheetProgress();
     bindEvents();
-    runSearch();
+    state.suppressInitialSearch = true;
     els.studentSearch.focus();
 }
 

@@ -5,6 +5,7 @@ const els = {
   statusLine: document.getElementById("statusLine"),
   doForm: document.getElementById("doForm"),
   typeButtons: document.getElementById("typeButtons"),
+  subjectLevelRow: document.getElementById("subjectLevelRow"),
   subjectButtons: document.getElementById("subjectButtons"),
   levelSelect: document.getElementById("levelSelect"),
   doItemsHeaderLabel: document.getElementById("doItemsHeaderLabel"),
@@ -154,22 +155,56 @@ function levelsForSubject(subjectId) {
   );
 }
 
-// Normalizes worksheet/cd rows into a common {masterId, itemNo} shape.
+// Normalizes worksheet rows into a common {masterId, itemNo} shape. WS still
+// picks a single level and shows every worksheet number in it (20 boxes is
+// too many to show a whole subject at once).
 function itemsForLevel(type, levelMasterId) {
   const source = itemSourceForType(type);
 
   return source
     .filter((item) => Number(item.levelMasterId) === Number(levelMasterId))
     .map((item) => ({
-      masterId: type === "cd" ? item.cdMasterId : item.worksheetMasterId,
-      itemNo: type === "cd" ? item.cdNo : item.worksheetNo
+      masterId: item.worksheetMasterId,
+      itemNo: item.worksheetNo
     }))
     .sort((a, b) => a.itemNo - b.itemNo);
 }
 
-// Largest item count across all levels of this type, halved into rows for
-// the 2-column grid.
+// CD doesn't need a level step at all: most levels only have 1 CD, so the
+// legacy tool just shows every CD across the whole subject at once, in
+// curriculum order. Levels with more than one CD (e.g. TRP's 7A/6A) get a
+// number suffix on the label; levels with just one don't.
+function itemsForSubjectCd(subjectId) {
+  const levels = state.masters.levels.filter((level) => Number(level.subjectId) === Number(subjectId));
+  const items = [];
+
+  levels.forEach((level) => {
+    const cds = state.masters.cds
+      .filter((cd) => Number(cd.levelMasterId) === Number(level.levelMasterId))
+      .sort((a, b) => a.cdNo - b.cdNo);
+
+    cds.forEach((cd) => {
+      items.push({
+        masterId: cd.cdMasterId,
+        label: cds.length > 1 ? `${level.levelCode}${cd.cdNo}` : level.levelCode
+      });
+    });
+  });
+
+  return items;
+}
+
+// Largest item count across all levels (WS) or whole subjects (CD) of this
+// type, halved into rows for the 2-column grid — fixed per type so every
+// level/subject of the same type gets same-sized boxes.
 function computeMaxGridRowCount(type) {
+  if (type === "cd") {
+    const counts = subjectsForType("cd").map((subject) => itemsForSubjectCd(subject.subjectId).length);
+    const maxCount = Math.max(1, ...counts);
+
+    return Math.ceil(maxCount / 2);
+  }
+
   const source = itemSourceForType(type);
   const counts = new Map();
 
@@ -244,6 +279,7 @@ function selectItemType(type) {
   renderTypeButtons();
   renderSubjectButtons();
   renderLevelOptions();
+  els.subjectLevelRow.classList.toggle("level-hidden", type === "cd");
   renderItemsGrid();
 }
 
@@ -263,32 +299,34 @@ function selectLevel(levelMasterId) {
 }
 
 function renderItemsGrid() {
-  const items = state.selectedLevelMasterId
-    ? itemsForLevel(state.selectedItemType, state.selectedLevelMasterId)
-    : [];
+  const isCd = state.selectedItemType === "cd";
+  const items = isCd
+    ? (state.selectedSubjectId ? itemsForSubjectCd(state.selectedSubjectId) : [])
+    : (state.selectedLevelMasterId ? itemsForLevel(state.selectedItemType, state.selectedLevelMasterId) : []);
   const level = state.masters.levels.find((item) => Number(item.levelMasterId) === Number(state.selectedLevelMasterId));
 
+  els.doItemsEmpty.textContent = isCd ? "เลือกวิชาก่อน" : "เลือกวิชาและ Level ก่อน";
   els.doItemsEmpty.classList.toggle("hidden", items.length > 0);
   els.doItemsGrid.classList.toggle("hidden", items.length === 0);
 
   // Column-major layout: fill the left column top-to-bottom first, then the
   // right column, sized to exactly fill the card height with no scrolling.
-  // Row count is fixed per type (not derived from this level's own count)
-  // so every level of the same type has same-sized boxes — a short level
-  // just leaves its second column blank.
+  // Row count is fixed per type (not derived from this level's/subject's own
+  // count) so every level/subject of the same type has same-sized boxes —
+  // a shorter one just leaves its second column blank.
   els.doItemsGrid.style.gridTemplateRows = `repeat(${state.gridRowCount}, minmax(0, 1fr))`;
 
   // Halfway divider within each column (e.g. after row 5 of 10) so users
   // don't lose their place and mistype into the wrong box.
   const halfRow = Math.ceil(state.gridRowCount / 2);
-  const labelPrefix = state.selectedItemType === "cd" ? "CD" : "";
 
   els.doItemsGrid.innerHTML = items.map((item, index) => {
     const isHalfway = state.gridRowCount > 1 && (index % state.gridRowCount) === halfRow;
+    const label = isCd ? item.label : `${level?.levelCode || ""}${item.itemNo}`;
 
     return `
     <label class="do-item-cell ${isHalfway ? "do-item-cell-halfway" : ""}">
-      <span>${escapeHtml(level?.levelCode || "")}${labelPrefix}${item.itemNo}</span>
+      <span>${escapeHtml(label)}</span>
       <input
         type="number"
         min="0"

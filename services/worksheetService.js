@@ -1826,6 +1826,7 @@ async function buildReceiptPreview({
             billing.receipt_book,
             billing.receipt_no,
             billing.billing_date,
+            billing.created_at,
             billing.payment_method_id,
             billing.total_amount,
             billing.discount_amount,
@@ -2060,6 +2061,15 @@ async function buildReceiptPreview({
         billingDate: useExistingBilling
             ? normalizeDate(existingBilling.billing_date)
             : period.billingDate,
+        // Real time-of-payment for display on the printed receipt.
+        // billing_date is a DATE column (no time); billing.created_at is
+        // the only place an actual timestamp exists for an existing
+        // receipt. For a not-yet-paid preview there's no row yet, so "now"
+        // is the closest honest answer — receiveReceiptPayment's own
+        // INSERT happens moments later anyway.
+        billingTime: useExistingBilling
+            ? existingBilling.created_at
+            : new Date(),
         paymentMethodId: useExistingBilling ? existingBilling.payment_method_id : paymentMethod.payment_method_id,
         paymentMethodCode: useExistingBilling ? existingBilling.payment_method_code : paymentMethod.payment_method_code,
         paymentMethodName: useExistingBilling ? existingBilling.payment_method_name : paymentMethod.payment_method_name,

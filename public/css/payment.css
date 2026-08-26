@@ -261,19 +261,50 @@ html[data-role="staff"] [data-staff-up] {
   color: var(--red);
 }
 
-.summary-grid {
+.summary-section {
   flex: 0 0 auto;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
   gap: 12px;
   margin: 16px 0;
 }
 
+.summary-group {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 12px 14px 14px;
+}
+
+.summary-group-money {
+  background: #f7faf9;
+}
+
+.summary-group-title {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.summary-group-money .summary-cards {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .summary-card {
   border: 1px solid var(--line);
-  border-radius: 9px;
+  border-radius: 8px;
   background: var(--surface);
-  padding: 14px;
+  padding: 10px 12px;
 }
 
 .summary-card span {
@@ -286,7 +317,11 @@ html[data-role="staff"] [data-staff-up] {
 .summary-card strong {
   display: block;
   margin-top: 3px;
-  font-size: 28px;
+  font-size: 24px;
+}
+
+.summary-card.is-total strong {
+  color: var(--text);
 }
 
 .summary-card.is-paid strong {
@@ -311,6 +346,32 @@ html[data-role="staff"] [data-staff-up] {
 
 .summary-card.is-unpaid-net strong {
   color: var(--red);
+}
+
+.summary-progress {
+  display: flex;
+  height: 10px;
+  margin-top: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--line);
+}
+
+.summary-progress-segment {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.summary-progress-segment.is-paid {
+  background: var(--green);
+}
+
+.summary-progress-segment.is-partial {
+  background: var(--blue);
+}
+
+.summary-progress-segment.is-unpaid {
+  background: var(--orange);
 }
 
 .search-panel {
@@ -703,7 +764,15 @@ html[data-role="staff"] [data-staff-up] {
     border-right: 0;
   }
 
-  .summary-grid,
+  .summary-section {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-cards,
+  .summary-group-money .summary-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .receipt-period-controls {
     grid-template-columns: 1fr;
   }

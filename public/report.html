@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/report.css">
+  <link rel="stylesheet" href="/css/app-scale.css">
+</head>
+<body>
+  <main class="report-page">
+    <aside class="report-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link" href="/" data-admin-only>Tables</a>
+        <a class="home-link" href="/worksheet.html">WS Input</a>
+        <a class="home-link" href="/student-manager.html">Students</a>
+        <a class="home-link" href="/payment.html" data-staff-up>Payment</a>
+        <a class="home-link" href="/stock-receive.html" data-staff-up>Stock</a>
+        <a class="home-link active" href="/report.html" data-staff-up>Report</a>
+        <a class="home-link" href="/users.html" data-admin-only>Users</a>
+      </nav>
+
+      <div class="side-header">
+        <h1>Report</h1>
+        <div class="subtle">รายงานรายเดือน</div>
+      </div>
+
+      <section class="filter-panel">
+        <label>
+          <span>เดือน</span>
+          <select id="reportMonth"></select>
+        </label>
+        <label>
+          <span>ปี</span>
+          <input id="reportYear" type="number" min="2000" max="2600" step="1">
+        </label>
+        <button type="button" class="primary-button" id="generateButton">📊 สร้างรายงาน</button>
+        <button type="button" class="secondary-button" id="exportButton" disabled>⬇️ Export CSV</button>
+      </section>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="report-workspace">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Monthly Report</div>
+          <div class="subtle">รายชื่อ enrollment ที่มีกิจกรรม (WS / AT / DT / CD) ในเดือนที่เลือก</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="panel report-table-panel">
+        <div class="panel-header">
+          <div class="panel-title">ผลลัพธ์</div>
+          <div class="subtle" id="resultSubtitle">เลือกเดือน/ปี แล้วกดสร้างรายงาน</div>
+        </div>
+        <div class="report-table-wrap" id="reportTableWrap">
+          <div class="empty-state">ยังไม่มีรายงาน</div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/js/authClient.js"></script>
+  <script src="/js/report.js"></script>
+</body>
+</html>
