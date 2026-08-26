@@ -6,6 +6,7 @@ import { importBilling, previewBilling } from "./migrationBilling.js";
 import { importWorksheet, previewWorksheet } from "./migrationWorksheet.js";
 import { importWorksheetReceive, previewWorksheetReceive } from "./migrationWorksheetReceive.js";
 import { importAt, importCd, importDt, previewAt, previewCd, previewDt } from "./migrationActivity.js";
+import { importStock, previewStock } from "./migrationStock.js";
 import { buildPagination } from "./migrationPreviewCommon.js";
 
 const router = express.Router();
@@ -64,6 +65,12 @@ const migrationModules = [
         title: "CD",
         preview: previewCd,
         import: importCd
+    },
+    {
+        id: "stock",
+        title: "Stock",
+        preview: previewStock,
+        import: importStock
     }
 ];
 

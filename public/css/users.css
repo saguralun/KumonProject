@@ -105,25 +105,28 @@ select:focus {
 
 .side-nav {
   display: grid;
-  gap: 7px;
+  gap: 9px;
+  margin-bottom: 18px;
 }
 
 .home-link {
   display: block;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 7px;
   padding: 8px 10px;
-  color: #c7d6e6;
+  color: #dbeafe;
   text-decoration: none;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  transition: background-color var(--ease), color var(--ease);
+  font-size: 14px;
+  font-weight: 800;
+  transition: background-color var(--ease), border-color var(--ease), color var(--ease);
 }
 
-.home-link:hover,
-.home-link.active {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+.home-link.active,
+.home-link:hover {
+  border-color: #dbeafe;
+  background: #eaf2ff;
+  color: var(--blue);
 }
 
 .side-header {
@@ -132,17 +135,17 @@ select:focus {
 
 h1 {
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
   line-height: 1.15;
 }
 
 .subtle {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
 }
 
 .users-sidebar .subtle {
-  color: #9fb0c3;
+  color: #a9b8cc;
 }
 
 .auth-bar {
@@ -177,6 +180,11 @@ h1 {
 .auth-role-staff {
   background: #f0eaff;
   color: #6d3fc4;
+}
+
+.auth-role-guest {
+  background: #fff6db;
+  color: #8a5c08;
 }
 
 .auth-name {
@@ -230,20 +238,20 @@ h1 {
 }
 
 .page-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
 }
 
 .status-line {
   min-width: 150px;
-  border: 1px solid #b7ead4;
+  border: 1px solid #bbf7d0;
   border-radius: 8px;
   background: var(--green-soft);
   color: var(--green);
-  padding: 7px 11px;
+  padding: 7px 12px;
   text-align: center;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .status-line.is-error {
@@ -265,8 +273,8 @@ h1 {
 }
 
 .panel-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 17px;
+  font-weight: 800;
 }
 
 .create-form {
@@ -281,7 +289,7 @@ h1 {
   gap: 5px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .primary-button {
@@ -313,7 +321,7 @@ h1 {
   color: #b91c1c;
   padding: 9px 11px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .form-message.is-success {
@@ -357,7 +365,7 @@ th {
   top: 0;
   background: var(--surface-soft);
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 800;
 }
 
 tbody tr {
@@ -377,7 +385,7 @@ tbody tr.is-inactive {
   border-radius: 999px;
   padding: 3px 9px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
@@ -396,7 +404,7 @@ tbody tr.is-inactive {
   border-radius: 999px;
   padding: 3px 9px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .status-badge.active {

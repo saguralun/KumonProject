@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Stock Receive</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/stock-receive.css">
+  <link rel="stylesheet" href="/css/app-scale.css">
+</head>
+<body>
+  <main class="stock-page">
+    <aside class="stock-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link" href="/" data-admin-only>Tables</a>
+        <a class="home-link" href="/worksheet.html">WS Input</a>
+        <a class="home-link" href="/student-manager.html">Students</a>
+        <a class="home-link" href="/payment.html" data-staff-up>Payment</a>
+        <a class="home-link active" href="/stock-receive.html" data-staff-up>Stock</a>
+        <a class="home-link" href="/users.html" data-admin-only>Users</a>
+      </nav>
+
+      <div class="side-header">
+        <h1>Stock</h1>
+        <div class="subtle">รับ Worksheet เข้าคลัง</div>
+      </div>
+
+      <section class="filter-panel">
+        <label>
+          <span>ประเภท</span>
+          <select id="typeFilter">
+            <option value="all" selected>ทั้งหมด</option>
+            <option value="ws">WS</option>
+            <option value="cd">CD</option>
+          </select>
+        </label>
+        <label>
+          <span>สถานะ DO</span>
+          <select id="statusFilter">
+            <option value="pending" selected>รอ Process</option>
+            <option value="processed">Process แล้ว</option>
+            <option value="all">ทั้งหมด</option>
+          </select>
+        </label>
+        <label>
+          <span>ค้นหาเลข DO</span>
+          <input id="doSearch" type="text" autocomplete="off" placeholder="เช่น 1606/0081">
+        </label>
+      </section>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="stock-workspace">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Stock Receive</div>
+          <div class="subtle">บันทึกใบรับของ (DO) แล้วค่อยกด Process เพื่อบวกเข้า stock จริง</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="content-grid">
+        <section class="panel do-form-panel">
+          <div class="panel-header">
+            <div class="panel-title">รับของใหม่ (New DO)</div>
+          </div>
+
+          <form id="doForm" class="do-form">
+            <div class="do-header-fields">
+              <label>
+                <span>เลข DO</span>
+                <input name="doNo" type="text" autocomplete="off" required placeholder="เช่น 1606/0081">
+              </label>
+              <label>
+                <span>วันที่ส่งออก (Out Date)</span>
+                <input name="outDate" type="date" required>
+              </label>
+              <label>
+                <span>วันที่รับของ (Receive Date)</span>
+                <input name="receiveDate" type="date" required>
+              </label>
+            </div>
+
+            <div class="do-pick-row do-pick-row-type">
+              <div class="do-pick-field">
+                <span class="field-label">ประเภท</span>
+                <div class="subject-buttons two-up" id="typeButtons"></div>
+              </div>
+            </div>
+
+            <div class="do-pick-row">
+              <div class="do-pick-field">
+                <span class="field-label">วิชา</span>
+                <div class="subject-buttons" id="subjectButtons"></div>
+              </div>
+              <label class="do-pick-field">
+                <span class="field-label">Level</span>
+                <select id="levelSelect">
+                  <option value="">- เลือก Level -</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="do-items-header">
+              <div class="panel-title" id="doItemsHeaderLabel">จำนวนที่รับต่อ WS</div>
+              <div class="subtle">ช่องไหนไม่กรอก หรือเป็น 0 จะไม่ถูกบันทึก</div>
+            </div>
+
+            <div class="do-items-wrap">
+              <div class="do-items-grid" id="doItemsGrid"></div>
+              <div class="empty-state" id="doItemsEmpty">เลือกวิชาและ Level ก่อน</div>
+            </div>
+
+            <div class="do-form-footer">
+              <div class="do-total" id="doTotal">รวม 0 รายการ • 0 ชุด</div>
+              <button type="submit" class="primary-button" id="saveDoButton">💾 บันทึก DO</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="panel do-list-panel">
+          <div class="panel-header">
+            <div class="panel-title">รายการ DO</div>
+            <div class="subtle" id="doListSubtitle">กำลังโหลด...</div>
+          </div>
+          <div class="do-table-wrap" id="doTableWrap">
+            <div class="empty-state">กำลังโหลด...</div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <div class="modal-backdrop hidden" id="doDetailModal" role="dialog" aria-modal="true" aria-labelledby="doDetailTitle">
+    <div class="do-detail-dialog">
+      <div class="modal-header">
+        <div>
+          <div class="panel-title" id="doDetailTitle">DO Detail</div>
+          <div class="subtle" id="doDetailSubtitle"></div>
+        </div>
+        <button type="button" class="modal-close" id="doDetailClose" aria-label="Close">✕</button>
+      </div>
+      <div class="do-detail-body" id="doDetailBody"></div>
+      <div class="modal-actions">
+        <button type="button" class="danger-button hidden" id="doDeleteButton">🗑️ ลบ DO</button>
+        <button type="button" class="primary-button hidden" id="doProcessButton">✅ Process เข้า Stock</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/authClient.js"></script>
+  <script src="/js/stock-receive.js"></script>
+</body>
+</html>

@@ -5,8 +5,12 @@ DROP TABLE IF EXISTS worksheet_used CASCADE;
 DROP TABLE IF EXISTS billing_detail CASCADE;
 DROP TABLE IF EXISTS billing CASCADE;
 DROP TABLE IF EXISTS enrollment_status CASCADE;
-DROP TABLE IF EXISTS worksheet_receive;
-DROP TABLE IF EXISTS worksheet_do;
+DROP TABLE IF EXISTS enrollment CASCADE;
+DROP TABLE IF EXISTS student CASCADE;
+DROP TABLE IF EXISTS session;
+DROP TABLE IF EXISTS app_user CASCADE;
+DROP TABLE IF EXISTS stock_receive CASCADE;
+DROP TABLE IF EXISTS stock_do CASCADE;
 
 -- =========================================================
 -- Student
@@ -417,53 +421,95 @@ CREATE TABLE at_used (
 );
 
 -- =========================================================
--- worksheet_DO_Number
+-- Auth: Admin/Staff users
 -- =========================================================
+-- Only "admin"/"staff" accounts live in the database. "guest" is not a
+-- stored account — guests log in with a shared PIN (kept in server
+-- config, not the DB) plus a free-text display name, and get a
+-- restricted session. See services/authService.js.
 
-CREATE TABLE worksheet_do (
+CREATE TABLE app_user (
 
-  worksheet_do_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
+  username VARCHAR(50) NOT NULL UNIQUE,
+
+  password_hash VARCHAR(200) NOT NULL,
+
+  display_name VARCHAR(100) NOT NULL,
+
+  role VARCHAR(10) NOT NULL DEFAULT 'admin',
+
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
+  last_login_at TIMESTAMP,
+
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT app_user_role_check
+    CHECK (role IN ('admin', 'staff'))
+
+);
+
+-- Session store for express-session (connect-pg-simple). This table's
+-- shape is dictated by connect-pg-simple itself; created here so the
+-- app never needs createTableIfMissing at runtime.
+CREATE TABLE session (
+  sid VARCHAR NOT NULL COLLATE "default" PRIMARY KEY,
+  sess JSON NOT NULL,
+  expire TIMESTAMP(6) NOT NULL
+);
+
+CREATE INDEX idx_session_expire ON session (expire);
+
+-- =========================================================
+-- Stock receiving (DO)
+-- =========================================================
+-- One shared DO system for every stock type it's used with (WS, CD, ...) —
+-- mirrors how the `stock` table itself works: stock_type_id + master_id
+-- together say which master table a row means (master_id carries no FK of
+-- its own, it's polymorphic). See services/stockReceiveService.js.
+
+CREATE TABLE stock_do (
+  stock_do_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   do_no VARCHAR(50) NOT NULL,
-
   out_date DATE NOT NULL,
-
   receive_date DATE,
-
   receive_month SMALLINT NOT NULL,
-
   receive_year SMALLINT NOT NULL,
-
   is_stock_processed BOOLEAN NOT NULL DEFAULT FALSE,
-  
-  CONSTRAINT uq_worksheet_do_no
-    UNIQUE (do_no)
-
+  CONSTRAINT uq_stock_do_no UNIQUE (do_no)
 );
 
--- =========================================================
--- Worksheet Receive Detail
--- =========================================================
-
-CREATE TABLE worksheet_receive (
-
-  worksheet_receive_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-
-  worksheet_do_id INTEGER NOT NULL,
-
-  worksheet_master_id INTEGER NOT NULL,
-
+CREATE TABLE stock_receive (
+  stock_receive_id INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  stock_do_id INTEGER NOT NULL,
+  stock_type_id SMALLINT NOT NULL,
+  master_id INTEGER NOT NULL,
   quantity SMALLINT NOT NULL,
-
-  CONSTRAINT uq_worksheet_receive_do_worksheet
-    UNIQUE (worksheet_do_id, worksheet_master_id),
-
-  CONSTRAINT fk_worksheet_receive_do
-    FOREIGN KEY (worksheet_do_id)
-    REFERENCES worksheet_do(worksheet_do_id),
-
-  CONSTRAINT fk_worksheet_receive_master
-    FOREIGN KEY (worksheet_master_id)
-    REFERENCES worksheet_master(worksheet_master_id)
-
+  CONSTRAINT uq_stock_receive_do_type_master UNIQUE (stock_do_id, stock_type_id, master_id),
+  CONSTRAINT fk_stock_receive_do FOREIGN KEY (stock_do_id) REFERENCES stock_do(stock_do_id),
+  CONSTRAINT fk_stock_receive_type FOREIGN KEY (stock_type_id) REFERENCES stock_type_master(stock_type_id)
 );
+
+-- =========================================================
+-- Bootstrap admin account
+-- =========================================================
+-- So day-one setup doesn't require a separate `npm run create-admin`
+-- step. Password: 123456 (bcryptjs, 10 rounds — see services/authService.js).
+-- CHANGE THIS PASSWORD after first login in any environment other than
+-- local dev. ON CONFLICT DO NOTHING makes this safe to re-run: it won't
+-- clobber an admin account you've since renamed/repassworded via the
+-- Users page.
+
+INSERT INTO app_user (username, password_hash, display_name, role, is_active)
+VALUES (
+  'admin',
+  '$2b$10$N9q8XcqSHUNdbyuVWU/y9.k3goIllqAxKuare5bo2JQRGvKq6xmny',
+  'Admin',
+  'admin',
+  TRUE
+)
+ON CONFLICT (username) DO NOTHING;

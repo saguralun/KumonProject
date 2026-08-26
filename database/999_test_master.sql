@@ -1,4 +1,25 @@
 -- =========================================================
+-- Table Existence (structural check only — did every table from 001 and
+-- 003 actually get created? Not a data/content check, just catches a
+-- migration that silently failed partway through a fresh install.)
+-- =========================================================
+
+SELECT table_name, (to_regclass(table_name) IS NOT NULL) AS exists
+FROM (VALUES
+    -- 001_create_master_tables.sql
+    ('subject_master'), ('level_master'), ('worksheet_master'), ('cd_master'),
+    ('dt_master'), ('dt_result_master'), ('at_master'), ('status_master'),
+    ('school_grade_master'), ('center_master'), ('prefix_master'), ('gender_master'),
+    ('weekday_master'), ('opening_schedule'), ('payment_method_master'),
+    ('stock_type_master'), ('stock'),
+    -- 003_create_transaction_tables.sql
+    ('student'), ('enrollment'), ('enrollment_status'), ('billing'), ('billing_detail'),
+    ('worksheet_used'), ('cd_used'), ('at_used'), ('dt_used'),
+    ('app_user'), ('session'), ('stock_do'), ('stock_receive')
+) AS expected_tables(table_name)
+ORDER BY exists ASC, table_name;
+
+-- =========================================================
 -- Record Count
 -- =========================================================
 

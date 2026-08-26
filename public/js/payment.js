@@ -40,6 +40,32 @@ const state = {
     isCancellingPayment: false
 };
 
+function selectInputText(input) {
+    if (!input) {
+        return;
+    }
+
+    input.select();
+}
+
+function bindSelectAllInput(input, onFocus = null) {
+    if (!input) {
+        return;
+    }
+
+    input.addEventListener("focus", () => {
+        selectInputText(input);
+        onFocus?.();
+    });
+    input.addEventListener("mousedown", (event) => {
+        if (document.activeElement === input) {
+            event.preventDefault();
+            selectInputText(input);
+        }
+    });
+    input.addEventListener("click", () => selectInputText(input));
+}
+
 function escapeHtml(value) {
     return String(value ?? "")
         .replace(/&/g, "&amp;")
@@ -783,6 +809,7 @@ function bindEvents() {
         clearTimeout(state.searchTimer);
         state.searchTimer = setTimeout(loadPaymentStatus, 180);
     });
+    bindSelectAllInput(els.paymentSearch);
     els.refreshButton.addEventListener("click", loadPaymentStatus);
     els.printUnpaidButton.addEventListener("click", printUnpaidList);
     els.exportUnpaidButton.addEventListener("click", exportUnpaidCsv);

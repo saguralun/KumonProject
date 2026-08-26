@@ -8,6 +8,7 @@ import tableRoutes from "./routes/tableRoutes.js";
 import worksheetRoutes from "./routes/worksheetRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import stockReceiveRoutes from "./routes/stockReceiveRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import migrationRoutes from "./migration/migrationRoutes.js";
@@ -66,12 +67,17 @@ app.get("/users.html", requireAdminPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "users.html"));
 });
 
+app.get("/stock-receive.html", requireStaffPage, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "stock-receive.html"));
+});
+
 // Specific /api/* mounts must come before the generic "/api" one below —
 // Express tries middleware in registration order, and a broader prefix
 // registered first would swallow requests meant for these.
 app.use("/api/worksheet", requireAuth, worksheetRoutes);
 app.use("/api/students", requireAuth, studentRoutes);
 app.use("/api/payment", requireStaff, paymentRoutes);
+app.use("/api/stock-receive", requireStaff, stockReceiveRoutes);
 app.use("/api/users", requireAdmin, userRoutes);
 app.use("/api/migration", requireAdmin, migrationRoutes);
 app.use("/api", requireAdmin, tableRoutes);

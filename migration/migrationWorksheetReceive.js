@@ -374,6 +374,7 @@ async function loadMasterData(db = pool) {
         subjectResult,
         levelResult,
         worksheetResult,
+        stockTypeResult,
         doExists,
         receiveExists
     ] = await Promise.all([
@@ -399,9 +400,11 @@ async function loadMasterData(db = pool) {
             FROM worksheet_master wm
             ORDER BY wm.level_master_id, wm.worksheet_no
         `),
-        tableExists(db, "worksheet_do"),
-        tableExists(db, "worksheet_receive")
+        db.query(`SELECT stock_type_id FROM stock_type_master WHERE stock_type_code = 'WS'`),
+        tableExists(db, "stock_do"),
+        tableExists(db, "stock_receive")
     ]);
+    const wsStockTypeId = stockTypeResult.rows[0]?.stock_type_id ?? null;
     const levelsBySubjectId = new Map();
 
     for (const level of levelResult.rows) {
@@ -417,22 +420,23 @@ async function loadMasterData(db = pool) {
 
     if (doExists) {
         existingDoResult = await db.query(`
-            SELECT worksheet_do_id, do_no
-            FROM worksheet_do
-            ORDER BY worksheet_do_id
+            SELECT stock_do_id, do_no
+            FROM stock_do
+            ORDER BY stock_do_id
         `);
     }
 
     if (doExists && receiveExists) {
         existingReceiveResult = await db.query(`
-            SELECT wr.worksheet_do_id,
-                   wd.do_no,
-                   wr.worksheet_master_id
-            FROM worksheet_receive wr
-            JOIN worksheet_do wd
-                ON wd.worksheet_do_id = wr.worksheet_do_id
-            ORDER BY wr.worksheet_receive_id
-        `);
+            SELECT sr.stock_do_id,
+                   sd.do_no,
+                   sr.master_id AS worksheet_master_id
+            FROM stock_receive sr
+            JOIN stock_do sd
+                ON sd.stock_do_id = sr.stock_do_id
+            WHERE sr.stock_type_id = $1
+            ORDER BY sr.stock_receive_id
+        `, [wsStockTypeId]);
     }
 
     return {
@@ -472,6 +476,7 @@ async function loadMasterData(db = pool) {
             )
         ),
         worksheetMasterCount: worksheetResult.rows.length,
+        wsStockTypeId,
         doTableExists: doExists,
         receiveTableExists: receiveExists,
         existingDoCount: existingDoResult.rows.length,
@@ -974,8 +979,8 @@ export async function previewWorksheetReceive() {
             validationItem("Header Consistency", 0, infoCounts.headerConsistency),
             validationItem("Boolean Defaults", 0, infoCounts.booleanDefaults),
             validationItem("Invalid Boolean", 0, infoCounts.invalidBoolean),
-            tableMissingItem("worksheet_do Target Table", !masters.doTableExists),
-            tableMissingItem("worksheet_receive Target Table", !masters.receiveTableExists)
+            tableMissingItem("stock_do Target Table", !masters.doTableExists),
+            tableMissingItem("stock_receive Target Table", !masters.receiveTableExists)
         ],
         columns: DETAIL_COLUMNS,
         rows: detailRows,
@@ -1046,16 +1051,17 @@ function tableRows(previewResult, tableId) {
 async function targetTablesExist(client) {
     const result = await client.query(`
         SELECT
-            to_regclass('worksheet_do') AS worksheet_do,
-            to_regclass('worksheet_receive') AS worksheet_receive
+            to_regclass('stock_do') AS stock_do,
+            to_regclass('stock_receive') AS stock_receive
     `);
     const row = result.rows[0];
 
-    return Boolean(row.worksheet_do && row.worksheet_receive);
+    return Boolean(row.stock_do && row.stock_receive);
 }
 
 export async function importWorksheetReceive() {
     const previewResult = await previewWorksheetReceive();
+    const masters = await loadMasterData();
     const headerRows = tableRows(previewResult, "worksheet_do_headers");
     const detailRows = tableRows(previewResult, "worksheet_receive_details");
     const previewSkippedCount = summaryValue(previewResult.summary, "Skipped");
@@ -1102,7 +1108,7 @@ export async function importWorksheetReceive() {
                 module: "worksheet-receive",
                 title: "Worksheet Receive Import",
                 status: "ERROR",
-                message: "worksheet_do and worksheet_receive tables are required before import.",
+                message: "stock_do and stock_receive tables are required before import.",
                 summary: [
                     { label: "Inserted DO Headers", value: 0 },
                     { label: "Inserted Details", value: 0 },
@@ -1143,7 +1149,7 @@ export async function importWorksheetReceive() {
         for (const header of headerRows) {
             const headerResult = await client.query(
                 `
-                    INSERT INTO worksheet_do (
+                    INSERT INTO stock_do (
                         do_no,
                         out_date,
                         receive_date,
@@ -1153,7 +1159,7 @@ export async function importWorksheetReceive() {
                     )
                     VALUES ($1, $2, $3, $4, $5, $6)
                     ON CONFLICT (do_no) DO NOTHING
-                    RETURNING worksheet_do_id
+                    RETURNING stock_do_id
                 `,
                 [
                     header.do_no,
@@ -1178,12 +1184,12 @@ export async function importWorksheetReceive() {
                     worksheet_receive_id: null,
                     worksheet_master_id: null,
                     quantity: null,
-                    message: "Existing worksheet_do.do_no; header and details skipped."
+                    message: "Existing stock_do.do_no; header and details skipped."
                 });
                 continue;
             }
 
-            const worksheetDoId = headerResult.rows[0].worksheet_do_id;
+            const worksheetDoId = headerResult.rows[0].stock_do_id;
 
             insertedHeaderCount++;
             importRows.push({
@@ -1194,23 +1200,25 @@ export async function importWorksheetReceive() {
                 worksheet_receive_id: null,
                 worksheet_master_id: null,
                 quantity: null,
-                message: "Inserted worksheet_do header."
+                message: "Inserted stock_do header."
             });
 
             for (const detail of detailRowsByDoNo.get(header.do_no) || []) {
                 const detailResult = await client.query(
                     `
-                        INSERT INTO worksheet_receive (
-                            worksheet_do_id,
-                            worksheet_master_id,
+                        INSERT INTO stock_receive (
+                            stock_do_id,
+                            stock_type_id,
+                            master_id,
                             quantity
                         )
-                        VALUES ($1, $2, $3)
-                        ON CONFLICT (worksheet_do_id, worksheet_master_id) DO NOTHING
-                        RETURNING worksheet_receive_id
+                        VALUES ($1, $2, $3, $4)
+                        ON CONFLICT (stock_do_id, stock_type_id, master_id) DO NOTHING
+                        RETURNING stock_receive_id
                     `,
                     [
                         worksheetDoId,
+                        masters.wsStockTypeId,
                         detail.worksheet_master_id,
                         detail.quantity
                     ]
@@ -1226,7 +1234,7 @@ export async function importWorksheetReceive() {
                         worksheet_receive_id: null,
                         worksheet_master_id: detail.worksheet_master_id,
                         quantity: detail.quantity,
-                        message: "Existing worksheet_receive detail."
+                        message: "Existing stock_receive detail."
                     });
                     continue;
                 }
@@ -1237,10 +1245,10 @@ export async function importWorksheetReceive() {
                     action: "INSERT DETAIL",
                     do_no: detail.do_no,
                     worksheet_do_id: worksheetDoId,
-                    worksheet_receive_id: detailResult.rows[0].worksheet_receive_id,
+                    worksheet_receive_id: detailResult.rows[0].stock_receive_id,
                     worksheet_master_id: detail.worksheet_master_id,
                     quantity: detail.quantity,
-                    message: "Inserted worksheet_receive detail."
+                    message: "Inserted stock_receive detail."
                 });
             }
         }

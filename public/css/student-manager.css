@@ -507,16 +507,16 @@ label span {
 }
 
 .student-fields .student-gender-field,
-.student-fields .student-class-field,
-.add-student-profile-grid .add-gender-field,
-.add-student-profile-grid .add-class-field {
+.add-student-profile-grid .add-gender-field {
   grid-column: span 2;
 }
 
 .student-fields .student-nickname-field,
 .student-fields .student-birth-field,
+.student-fields .student-class-field,
 .add-student-profile-grid .add-nickname-field,
-.add-student-profile-grid .add-birth-field {
+.add-student-profile-grid .add-birth-field,
+.add-student-profile-grid .add-class-field {
   grid-column: span 4;
 }
 
@@ -527,12 +527,12 @@ label span {
 
 .student-fields .student-school-field,
 .add-student-profile-grid .add-school-field {
-  grid-column: span 8;
+  grid-column: span 7;
 }
 
 .student-fields .student-email-field,
 .add-student-profile-grid .add-email-field {
-  grid-column: span 6;
+  grid-column: span 5;
 }
 
 .wide-field {
