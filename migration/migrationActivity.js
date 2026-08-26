@@ -556,12 +556,19 @@ async function loadMasterData(moduleId, db = pool) {
     };
 }
 
+// Cast the date column to text in SQL (not left as a JS Date object) so
+// the stringified key here actually matches the "YYYY-MM-DD" string the
+// CSV rows parse to — same pattern migrationWorksheet.js already uses.
+// Without the cast, String(dateObject) produces a totally different
+// format ("Wed Jan 15 2024 ...") and existingKeys never matches anything,
+// silently letting every re-import duplicate cd_used/dt_used/at_used rows
+// (neither table has a DB-level unique constraint as a backstop).
 function existingQueryForModule(moduleId) {
     if (moduleId === "cd") {
         return `
             SELECT enrollment_id,
                    cd_master_id AS master_id,
-                   cd_date AS used_date
+                   cd_date::text AS used_date
             FROM cd_used
             ORDER BY cd_used_id
         `;
@@ -571,7 +578,7 @@ function existingQueryForModule(moduleId) {
         return `
             SELECT enrollment_id,
                    dt_master_id AS master_id,
-                   dt_date AS used_date
+                   dt_date::text AS used_date
             FROM dt_used
             ORDER BY dt_used_id
         `;
@@ -580,7 +587,7 @@ function existingQueryForModule(moduleId) {
     return `
         SELECT enrollment_id,
                at_master_id AS master_id,
-               at_date AS used_date
+               at_date::text AS used_date
         FROM at_used
         ORDER BY at_used_id
     `;
