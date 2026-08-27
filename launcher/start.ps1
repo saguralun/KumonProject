@@ -7,7 +7,10 @@
 
 $ErrorActionPreference = "SilentlyContinue"
 
-$ProjectDir = "D:\Project\KumonDB"
+# Derived from this script's own location (launcher\start.ps1) instead of
+# hardcoded, so the same file works regardless of which drive/folder the
+# project is cloned into on any given machine.
+$ProjectDir = Split-Path -Parent $PSScriptRoot
 $AppUrl = "http://localhost:3000/login.html"
 $Marker = "KUMONDB_LAUNCHER_MARKER"
 
