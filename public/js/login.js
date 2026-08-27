@@ -4,8 +4,33 @@ const els = {
   adminForm: document.getElementById("adminForm"),
   guestForm: document.getElementById("guestForm"),
   adminSubmit: document.getElementById("adminSubmit"),
-  guestSubmit: document.getElementById("guestSubmit")
+  guestSubmit: document.getElementById("guestSubmit"),
+  lanInfo: document.getElementById("loginLanInfo")
 };
+
+async function loadLanInfo() {
+  try {
+    const response = await fetch("/api/server-info");
+    const data = await response.json();
+    const addresses = data.lanAddresses || [];
+
+    if (!addresses.length) {
+      return;
+    }
+
+    const urls = addresses.map((address) => `http://${address}:${data.port}`);
+
+    els.lanInfo.innerHTML = `
+      <div>เข้าจากเครื่องอื่นในวง LAN เดียวกัน ใช้ address นี้:</div>
+      ${urls.map((url) => `<div class="login-lan-url">${url}</div>`).join("")}
+    `;
+    els.lanInfo.classList.remove("hidden");
+  } catch (error) {
+    // Non-critical — just skip showing it if the endpoint is unreachable.
+  }
+}
+
+loadLanInfo();
 
 function setMessage(text) {
   if (!text) {

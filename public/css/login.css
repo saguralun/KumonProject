@@ -179,6 +179,26 @@ body {
   text-align: center;
 }
 
+.login-lan-info {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  padding: 10px 11px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.login-lan-url {
+  margin-top: 2px;
+  color: var(--blue);
+  font-weight: 700;
+  font-family: "Consolas", "SFMono-Regular", monospace;
+  user-select: all;
+}
+
 .hidden {
   display: none !important;
 }

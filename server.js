@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import os from "os";
 import path from "path";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -43,6 +44,22 @@ app.use(session({
 
 // Public: login/logout/session-check. Must stay unauthenticated.
 app.use("/api/auth", authRoutes);
+
+// Public: lets the login page show "other computers on this network use
+// this address" — no auth (nothing sensitive, just this machine's own LAN
+// IPs), and it has to work before anyone is logged in anyway.
+app.get("/api/server-info", (req, res) => {
+  const lanAddresses = Object.values(os.networkInterfaces())
+    .flat()
+    .filter((entry) => entry && entry.family === "IPv4" && !entry.internal)
+    .map((entry) => entry.address);
+
+  res.json({
+    success: true,
+    port: PORT,
+    lanAddresses
+  });
+});
 
 // Page shells. Registered before express.static so unauthenticated
 // visitors get redirected instead of receiving the (empty, since the
