@@ -80,7 +80,7 @@ function Resolve-ChromePath {
 $chromePath = Resolve-ChromePath
 
 if ($chromePath) {
-    Start-Process -FilePath $chromePath -ArgumentList @("--app=$AppUrl", "--window-size=1280,860")
+    Start-Process -FilePath $chromePath -ArgumentList @("--app=$AppUrl", "--start-maximized")
 }
 else {
     # Chrome not found anywhere expected — fall back to the OS default
