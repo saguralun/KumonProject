@@ -36,6 +36,7 @@ const els = {
     worksheetProgressLevel: document.getElementById("worksheetProgressLevel"),
     worksheetProgressValue: document.getElementById("worksheetProgressValue"),
     worksheetProgressCaption: document.getElementById("worksheetProgressCaption"),
+    gradeSyncBadge: document.getElementById("gradeSyncBadge"),
     worksheetInputs: document.getElementById("worksheetInputs"),
     previewCount: document.getElementById("previewCount"),
     previewList: document.getElementById("previewList"),
@@ -83,6 +84,9 @@ const state = {
     // that shouldn't pop the results dropdown open before the user has
     // actually typed or clicked anything — skip just that one search.
     suppressInitialSearch: false,
+    // True once the box shows a confirmed "#id ชื่อ" selection rather than
+    // a query the user is actively typing — lets focus tell those apart.
+    hasConfirmedSelection: false,
     context: null,
     history: [],
     worksheetPacketSummary: null,
@@ -189,7 +193,7 @@ async function runSearch() {
             query: els.studentSearch.value,
             mode: state.searchMode,
             subject: state.subjectFilter,
-            limit: 20
+            limit: 30
         });
 
         if (requestId !== state.searchRequestId) {
@@ -412,6 +416,31 @@ function renderWorksheetProgress() {
     els.worksheetProgressLevel.textContent = progress.levelCode;
     els.worksheetProgressValue.textContent = String(progress.displayWorksheetNo);
     els.worksheetProgressCaption.textContent = `${progress.percent}%`;
+
+    renderGradeSyncBadge(state.progressKind === "main" ? state.context?.gradeSyncStatus : null);
+}
+
+const GRADE_SYNC_LABELS = {
+    KSIS: "เรียนทันชั้นเรียน",
+    "6M": "เรียนเกินชั้นเรียน 6 เดือน",
+    "2Y": "เรียนเกินชั้นเรียน 2 ปี",
+    "3Y": "เรียนเกินชั้นเรียน 3 ปี",
+    "5Y": "เรียนเกินชั้นเรียน 5 ปี",
+    "7Y": "เรียนเกินชั้นเรียน 7 ปี"
+};
+
+function renderGradeSyncBadge(status) {
+    if (!status?.code || !GRADE_SYNC_LABELS[status.code]) {
+        els.gradeSyncBadge.classList.add("hidden");
+        els.gradeSyncBadge.textContent = "";
+        els.gradeSyncBadge.removeAttribute("title");
+        return;
+    }
+
+    els.gradeSyncBadge.textContent = status.code;
+    els.gradeSyncBadge.title = GRADE_SYNC_LABELS[status.code];
+    els.gradeSyncBadge.classList.toggle("grade-sync-badge-ksis", status.code === "KSIS");
+    els.gradeSyncBadge.classList.remove("hidden");
 }
 
 function focusWorksheetControl(input) {
@@ -716,7 +745,7 @@ function updatePreview() {
 }
 
 function renderHistoryTable({ scrollToTop = false } = {}) {
-    renderHistory(els.historyTableWrap, state.history);
+    renderHistory(els.historyTableWrap, state.history, state.worksheetMonthSummary);
 
     if (scrollToTop) {
         els.historyTableWrap.scrollTop = 0;
@@ -1441,6 +1470,7 @@ async function loadEnrollmentContext(enrollmentId) {
         els.dateNext.disabled = false;
         els.receiveDate.value = context.defaults.receiveDate;
         els.studentSearch.value = `#${context.enrollment.enrollmentId} ${context.enrollment.studentName}`;
+        state.hasConfirmedSelection = true;
 
         populateStudentStrip(context);
         renderPatternButtons();
@@ -1568,6 +1598,7 @@ async function saveEntries() {
         state.context.history = state.history;
         state.context.completionState = result.completionState;
         state.context.worksheetProgress = result.worksheetProgress || state.context.worksheetProgress;
+        state.context.gradeSyncStatus = result.gradeSyncStatus;
         state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
         state.worksheetPacketSummary = state.context.worksheetPacketSummary;
         els.receiveDate.value = result.nextReceiveDate;
@@ -1619,6 +1650,7 @@ async function deleteHistoryRecord(worksheetUsedId) {
         state.context.history = state.history;
         state.context.completionState = result.completionState || state.context.completionState;
         state.context.worksheetProgress = result.worksheetProgress || state.context.worksheetProgress;
+        state.context.gradeSyncStatus = result.gradeSyncStatus;
         state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
         state.worksheetPacketSummary = state.context.worksheetPacketSummary;
         await refreshWorksheetMonthSummary();
@@ -1670,13 +1702,26 @@ function bindEvents() {
         }
     });
 
-    els.studentSearch.addEventListener("input", queueSearch);
+    els.studentSearch.addEventListener("input", () => {
+        state.hasConfirmedSelection = false;
+        queueSearch();
+    });
     els.studentSearch.addEventListener("focus", () => {
-        selectStudentSearchText();
-
         if (state.suppressInitialSearch) {
             state.suppressInitialSearch = false;
+            selectStudentSearchText();
             return;
+        }
+
+        // Re-focusing a box that still shows a previously picked student
+        // (e.g. "#3210 กชพร...") would search for that literal label and
+        // find nothing. Clear it instead so focusing shows a fresh browse
+        // list, ready to type over.
+        if (state.hasConfirmedSelection) {
+            state.hasConfirmedSelection = false;
+            els.studentSearch.value = "";
+        } else {
+            selectStudentSearchText();
         }
 
         queueSearch();

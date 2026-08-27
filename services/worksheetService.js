@@ -11,6 +11,141 @@ const COMPLETER_LEVEL_BY_SUBJECT = new Map([
 const DEFAULT_HISTORY_LIMIT = 30;
 const MAX_HISTORY_LIMIT = 100;
 
+// School-grade ↔ Kumon-level pace table, confirmed with the center owner.
+// Each entry is one school year; `levels` lists the level(s) that make up
+// that year in curriculum order (earliest first). A grade with N levels
+// splits its year into N equal slices (e.g. ม.4 covers J then K, 6 months
+// each) — this mirrors how TRP already splits one letter into two DB rows
+// (e.g. "AI"/"AII") to cover one year.
+const GRADE_LEVEL_GROUPS_BY_SUBJECT = new Map([
+    ["ME", [
+        { schoolClass: "เตรียมอ.", levels: ["6A", "5A"] },
+        { schoolClass: "อ.1", levels: ["4A"] },
+        { schoolClass: "อ.2", levels: ["3A"] },
+        { schoolClass: "อ.3", levels: ["2A"] },
+        { schoolClass: "ป.1", levels: ["A"] },
+        { schoolClass: "ป.2", levels: ["B"] },
+        { schoolClass: "ป.3", levels: ["C"] },
+        { schoolClass: "ป.4", levels: ["D"] },
+        { schoolClass: "ป.5", levels: ["E"] },
+        { schoolClass: "ป.6", levels: ["F"] },
+        { schoolClass: "ม.1", levels: ["G"] },
+        { schoolClass: "ม.2", levels: ["H"] },
+        { schoolClass: "ม.3", levels: ["I"] },
+        { schoolClass: "ม.4", levels: ["J", "K"] },
+        { schoolClass: "ม.5", levels: ["L", "M"] },
+        { schoolClass: "ม.6", levels: ["N", "O"] }
+    ]],
+    ["EFL", [
+        { schoolClass: "เตรียมอ.", levels: ["7A", "6A", "5A"] },
+        { schoolClass: "อ.1", levels: ["4A"] },
+        { schoolClass: "อ.2", levels: ["3A"] },
+        { schoolClass: "อ.3", levels: ["2A"] },
+        { schoolClass: "ป.1", levels: ["A"] },
+        { schoolClass: "ป.2", levels: ["B"] },
+        { schoolClass: "ป.3", levels: ["C"] },
+        { schoolClass: "ป.4", levels: ["D"] },
+        { schoolClass: "ป.5", levels: ["E"] },
+        { schoolClass: "ป.6", levels: ["F"] },
+        { schoolClass: "ม.1", levels: ["G"] },
+        { schoolClass: "ม.2", levels: ["H"] },
+        { schoolClass: "ม.3", levels: ["I"] },
+        { schoolClass: "ม.4", levels: ["J", "K"] },
+        { schoolClass: "ม.5", levels: ["L", "M"] },
+        { schoolClass: "ม.6", levels: ["N", "O"] }
+    ]],
+    ["TRP", [
+        { schoolClass: "เตรียมอ.", levels: ["7A", "6A", "5A"] },
+        { schoolClass: "อ.1", levels: ["4A"] },
+        { schoolClass: "อ.2", levels: ["3A"] },
+        { schoolClass: "อ.3", levels: ["2A"] },
+        { schoolClass: "ป.1", levels: ["AI", "AII"] },
+        { schoolClass: "ป.2", levels: ["BI", "BII"] },
+        { schoolClass: "ป.3", levels: ["CI", "CII"] },
+        { schoolClass: "ป.4", levels: ["DI", "DII"] },
+        { schoolClass: "ป.5", levels: ["EI", "EII"] },
+        { schoolClass: "ป.6", levels: ["FI", "FII"] },
+        { schoolClass: "ม.1", levels: ["GI", "GII"] },
+        { schoolClass: "ม.2", levels: ["HI", "HII"] },
+        { schoolClass: "ม.3", levels: ["II", "III"] }
+        // TRP has no level left past "III" — ม.4-ม.6 have nothing to
+        // compare against, so grade-sync status is simply not shown there.
+    ]]
+]);
+
+// Thresholds are "at least this many months ahead" — the highest one the
+// gap clears wins. A negative gap (behind grade level) intentionally
+// returns null: the center only wants this badge to celebrate being on
+// pace or ahead, never to flag a child as behind.
+const GRADE_SYNC_THRESHOLDS = [
+    { minMonths: 84, code: "7Y" },
+    { minMonths: 60, code: "5Y" },
+    { minMonths: 36, code: "3Y" },
+    { minMonths: 24, code: "2Y" },
+    { minMonths: 6, code: "6M" },
+    { minMonths: -Infinity, code: "KSIS" }
+];
+
+function schoolYearFraction(today) {
+    const year = today.getFullYear();
+    const may1ThisCycle = today.getMonth() >= 4 // getMonth() 0-based, 4 = May
+        ? new Date(year, 4, 1)
+        : new Date(year - 1, 4, 1);
+    const may1NextCycle = new Date(may1ThisCycle.getFullYear() + 1, 4, 1);
+    const totalDays = (may1NextCycle - may1ThisCycle) / 86400000;
+    const elapsedDays = (today - may1ThisCycle) / 86400000;
+
+    return Math.max(0, Math.min(1, elapsedDays / totalDays));
+}
+
+export function computeGradeSyncStatus({
+    subjectCode,
+    schoolGradeClass,
+    currentLevelCode,
+    progressPercent,
+    today = new Date()
+}) {
+    const groups = GRADE_LEVEL_GROUPS_BY_SUBJECT.get(subjectCode);
+
+    if (!groups || !schoolGradeClass || !currentLevelCode) {
+        return null;
+    }
+
+    const expectedGroupIndex = groups.findIndex((group) => group.schoolClass === schoolGradeClass);
+
+    if (expectedGroupIndex === -1) {
+        return null;
+    }
+
+    const actualGroupIndex = groups.findIndex((group) => group.levels.includes(currentLevelCode));
+
+    if (actualGroupIndex === -1) {
+        return null;
+    }
+
+    const actualGroup = groups[actualGroupIndex];
+    const withinGroupIndex = actualGroup.levels.indexOf(currentLevelCode);
+    const sliceMonths = 12 / actualGroup.levels.length;
+    const percent = Math.max(0, Math.min(100, Number(progressPercent) || 0));
+
+    const expectedMonths = (expectedGroupIndex * 12) + (schoolYearFraction(today) * 12);
+    const actualMonths = (actualGroupIndex * 12)
+        + (withinGroupIndex * sliceMonths)
+        + ((percent / 100) * sliceMonths);
+    const gapMonths = actualMonths - expectedMonths;
+
+    if (gapMonths < 0) {
+        return null;
+    }
+
+    const tier = GRADE_SYNC_THRESHOLDS.find((entry) => gapMonths >= entry.minMonths);
+
+    return {
+        code: tier.code,
+        gapMonths: Math.round(gapMonths)
+    };
+}
+
 export const WORKSHEET_PATTERNS = [
     {
         code: "daily20",
@@ -237,6 +372,8 @@ function mapEnrollment(row) {
         currentLevelCode: row.current_level_code,
         currentZunLevelMasterId: row.current_zun_level_master_id,
         currentZunLevelCode: row.current_zun_level_code,
+        schoolGradeId: row.school_grade_id,
+        schoolGradeClass: row.school_grade_class,
         startingWorksheetMasterId: row.starting_worksheet_master_id,
         startingWorksheetNo: row.starting_worksheet_no,
         isKumonConnect: row.is_kumon_connect === true,
@@ -308,6 +445,8 @@ async function getEnrollmentRow(enrollmentId, { activeOnly = true } = {}) {
             student.first_name,
             student.last_name,
             student.nickname,
+            student.school_grade_id,
+            grade.school_class AS school_grade_class,
             subject.subject_code,
             subject.subject_name,
             current_level.level_code AS current_level_code,
@@ -319,6 +458,8 @@ async function getEnrollmentRow(enrollmentId, { activeOnly = true } = {}) {
         FROM ${TABLE_SCHEMA}.enrollment e
         JOIN ${TABLE_SCHEMA}.student student
             ON student.student_id = e.student_id
+        LEFT JOIN ${TABLE_SCHEMA}.school_grade_master grade
+            ON grade.school_grade_id = student.school_grade_id
         JOIN ${TABLE_SCHEMA}.subject_master subject
             ON subject.subject_id = e.subject_id
         JOIN ${TABLE_SCHEMA}.level_master current_level
@@ -1192,6 +1333,12 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
         levelMasterId: enrollment.currentZunLevelMasterId,
         options: zunWorksheetOptions
     });
+    const gradeSyncStatus = computeGradeSyncStatus({
+        subjectCode: enrollment.subjectCode,
+        schoolGradeClass: enrollment.schoolGradeClass,
+        currentLevelCode: enrollment.currentLevelCode,
+        progressPercent: worksheetProgress?.main?.percent
+    });
 
     return {
         enrollment,
@@ -1211,6 +1358,7 @@ export async function getEnrollmentContext(enrollmentId, historyLimit) {
         worksheetPacketSummary,
         worksheetMonthSummary,
         worksheetProgress,
+        gradeSyncStatus,
         completionState,
         cdState
     };
@@ -1480,6 +1628,12 @@ export async function saveWorksheetEntries(payload) {
             getWorksheetProgress(enrollment),
             getWorksheetPacketSummary(enrollment)
         ]);
+        const gradeSyncStatus = computeGradeSyncStatus({
+            subjectCode: enrollment.subjectCode,
+            schoolGradeClass: enrollment.schoolGradeClass,
+            currentLevelCode: enrollment.currentLevelCode,
+            progressPercent: worksheetProgress?.main?.percent
+        });
 
         return {
             success: true,
@@ -1487,6 +1641,7 @@ export async function saveWorksheetEntries(payload) {
             nextReceiveDate: addDays(latestSavedDate, 1),
             completionState,
             worksheetProgress,
+            gradeSyncStatus,
             worksheetPacketSummary
         };
     } catch (error) {
@@ -2941,12 +3096,21 @@ export async function deleteWorksheetEntry({
                 getWorksheetPacketSummary(refreshedEnrollment)
             ])
             : [null, null, null];
+        const gradeSyncStatus = refreshedEnrollment
+            ? computeGradeSyncStatus({
+                subjectCode: refreshedEnrollment.subjectCode,
+                schoolGradeClass: refreshedEnrollment.schoolGradeClass,
+                currentLevelCode: refreshedEnrollment.currentLevelCode,
+                progressPercent: worksheetProgress?.main?.percent
+            })
+            : null;
 
         return {
             success: true,
             worksheetUsedId: normalizedWorksheetUsedId,
             completionState,
             worksheetProgress,
+            gradeSyncStatus,
             worksheetPacketSummary
         };
     } catch (error) {

@@ -819,6 +819,32 @@ html[data-role="staff"] [data-staff-up] {
   box-shadow: 0 4px 10px rgba(14, 165, 233, 0.12);
 }
 
+.grade-sync-badge {
+  position: absolute;
+  z-index: 3;
+  bottom: 9px;
+  left: 10px;
+  border: 1px solid #fbcf7a;
+  border-radius: 999px;
+  background: rgba(255, 251, 235, 0.95);
+  padding: 2px 7px;
+  color: #b8720a;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(217, 144, 24, 0.16);
+}
+
+.grade-sync-badge.hidden {
+  display: none;
+}
+
+.grade-sync-badge.grade-sync-badge-ksis {
+  border-color: #bae6fd;
+  background: rgba(255, 255, 255, 0.92);
+  color: #0ea5e9;
+  box-shadow: 0 4px 10px rgba(14, 165, 233, 0.12);
+}
+
 .worksheet-progress-tabs {
   position: absolute;
   z-index: 3;
@@ -1329,16 +1355,12 @@ html[data-role="staff"] [data-staff-up] {
   background: #f8fbff;
 }
 
-.history-table tbody tr.history-row-unprocessed-stock td {
-  background: #fff7df;
+.history-table tbody tr.history-row-current-period td {
+  background: #eef5ff;
 }
 
-.history-table tbody tr.history-row-unprocessed-stock td:first-child {
-  box-shadow: inset 4px 0 0 #d99018;
-}
-
-.history-table tbody tr.history-row-unprocessed-stock:hover td {
-  background: #fff1bd;
+.history-table tbody tr.history-row-current-period:hover td {
+  background: #e2edff;
 }
 
 .history-table tbody tr:last-child td {
