@@ -246,18 +246,29 @@ async function loadMonthlyStatus(enrollmentIds, month, year) {
 }
 
 async function loadCdUsed(enrollmentIds, month, year) {
+    // DISTINCT ON (enrollment_id, cd_master_id, cd_date): the underlying
+    // cd_used table has real duplicate rows for a large chunk of its
+    // history (~half the table, matching the CD import duplicate-detection
+    // bug fixed earlier — a pre-fix import run appears to have doubled up
+    // the whole table). Collapsing here keeps the report correct without
+    // needing to touch that data.
     const result = await pool.query(`
-        SELECT
-            cu.enrollment_id,
-            cu.cd_date,
-            cm.cd_no,
-            lm.level_code
-        FROM ${TABLE_SCHEMA}.cd_used cu
-        JOIN ${TABLE_SCHEMA}.cd_master cm ON cm.cd_master_id = cu.cd_master_id
-        JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = cm.level_master_id
-        WHERE cu.cd_month = $2 AND cu.cd_year = $3
-          AND cu.enrollment_id = ANY($1::int[])
-        ORDER BY cu.enrollment_id, cu.cd_date ASC, cu.cd_used_id ASC
+        SELECT enrollment_id, cd_date, cd_no, level_code
+        FROM (
+            SELECT DISTINCT ON (cu.enrollment_id, cu.cd_master_id, cu.cd_date)
+                cu.enrollment_id,
+                cu.cd_date,
+                cm.cd_no,
+                lm.level_code,
+                cu.cd_used_id
+            FROM ${TABLE_SCHEMA}.cd_used cu
+            JOIN ${TABLE_SCHEMA}.cd_master cm ON cm.cd_master_id = cu.cd_master_id
+            JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = cm.level_master_id
+            WHERE cu.cd_month = $2 AND cu.cd_year = $3
+              AND cu.enrollment_id = ANY($1::int[])
+            ORDER BY cu.enrollment_id, cu.cd_master_id, cu.cd_date, cu.cd_used_id ASC
+        ) deduped
+        ORDER BY enrollment_id, cd_date ASC, cd_used_id ASC
     `, [enrollmentIds, month, year]);
 
     const byEnrollmentId = new Map();
