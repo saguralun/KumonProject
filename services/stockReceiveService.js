@@ -324,22 +324,47 @@ export async function createDeliveryOrder(type, payload) {
         await client.query("BEGIN");
 
         const existing = await client.query(
-            `SELECT stock_do_id FROM ${TABLE_SCHEMA}.stock_do WHERE do_no = $1`,
+            `SELECT stock_do_id, is_stock_processed FROM ${TABLE_SCHEMA}.stock_do WHERE do_no = $1`,
             [doNo]
         );
+        const existingDo = existing.rows[0];
+        let doId;
+        let appended = false;
 
-        if (existing.rows[0]) {
-            throw httpError(409, `เลข DO '${doNo}' มีอยู่แล้ว`);
+        if (existingDo) {
+            if (existingDo.is_stock_processed) {
+                throw httpError(409, `เลข DO '${doNo}' ถูก process เข้า stock ไปแล้ว ไม่สามารถเพิ่มรายการได้`);
+            }
+
+            // A DO is homogeneous (all-WS or all-CD, see the comment on
+            // searchDeliveryOrders) — appending a different type onto it
+            // would break that, so block the mismatch explicitly rather
+            // than silently mixing types under one DO number.
+            const existingType = await client.query(
+                `SELECT MIN(stm.stock_type_code) AS stock_type_code
+                 FROM ${TABLE_SCHEMA}.stock_receive r
+                 JOIN ${TABLE_SCHEMA}.stock_type_master stm ON stm.stock_type_id = r.stock_type_id
+                 WHERE r.stock_do_id = $1`,
+                [existingDo.stock_do_id]
+            );
+            const existingTypeCode = existingType.rows[0]?.stock_type_code;
+
+            if (existingTypeCode && existingTypeCode !== config.stockTypeCode) {
+                throw httpError(409, `เลข DO '${doNo}' เป็นรายการ ${existingTypeCode} อยู่แล้ว ไม่สามารถเพิ่ม ${config.stockTypeCode} ได้`);
+            }
+
+            doId = existingDo.stock_do_id;
+            appended = true;
+        } else {
+            const doResult = await client.query(`
+                INSERT INTO ${TABLE_SCHEMA}.stock_do (
+                    do_no, out_date, receive_date, receive_month, receive_year, is_stock_processed
+                )
+                VALUES ($1, $2, $3, $4, $5, FALSE)
+                RETURNING stock_do_id
+            `, [doNo, outDate, receiveDate, period.month, period.year]);
+            doId = doResult.rows[0].stock_do_id;
         }
-
-        const doResult = await client.query(`
-            INSERT INTO ${TABLE_SCHEMA}.stock_do (
-                do_no, out_date, receive_date, receive_month, receive_year, is_stock_processed
-            )
-            VALUES ($1, $2, $3, $4, $5, FALSE)
-            RETURNING stock_do_id
-        `, [doNo, outDate, receiveDate, period.month, period.year]);
-        const doId = doResult.rows[0].stock_do_id;
 
         for (const [masterId, quantity] of mergedByMaster.entries()) {
             const masterCheck = await client.query(
@@ -351,15 +376,26 @@ export async function createDeliveryOrder(type, payload) {
                 throw httpError(400, `ไม่พบรายการ id ${masterId}`);
             }
 
-            await client.query(`
-                INSERT INTO ${TABLE_SCHEMA}.stock_receive (stock_do_id, stock_type_id, master_id, quantity)
-                VALUES ($1, $2, $3, $4)
-            `, [doId, config.stockTypeId, masterId, quantity]);
+            // Adds onto an existing line for the same item within this DO
+            // instead of creating a duplicate row, same additive spirit as
+            // processDeliveryOrder below.
+            const updateResult = await client.query(`
+                UPDATE ${TABLE_SCHEMA}.stock_receive
+                SET quantity = quantity + $1
+                WHERE stock_do_id = $2 AND stock_type_id = $3 AND master_id = $4
+            `, [quantity, doId, config.stockTypeId, masterId]);
+
+            if (updateResult.rowCount === 0) {
+                await client.query(`
+                    INSERT INTO ${TABLE_SCHEMA}.stock_receive (stock_do_id, stock_type_id, master_id, quantity)
+                    VALUES ($1, $2, $3, $4)
+                `, [doId, config.stockTypeId, masterId, quantity]);
+            }
         }
 
         await client.query("COMMIT");
 
-        return { type: config.type, doId, doNo };
+        return { type: config.type, doId, doNo, appended };
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -482,6 +518,115 @@ export async function deleteDeliveryOrder(doId) {
         await client.query("COMMIT");
 
         return { doId: normalizedDoId };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+// Shared by deleteDeliveryOrderItem/updateDeliveryOrderItemQuantity — locks
+// and returns the parent DO row, throwing if it's missing, mismatched, or
+// already processed (its quantities are already applied to stock.quantity
+// at that point, so editing the line here would silently drift out of sync).
+async function lockPendingDoForItem(client, doId, receiveId) {
+    const normalizedDoId = Number(doId);
+    const normalizedReceiveId = Number(receiveId);
+
+    if (!Number.isInteger(normalizedDoId) || normalizedDoId < 1) {
+        throw httpError(400, "DO ID ไม่ถูกต้อง");
+    }
+
+    if (!Number.isInteger(normalizedReceiveId) || normalizedReceiveId < 1) {
+        throw httpError(400, "Item ID ไม่ถูกต้อง");
+    }
+
+    const doResult = await client.query(`
+        SELECT stock_do_id, is_stock_processed
+        FROM ${TABLE_SCHEMA}.stock_do
+        WHERE stock_do_id = $1
+        FOR UPDATE
+    `, [normalizedDoId]);
+    const doRow = doResult.rows[0];
+
+    if (!doRow) {
+        throw httpError(404, "ไม่พบ DO นี้");
+    }
+
+    if (doRow.is_stock_processed) {
+        throw httpError(409, "แก้ไม่ได้ เพราะ DO นี้ตัด stock ไปแล้ว");
+    }
+
+    const itemResult = await client.query(
+        `SELECT stock_receive_id FROM ${TABLE_SCHEMA}.stock_receive WHERE stock_receive_id = $1 AND stock_do_id = $2`,
+        [normalizedReceiveId, normalizedDoId]
+    );
+
+    if (!itemResult.rows[0]) {
+        throw httpError(404, "ไม่พบรายการนี้ใน DO นี้");
+    }
+
+    return { doId: normalizedDoId, receiveId: normalizedReceiveId };
+}
+
+export async function deleteDeliveryOrderItem(doId, receiveId) {
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const { doId: normalizedDoId, receiveId: normalizedReceiveId } =
+            await lockPendingDoForItem(client, doId, receiveId);
+
+        const remaining = await client.query(
+            `SELECT COUNT(*)::int AS remaining FROM ${TABLE_SCHEMA}.stock_receive WHERE stock_do_id = $1`,
+            [normalizedDoId]
+        );
+
+        if (Number(remaining.rows[0].remaining) <= 1) {
+            throw httpError(409, "ลบไม่ได้ เพราะเป็นรายการสุดท้ายของ DO นี้ — ลบทั้ง DO แทนถ้าไม่ต้องการแล้ว");
+        }
+
+        await client.query(
+            `DELETE FROM ${TABLE_SCHEMA}.stock_receive WHERE stock_receive_id = $1`,
+            [normalizedReceiveId]
+        );
+
+        await client.query("COMMIT");
+
+        return { doId: normalizedDoId, receiveId: normalizedReceiveId };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+export async function updateDeliveryOrderItemQuantity(doId, receiveId, quantity) {
+    const normalizedQuantity = Number(quantity);
+
+    if (!Number.isInteger(normalizedQuantity) || normalizedQuantity < 1) {
+        throw httpError(400, "จำนวนต้องเป็นเลขจำนวนเต็มมากกว่า 0");
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const { doId: normalizedDoId, receiveId: normalizedReceiveId } =
+            await lockPendingDoForItem(client, doId, receiveId);
+
+        await client.query(
+            `UPDATE ${TABLE_SCHEMA}.stock_receive SET quantity = $1 WHERE stock_receive_id = $2`,
+            [normalizedQuantity, normalizedReceiveId]
+        );
+
+        await client.query("COMMIT");
+
+        return { doId: normalizedDoId, receiveId: normalizedReceiveId, quantity: normalizedQuantity };
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;

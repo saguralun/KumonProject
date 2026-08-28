@@ -525,6 +525,23 @@ html[data-role="staff"] [data-staff-up] {
   box-shadow: none;
 }
 
+.ghost-button {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ghost-button:hover {
+  border-color: #cbd5e1;
+  background: var(--surface-soft);
+  color: var(--ink);
+}
+
 .danger-button {
   min-height: 38px;
   border: 1px solid #fecaca;
@@ -582,6 +599,32 @@ html[data-role="staff"] [data-staff-up] {
 
 .do-table tbody tr:hover {
   background: var(--blue-soft);
+}
+
+.do-quick-fill-column {
+  width: 30px;
+  min-width: 30px;
+  padding-right: 0 !important;
+}
+
+.do-quick-fill-button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid #059669;
+  border-radius: 6px;
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.do-quick-fill-button:hover {
+  background: #059669;
+  color: #ffffff;
 }
 
 .status-pill {
@@ -704,6 +747,44 @@ html[data-role="staff"] [data-staff-up] {
   background: var(--surface-soft);
   color: var(--muted);
   font-weight: 800;
+}
+
+.do-item-qty-input {
+  width: 64px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.do-item-qty-input:focus {
+  outline: none;
+  border-color: #059669;
+  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.16);
+}
+
+.do-item-qty-input:disabled {
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.do-item-delete-button {
+  min-height: 26px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0 8px;
+  background: #fff1f2;
+  font-size: 12px;
+}
+
+.do-item-delete-button:hover:not(:disabled) {
+  background: #fee2e2;
+}
+
+.do-item-delete-button:disabled {
+  opacity: 0.5;
 }
 
 .modal-actions {

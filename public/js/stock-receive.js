@@ -4,6 +4,7 @@ const els = {
   doSearch: document.getElementById("doSearch"),
   statusLine: document.getElementById("statusLine"),
   doForm: document.getElementById("doForm"),
+  doFormPanel: document.getElementById("doFormPanel"),
   typeButtons: document.getElementById("typeButtons"),
   subjectLevelRow: document.getElementById("subjectLevelRow"),
   subjectButtons: document.getElementById("subjectButtons"),
@@ -13,6 +14,7 @@ const els = {
   doItemsEmpty: document.getElementById("doItemsEmpty"),
   doTotal: document.getElementById("doTotal"),
   saveDoButton: document.getElementById("saveDoButton"),
+  newDoButton: document.getElementById("newDoButton"),
   doListSubtitle: document.getElementById("doListSubtitle"),
   doTableWrap: document.getElementById("doTableWrap"),
   doDetailModal: document.getElementById("doDetailModal"),
@@ -271,8 +273,18 @@ function selectItemType(type) {
   state.gridRowCount = computeMaxGridRowCount(type);
 
   const subjects = subjectsForType(type);
+  // Keep whatever subject was already picked if it still has items of the
+  // new type (e.g. TRP has both WS and CD) — only fall back to the first
+  // one when it doesn't (e.g. switching to CD while ME was selected, since
+  // ME has no CDs at all). Previously this always reset to subjects[0],
+  // silently swapping the subject out from under whoever was mid-entry.
+  const currentSubjectStillValid = subjects.some(
+    (subject) => Number(subject.subjectId) === Number(state.selectedSubjectId)
+  );
 
-  state.selectedSubjectId = subjects[0]?.subjectId ?? null;
+  state.selectedSubjectId = currentSubjectStillValid
+    ? state.selectedSubjectId
+    : (subjects[0]?.subjectId ?? null);
   state.selectedLevelMasterId = null;
   state.quantities.clear();
 
@@ -420,8 +432,18 @@ els.doForm.addEventListener("submit", async (event) => {
       })
     });
 
-    setStatus(`บันทึก DO ${data.doNo} แล้ว รอ Process เข้า stock`, "success");
-    resetForm();
+    setStatus(
+      data.appended
+        ? `เพิ่มรายการเข้า DO '${data.doNo}' เดิมแล้ว รอ Process เข้า stock`
+        : `บันทึก DO ${data.doNo} แล้ว รอ Process เข้า stock`,
+      "success"
+    );
+    // Keep DO No / dates / subject / type / level as-is — the common case
+    // is entering several subjects or levels onto the SAME physical
+    // delivery note back to back, so only the quantities that were just
+    // submitted get cleared. "เริ่ม DO ใหม่" is there for when they're
+    // actually moving on to a different delivery note.
+    clearQuantities();
     await loadDeliveryOrders();
   } catch (error) {
     setStatus(error.message, "error");
@@ -430,6 +452,16 @@ els.doForm.addEventListener("submit", async (event) => {
   }
 });
 
+// Clears only the entered quantities after a save — DO No, dates, subject,
+// type, and level are left exactly as they were, ready for the next item
+// on the same DO. See the submit handler for why.
+function clearQuantities() {
+  state.quantities.clear();
+  renderItemsGrid();
+}
+
+// Full reset for actually starting a different delivery note — either
+// automatically on page load, or via the "เริ่ม DO ใหม่" button.
 function resetForm() {
   els.doForm.reset();
   setDefaultDates();
@@ -445,6 +477,15 @@ function setDefaultDates() {
   els.doForm.elements.outDate.value = today;
   els.doForm.elements.receiveDate.value = today;
 }
+
+els.newDoButton.addEventListener("click", () => {
+  if (state.quantities.size > 0 && !window.confirm("ยังไม่ได้บันทึกรายการที่กรอกไว้ เริ่ม DO ใหม่เลยไหม?")) {
+    return;
+  }
+
+  resetForm();
+  selectInputText(els.doForm.elements.doNo);
+});
 
 // ---- DO list ----
 
@@ -464,6 +505,7 @@ function renderDoTable(rows) {
     <table class="do-table">
       <thead>
         <tr>
+          <th class="do-quick-fill-column"></th>
           <th>ประเภท</th>
           <th>สถานะ</th>
           <th>เลข DO</th>
@@ -475,6 +517,23 @@ function renderDoTable(rows) {
       <tbody>
         ${rows.map((row) => `
           <tr data-do-id="${row.doId}">
+            <td class="do-quick-fill-column">
+              ${row.isStockProcessed
+                ? ""
+                : `
+                  <button
+                    type="button"
+                    class="do-quick-fill-button"
+                    data-quick-fill-do-id="${row.doId}"
+                    data-do-no="${escapeHtml(row.doNo)}"
+                    data-out-date="${escapeHtml(row.outDate || "")}"
+                    data-receive-date="${escapeHtml(row.receiveDate || "")}"
+                    data-type="${escapeHtml(row.type || "")}"
+                    title="เอาเลข DO และวันที่ของรายการนี้ไปใส่ในฟอร์ม"
+                    aria-label="เพิ่มรายการเข้า DO นี้"
+                  >+</button>
+                `}
+            </td>
             <td>${typeBadgeHtml(row.type)}</td>
             <td>${statusPillHtml(row)}</td>
             <td><strong>${escapeHtml(row.doNo)}</strong></td>
@@ -509,7 +568,42 @@ async function loadDeliveryOrders() {
   }
 }
 
+function quickFillDo(button) {
+  const { doNo, outDate, receiveDate, type } = button.dataset;
+  const form = els.doForm;
+
+  if (state.quantities.size > 0 && !window.confirm(`ยังไม่ได้บันทึกรายการที่กรอกไว้ เอาเลข DO '${doNo}' มาใส่แทนเลยไหม?`)) {
+    return;
+  }
+
+  form.elements.doNo.value = doNo;
+
+  if (outDate) {
+    form.elements.outDate.value = outDate;
+  }
+
+  if (receiveDate) {
+    form.elements.receiveDate.value = receiveDate;
+  }
+
+  if (type && type !== state.selectedItemType) {
+    selectItemType(type);
+  } else {
+    clearQuantities();
+  }
+
+  setStatus(`เตรียม DO '${doNo}' ไว้ในฟอร์มแล้ว เลือกวิชา/level แล้วกรอกจำนวนเพิ่มได้เลย`, "success");
+  els.doFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 els.doTableWrap.addEventListener("click", (event) => {
+  const quickFillButton = event.target.closest("[data-quick-fill-do-id]");
+
+  if (quickFillButton) {
+    quickFillDo(quickFillButton);
+    return;
+  }
+
   const row = event.target.closest("tr[data-do-id]");
 
   if (row) {
@@ -548,16 +642,44 @@ async function openDoDetail(doId) {
       <div class="do-detail-items">
         <table>
           <thead>
-            <tr><th>ประเภท</th><th>วิชา</th><th>Level</th><th>เลข</th><th>จำนวน</th></tr>
+            <tr>
+              <th>ประเภท</th><th>วิชา</th><th>Level</th><th>เลข</th><th>จำนวน</th>
+              ${deliveryOrder.isStockProcessed ? "" : "<th></th>"}
+            </tr>
           </thead>
           <tbody>
             ${deliveryOrder.items.map((item) => `
-              <tr>
+              <tr data-receive-id="${item.receiveId}">
                 <td>${typeBadgeHtml(item.type)}</td>
                 <td>${escapeHtml(item.subjectCode)}</td>
                 <td>${escapeHtml(item.levelCode)}</td>
                 <td>${item.itemNo}</td>
-                <td>${item.quantity}</td>
+                <td>
+                  ${deliveryOrder.isStockProcessed
+                    ? item.quantity
+                    : `
+                      <input
+                        type="number"
+                        class="do-item-qty-input"
+                        min="1"
+                        step="1"
+                        value="${item.quantity}"
+                        data-receive-id="${item.receiveId}"
+                        data-original-quantity="${item.quantity}"
+                      >
+                    `}
+                </td>
+                ${deliveryOrder.isStockProcessed ? "" : `
+                  <td>
+                    <button
+                      type="button"
+                      class="do-item-delete-button"
+                      data-delete-receive-id="${item.receiveId}"
+                      aria-label="ลบรายการนี้"
+                      title="ลบรายการนี้"
+                    >🗑️</button>
+                  </td>
+                `}
               </tr>
             `).join("")}
           </tbody>
@@ -582,6 +704,69 @@ els.doDetailClose.addEventListener("click", closeDoDetail);
 els.doDetailModal.addEventListener("mousedown", (event) => {
   if (event.target === els.doDetailModal) {
     closeDoDetail();
+  }
+});
+
+els.doDetailBody.addEventListener("click", async (event) => {
+  const deleteButton = event.target.closest("[data-delete-receive-id]");
+
+  if (!deleteButton || !state.selectedDoId) {
+    return;
+  }
+
+  if (!window.confirm("ลบรายการนี้ใช่ไหม?")) {
+    return;
+  }
+
+  deleteButton.disabled = true;
+
+  try {
+    await requestJson(`/api/stock-receive/dos/${state.selectedDoId}/items/${deleteButton.dataset.deleteReceiveId}`, {
+      method: "DELETE"
+    });
+    setStatus("ลบรายการแล้ว", "success");
+    await openDoDetail(state.selectedDoId);
+    await loadDeliveryOrders();
+  } catch (error) {
+    setStatus(error.message, "error");
+    deleteButton.disabled = false;
+  }
+});
+
+els.doDetailBody.addEventListener("change", async (event) => {
+  const input = event.target.closest(".do-item-qty-input");
+
+  if (!input || !state.selectedDoId) {
+    return;
+  }
+
+  const newQuantity = Number(input.value);
+  const originalQuantity = Number(input.dataset.originalQuantity);
+
+  if (!Number.isInteger(newQuantity) || newQuantity < 1) {
+    setStatus("จำนวนต้องเป็นเลขจำนวนเต็มมากกว่า 0", "error");
+    input.value = originalQuantity;
+    return;
+  }
+
+  if (newQuantity === originalQuantity) {
+    return;
+  }
+
+  input.disabled = true;
+
+  try {
+    await requestJson(`/api/stock-receive/dos/${state.selectedDoId}/items/${input.dataset.receiveId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ quantity: newQuantity })
+    });
+    setStatus("แก้จำนวนแล้ว", "success");
+    await openDoDetail(state.selectedDoId);
+    await loadDeliveryOrders();
+  } catch (error) {
+    setStatus(error.message, "error");
+    input.value = originalQuantity;
+    input.disabled = false;
   }
 });
 

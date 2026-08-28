@@ -2,10 +2,12 @@ import express from "express";
 import {
     createDeliveryOrder,
     deleteDeliveryOrder,
+    deleteDeliveryOrderItem,
     getDeliveryOrderDetail,
     getStockReceiveMasters,
     processDeliveryOrder,
-    searchDeliveryOrders
+    searchDeliveryOrders,
+    updateDeliveryOrderItemQuantity
 } from "../services/stockReceiveService.js";
 
 const router = express.Router();
@@ -88,6 +90,28 @@ router.delete("/dos/:doId", async (req, res) => {
         res.json({
             success: true,
             ...(await deleteDeliveryOrder(req.params.doId))
+        });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.delete("/dos/:doId/items/:receiveId", async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            ...(await deleteDeliveryOrderItem(req.params.doId, req.params.receiveId))
+        });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.patch("/dos/:doId/items/:receiveId", async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            ...(await updateDeliveryOrderItemQuantity(req.params.doId, req.params.receiveId, req.body?.quantity))
         });
     } catch (error) {
         sendError(res, error);
