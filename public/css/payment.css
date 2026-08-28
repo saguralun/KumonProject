@@ -238,6 +238,46 @@ html[data-role="staff"] [data-staff-up] {
   gap: 12px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.printer-status-badge {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.printer-status-badge:hover {
+  border-color: #cbd5e1;
+  background: var(--surface-soft);
+}
+
+.printer-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.printer-status-badge.is-connected .printer-status-dot {
+  background: var(--green, #0e9a68);
+}
+
+.printer-status-badge.is-disconnected .printer-status-dot {
+  background: var(--red, #dc3545);
+}
+
 .page-title {
   font-size: 24px;
   font-weight: 800;

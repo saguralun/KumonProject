@@ -1,5 +1,6 @@
 import express from "express";
 import { getPaymentStatus } from "../services/paymentService.js";
+import { getPrinterStatus } from "../services/printerService.js";
 
 const router = express.Router();
 
@@ -28,6 +29,17 @@ router.get("/status", async (req, res) => {
                 query: req.query.query,
                 limit: req.query.limit
             }))
+        });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.get("/printer-status", async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            ...(await getPrinterStatus())
         });
     } catch (error) {
         sendError(res, error);

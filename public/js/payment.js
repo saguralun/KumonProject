@@ -5,6 +5,9 @@ const els = {
     refreshButton: document.getElementById("refreshButton"),
     pageSubtitle: document.getElementById("pageSubtitle"),
     statusLine: document.getElementById("statusLine"),
+    printTestButton: document.getElementById("printTestButton"),
+    printerStatusBadge: document.getElementById("printerStatusBadge"),
+    printerStatusText: document.getElementById("printerStatusText"),
     totalStudents: document.getElementById("totalStudents"),
     paidStudents: document.getElementById("paidStudents"),
     partialStudents: document.getElementById("partialStudents"),
@@ -762,6 +765,87 @@ function exportUnpaidCsv() {
     setStatus(`Export รายชื่อค้างจ่าย ${rows.length} รายการแล้ว`);
 }
 
+// A browser page has no way to actually query printer status (no web API
+// exposes that) — the closest real check is just printing something and
+// seeing whether it comes out. This gives staff a quick, low-stakes way to
+// do that without pulling up a real receipt, sized the same as one so it
+// also confirms the 80mm layout itself looks right.
+function printTestReceipt() {
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+
+    if (!printWindow) {
+        setStatus("Browser บล็อกหน้าต่าง print", "error");
+        return;
+    }
+
+    const now = new Date();
+    const dateText = now.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" });
+    const timeText = now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+    printWindow.document.write(`
+        <!doctype html>
+        <html lang="th">
+        <head>
+            <meta charset="utf-8">
+            <title>ทดสอบพิมพ์</title>
+            <style>
+                @page { size: 80mm auto; margin: 0; }
+                body { font-family: "Sarabun", Arial, sans-serif; color: #111827; }
+                .paper { width: 80mm; padding: 4mm; box-sizing: border-box; font-size: 10.5px; }
+                h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
+                .line { border-top: 1px dashed #111827; margin: 6px 0; }
+                .row { display: flex; justify-content: space-between; }
+                .center { text-align: center; }
+            </style>
+        </head>
+        <body>
+            <div class="paper">
+                <h1>ทดสอบเครื่องพิมพ์</h1>
+                <div class="line"></div>
+                <div class="row"><span>วันที่</span><span>${escapeHtml(dateText)}</span></div>
+                <div class="row"><span>เวลา</span><span>${escapeHtml(timeText)}</span></div>
+                <div class="row"><span>ขนาดกระดาษ</span><span>80mm</span></div>
+                <div class="line"></div>
+                <div class="center">ถ้าพิมพ์ออกมาเต็มความกว้าง<br>และตัดกระดาษถูกจุด<br>แปลว่าพร้อมใช้งานแล้ว</div>
+                <div class="line"></div>
+            </div>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    setStatus("ส่งทดสอบพิมพ์แล้ว");
+}
+
+// Reads real Windows printer status server-side (browsers have no API for
+// this — see services/printerService.js). Not a print test: this just
+// checks what Windows itself already believes about the default printer.
+async function checkPrinterStatus() {
+    els.printerStatusBadge.classList.remove("is-connected", "is-disconnected");
+    els.printerStatusText.textContent = "🖨️ กำลังเช็ค...";
+
+    try {
+        const data = await requestJson("/api/payment/printer-status");
+
+        if (!data.supported) {
+            els.printerStatusText.textContent = "🖨️ เช็คไม่ได้";
+            els.printerStatusBadge.title = data.detail;
+            return;
+        }
+
+        els.printerStatusBadge.classList.toggle("is-connected", data.connected === true);
+        els.printerStatusBadge.classList.toggle("is-disconnected", data.connected === false);
+        els.printerStatusText.textContent = data.connected
+            ? `🖨️ ${data.printerName || "พร้อมพิมพ์"}`
+            : "🖨️ ไม่ได้เชื่อมต่อ";
+        els.printerStatusBadge.title = `${data.detail} (กดเพื่อเช็คใหม่)`;
+    } catch (error) {
+        els.printerStatusText.textContent = "🖨️ เช็คไม่ได้";
+        els.printerStatusBadge.title = error.message;
+    }
+}
+
 function printUnpaidList() {
     const rows = currentRowsForExport();
 
@@ -844,6 +928,8 @@ function bindEvents() {
     bindSelectAllInput(els.paymentSearch);
     els.refreshButton.addEventListener("click", loadPaymentStatus);
     els.printUnpaidButton.addEventListener("click", printUnpaidList);
+    els.printTestButton.addEventListener("click", printTestReceipt);
+    els.printerStatusBadge.addEventListener("click", checkPrinterStatus);
     els.exportUnpaidButton.addEventListener("click", exportUnpaidCsv);
     document.querySelectorAll("[data-status-filter]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -899,6 +985,7 @@ function init() {
     bindEvents();
     syncQuickFilterButtons();
     loadPaymentStatus();
+    checkPrinterStatus();
 }
 
 init();

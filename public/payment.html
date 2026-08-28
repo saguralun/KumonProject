@@ -48,7 +48,14 @@
           <div class="page-title">Payment Center</div>
           <div class="subtle" id="pageSubtitle">เลือกเดือนเพื่อดูว่าใครจ่ายแล้วบ้าง</div>
         </div>
-        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+        <div class="topbar-actions">
+          <button type="button" class="printer-status-badge" id="printerStatusBadge" title="กดเพื่อเช็คใหม่">
+            <span class="printer-status-dot"></span>
+            <span id="printerStatusText">🖨️ กำลังเช็ค...</span>
+          </button>
+          <button type="button" class="secondary-button" id="printTestButton">🖨️ ทดสอบพิมพ์</button>
+          <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+        </div>
       </header>
 
       <section class="summary-section" aria-label="Payment summary">
