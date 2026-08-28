@@ -1,0 +1,19 @@
+# Normalizes line endings for git's own diffing so "modified" doesn't show
+# up for files nobody actually touched, just because a different machine's
+# core.autocrlf setting round-tripped a file through CRLF once. Text files
+# are auto-detected and stored as LF in the repo, checked out using the
+# OS's native line ending.
+* text=auto
+
+# Windows-native scripts should always check out with CRLF regardless of
+# core.autocrlf, since some tools expect it.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.vbs text eol=crlf
+
+# Binary files — never touch line endings in these.
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
