@@ -82,7 +82,7 @@ els.updateBannerButton.addEventListener("click", async () => {
 
   try {
     await requestJson("/api/system/update-apply", { method: "POST" });
-    els.updateBannerButton.textContent = "อัพเดทสำเร็จ กำลังโหลดใหม่...";
+    els.updateBannerButton.textContent = "สำเร็จ กำลังโหลด...";
     await waitForServerAndReload();
   } catch (error) {
     els.updateBannerMessage.textContent = error.message;
