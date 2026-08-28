@@ -1731,6 +1731,11 @@ function renderEnrollmentTabs() {
     if (!enrollments.length) {
         els.enrollmentTabs.innerHTML = "";
         els.enrollmentActionBar.classList.add("hidden");
+        // deleteEnrollmentButton lives in .panel-actions now, not inside
+        // enrollmentActionBar, so hiding that bar alone doesn't hide it —
+        // it stayed visible/enabled from whatever the last enrollment's
+        // state was, letting it be clicked with nothing left to delete.
+        els.deleteEnrollmentButton.classList.add("hidden");
         els.enrollmentSubtitle.textContent = "ยังไม่มีวิชา";
         els.enrollmentForm.classList.add("hidden");
         els.enrollmentEmpty.classList.remove("hidden");
