@@ -14,7 +14,12 @@ function periodDateRange(month, year) {
 
     return {
         start: `${prevYear}-${pad2(prevMonth)}-21`,
-        end: `${year}-${pad2(month)}-21`
+        end: `${year}-${pad2(month)}-21`,
+        // PrevLevel/CurrentLevel snapshot dates — the 20th of the prior
+        // month (where they stood right before this period began) and the
+        // 20th of this month (this period's own official cutoff).
+        prevBoundary: `${prevYear}-${pad2(prevMonth)}-20`,
+        currentBoundary: `${year}-${pad2(month)}-20`
     };
 }
 
@@ -43,7 +48,7 @@ function formatThaiDate(value) {
         return "";
     }
 
-    return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year + 543}`;
+    return `${String(day).padStart(2, "0")}/${String(month).padStart(2, "0")}/${year}`;
 }
 
 function boolText(value) {
@@ -98,7 +103,7 @@ async function loadEnrollmentBase(enrollmentIds) {
         JOIN ${TABLE_SCHEMA}.status_master st1 ON st1.status_id = e.current_status_group1_id
         LEFT JOIN ${TABLE_SCHEMA}.status_master st2 ON st2.status_id = e.current_status_group2_id
         WHERE e.enrollment_id = ANY($1::int[])
-        ORDER BY sgm.school_grade_id NULLS LAST, e.enrollment_id
+        ORDER BY sgm.school_grade_id NULLS LAST, s.first_name, e.enrollment_id
     `, [enrollmentIds]);
 
     return result.rows;
@@ -106,30 +111,17 @@ async function loadEnrollmentBase(enrollmentIds) {
 
 async function loadWorksheetSummary(enrollmentIds, month, year) {
     const result = await pool.query(`
-        WITH ordered AS (
-            SELECT
-                wu.enrollment_id,
-                wu.actual_worksheet_no,
-                wu.worksheet_date,
-                wu.worksheet_used_id,
-                lm.level_code
-            FROM ${TABLE_SCHEMA}.worksheet_used wu
-            JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
-            JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
-            WHERE wu.worksheet_month = $2 AND wu.worksheet_year = $3
-              AND wu.enrollment_id = ANY($1::int[])
-        )
         SELECT
-            enrollment_id,
-            COUNT(*)::int AS wks_used,
-            COUNT(*) FILTER (WHERE level_code = 'ZI')::int AS used_zi,
-            COUNT(*) FILTER (WHERE level_code = 'ZII')::int AS used_zii,
-            (ARRAY_AGG(level_code ORDER BY worksheet_date ASC, worksheet_used_id ASC))[1] AS prev_level_code,
-            (ARRAY_AGG(actual_worksheet_no ORDER BY worksheet_date ASC, worksheet_used_id ASC))[1] AS prev_worksheet_no,
-            (ARRAY_AGG(level_code ORDER BY worksheet_date DESC, worksheet_used_id DESC))[1] AS current_level_code,
-            (ARRAY_AGG(actual_worksheet_no ORDER BY worksheet_date DESC, worksheet_used_id DESC))[1] AS current_worksheet_no
-        FROM ordered
-        GROUP BY enrollment_id
+            wu.enrollment_id,
+            COUNT(*) FILTER (WHERE lm.level_type = 1)::int AS wks_used,
+            COUNT(*) FILTER (WHERE lm.level_code = 'ZI')::int AS used_zi,
+            COUNT(*) FILTER (WHERE lm.level_code = 'ZII')::int AS used_zii
+        FROM ${TABLE_SCHEMA}.worksheet_used wu
+        JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
+        JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
+        WHERE wu.worksheet_month = $2 AND wu.worksheet_year = $3
+          AND wu.enrollment_id = ANY($1::int[])
+        GROUP BY wu.enrollment_id
     `, [enrollmentIds, month, year]);
 
     const byEnrollmentId = new Map();
@@ -139,6 +131,70 @@ async function loadWorksheetSummary(enrollmentIds, month, year) {
     });
 
     return byEnrollmentId;
+}
+
+// PrevLevel/CurrentLevel snapshot: the latest main-track (level_type=1),
+// confirmed (cpws=true) worksheet as of each boundary date — not scoped to
+// the report period, since "where they stood on 20/6" can be from before
+// this period started at all. Displayed worksheet number is +9 off the
+// actual one (capped at 200), matching the "packet" display convention
+// used everywhere else in the app (e.g. worksheet.js's displayWorksheetNo).
+const MAIN_MAX_WORKSHEET_NO = 200;
+const PACKET_DISPLAY_OFFSET = 9;
+
+async function loadLevelSnapshots(enrollmentIds, prevBoundary, currentBoundary) {
+    const result = await pool.query(`
+        WITH prev AS (
+            SELECT DISTINCT ON (wu.enrollment_id)
+                wu.enrollment_id,
+                lm.level_code,
+                wu.actual_worksheet_no
+            FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
+            JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
+            WHERE lm.level_type = 1
+              AND wu.cpws = TRUE
+              AND wu.worksheet_date <= $2::date
+              AND wu.enrollment_id = ANY($1::int[])
+            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
+        ),
+        current AS (
+            SELECT DISTINCT ON (wu.enrollment_id)
+                wu.enrollment_id,
+                lm.level_code,
+                wu.actual_worksheet_no
+            FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
+            JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
+            WHERE lm.level_type = 1
+              AND wu.cpws = TRUE
+              AND wu.worksheet_date <= $3::date
+              AND wu.enrollment_id = ANY($1::int[])
+            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
+        )
+        SELECT
+            COALESCE(prev.enrollment_id, current.enrollment_id) AS enrollment_id,
+            prev.level_code AS prev_level_code,
+            prev.actual_worksheet_no AS prev_worksheet_no,
+            current.level_code AS current_level_code,
+            current.actual_worksheet_no AS current_worksheet_no
+        FROM prev
+        FULL OUTER JOIN current ON current.enrollment_id = prev.enrollment_id
+    `, [enrollmentIds, prevBoundary, currentBoundary]);
+
+    const byEnrollmentId = new Map();
+
+    result.rows.forEach((row) => {
+        byEnrollmentId.set(row.enrollment_id, row);
+    });
+
+    return byEnrollmentId;
+}
+
+function displayWorksheetNo(actualWorksheetNo) {
+    return actualWorksheetNo === null || actualWorksheetNo === undefined
+        ? null
+        : Math.min(MAIN_MAX_WORKSHEET_NO, Number(actualWorksheetNo) + PACKET_DISPLAY_OFFSET);
 }
 
 async function loadCdUsed(enrollmentIds, month, year) {
@@ -245,7 +301,7 @@ export async function buildMonthlyReport({ month, year }) {
         throw httpError(400, "ปีไม่ถูกต้อง");
     }
 
-    const { start, end } = periodDateRange(normalizedMonth, normalizedYear);
+    const { start, end, prevBoundary, currentBoundary } = periodDateRange(normalizedMonth, normalizedYear);
     const enrollmentIds = await loadEnrollmentIdsWithActivity({
         month: normalizedMonth,
         year: normalizedYear,
@@ -257,15 +313,17 @@ export async function buildMonthlyReport({ month, year }) {
         return [];
     }
 
-    const [base, wsSummaryByEnrollmentId, cdByEnrollmentId, testsByEnrollmentId] = await Promise.all([
+    const [base, wsSummaryByEnrollmentId, levelSnapshotByEnrollmentId, cdByEnrollmentId, testsByEnrollmentId] = await Promise.all([
         loadEnrollmentBase(enrollmentIds),
         loadWorksheetSummary(enrollmentIds, normalizedMonth, normalizedYear),
+        loadLevelSnapshots(enrollmentIds, prevBoundary, currentBoundary),
         loadCdUsed(enrollmentIds, normalizedMonth, normalizedYear),
         loadTests(enrollmentIds, start, end)
     ]);
 
     return base.map((row) => {
         const ws = wsSummaryByEnrollmentId.get(row.enrollment_id);
+        const levelSnapshot = levelSnapshotByEnrollmentId.get(row.enrollment_id);
         const cds = cdByEnrollmentId.get(row.enrollment_id) || [];
         const tests = testsByEnrollmentId.get(row.enrollment_id) || [];
         const record = {
@@ -282,8 +340,12 @@ export async function buildMonthlyReport({ month, year }) {
             Subject: row.subject_code || "",
             FreeStudy: boolText(row.status2_code === "FS"),
             FreeEnrolment: boolText(row.status2_code === "FRG"),
-            PrevLevel: ws ? packetLabel(ws.prev_level_code, ws.prev_worksheet_no) : "",
-            CurrentLevel: ws ? packetLabel(ws.current_level_code, ws.current_worksheet_no) : "",
+            PrevLevel: levelSnapshot
+                ? packetLabel(levelSnapshot.prev_level_code, displayWorksheetNo(levelSnapshot.prev_worksheet_no))
+                : "",
+            CurrentLevel: levelSnapshot
+                ? packetLabel(levelSnapshot.current_level_code, displayWorksheetNo(levelSnapshot.current_worksheet_no))
+                : "",
             WksUsed: ws ? ws.wks_used : 0,
             Status1: row.status1_code || "",
             Status2: row.status2_code || "",
