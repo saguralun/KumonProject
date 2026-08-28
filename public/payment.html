@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/payment.css">
-  <link rel="stylesheet" href="/css/app-scale.css">
+  <link rel="stylesheet" href="/css/payment.css?v=20260828-cache-bust">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260828-cache-bust">
 </head>
 <body>
   <main class="payment-page">
@@ -53,7 +53,7 @@
             <span class="printer-status-dot"></span>
             <span id="printerStatusText">🖨️ กำลังเช็ค...</span>
           </button>
-          <button type="button" class="secondary-button" id="printTestButton">🖨️ ทดสอบพิมพ์</button>
+          <button type="button" class="secondary-button" id="printTestButton" disabled title="กำลังเช็คเครื่องพิมพ์...">🖨️ ทดสอบพิมพ์</button>
           <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
         </div>
       </header>
@@ -167,13 +167,13 @@
 
       <div class="receipt-actions">
         <button type="button" class="danger-button hidden" id="receiptCancelPayment">↩️ Cancel Receipt</button>
-        <button type="button" class="secondary-button" id="receiptPrint">🖨️ Print</button>
+        <button type="button" class="secondary-button" id="receiptPrint" disabled title="กำลังเช็คเครื่องพิมพ์...">🖨️ Print</button>
         <button type="button" class="save-button" id="receiptReceivePayment">💵 รับเงิน</button>
       </div>
     </div>
   </div>
 
-  <script src="/js/authClient.js"></script>
-  <script type="module" src="/js/payment.js"></script>
+  <script src="/js/authClient.js?v=20260828-cache-bust"></script>
+  <script type="module" src="/js/payment.js?v=20260828-cache-bust"></script>
 </body>
 </html>

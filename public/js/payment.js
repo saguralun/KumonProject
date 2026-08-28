@@ -42,6 +42,7 @@ const state = {
     paymentMethods: [],
     isReceivingPayment: false,
     isCancellingPayment: false,
+    printerConnected: false,
     // The sidebar Subject/Status <select> filters were removed as
     // unnecessary; status filtering still lives in the quick-filter
     // buttons above the table, backed by this instead of a hidden select.
@@ -821,9 +822,21 @@ function printTestReceipt() {
 // Reads real Windows printer status server-side (browsers have no API for
 // this — see services/printerService.js). Not a print test: this just
 // checks what Windows itself already believes about the default printer.
+function applyPrinterConnected(connected) {
+    state.printerConnected = connected;
+
+    const title = connected ? "" : "เครื่องพิมพ์ยังไม่พร้อม — เช็คสถานะที่มุมขวาบนก่อน";
+
+    els.receiptPrint.disabled = !connected;
+    els.receiptPrint.title = title;
+    els.printTestButton.disabled = !connected;
+    els.printTestButton.title = title;
+}
+
 async function checkPrinterStatus() {
     els.printerStatusBadge.classList.remove("is-connected", "is-disconnected");
     els.printerStatusText.textContent = "🖨️ กำลังเช็ค...";
+    applyPrinterConnected(false);
 
     try {
         const data = await requestJson("/api/payment/printer-status");
@@ -840,6 +853,7 @@ async function checkPrinterStatus() {
             ? `🖨️ ${data.printerName || "พร้อมพิมพ์"}`
             : "🖨️ ไม่ได้เชื่อมต่อ";
         els.printerStatusBadge.title = `${data.detail} (กดเพื่อเช็คใหม่)`;
+        applyPrinterConnected(data.connected === true);
     } catch (error) {
         els.printerStatusText.textContent = "🖨️ เช็คไม่ได้";
         els.printerStatusBadge.title = error.message;
