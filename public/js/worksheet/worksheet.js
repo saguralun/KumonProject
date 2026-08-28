@@ -1042,13 +1042,8 @@ function latestWorksheetText(row) {
     return `${label} • ${packet}`;
 }
 
-function renderIncompleteWsRows(rows) {
-    if (!rows.length) {
-        els.incompleteWsTableWrap.innerHTML = `<div class="empty-state">ทุกคนกรอกถึงวันที่ 20 แล้ว</div>`;
-        return;
-    }
-
-    els.incompleteWsTableWrap.innerHTML = `
+function incompleteWsTable(rows) {
+    return `
         <table class="incomplete-ws-table">
             <thead>
                 <tr>
@@ -1076,6 +1071,33 @@ function renderIncompleteWsRows(rows) {
     `;
 }
 
+function incompleteWsSection(title, data) {
+    const rows = data?.rows || [];
+    const totalRows = Number(data?.totalRows || rows.length);
+    const countText = totalRows > rows.length
+        ? `${rows.length} จาก ${totalRows} รายการ`
+        : `${rows.length} รายการ`;
+
+    return `
+        <div class="incomplete-ws-section">
+            <div class="incomplete-ws-section-header">
+                <span>${escapeHtml(title)}</span>
+                <span class="subtle">${escapeHtml(countText)}</span>
+            </div>
+            ${rows.length
+                ? incompleteWsTable(rows)
+                : `<div class="empty-state">ทุกคนกรอกถึงวันที่ 20 แล้ว</div>`}
+        </div>
+    `;
+}
+
+function renderIncompleteWsSections(data) {
+    els.incompleteWsTableWrap.innerHTML = `
+        ${incompleteWsSection("WS ปกติ", data.regular)}
+        ${incompleteWsSection("KC ค้างไว้", data.kc)}
+    `;
+}
+
 async function openIncompleteWsModal() {
     els.incompleteWsModal.classList.remove("hidden");
     els.incompleteWsSubtitle.textContent = "กำลังเช็ก WS ล่าสุดก่อนวันที่ 21 ของเดือนนี้";
@@ -1083,14 +1105,9 @@ async function openIncompleteWsModal() {
 
     try {
         const data = await worksheetApi.getIncompleteWorksheets();
-        const rows = data.rows || [];
-        const totalRows = Number(data.totalRows || rows.length);
-        const countText = totalRows > rows.length
-            ? `${rows.length} รายการล่าสุด`
-            : `พบ ${rows.length} รายการ`;
 
-        els.incompleteWsSubtitle.textContent = `เช็กถึง ${formatDateDisplay(data.cutoffDate)} • ${countText}`;
-        renderIncompleteWsRows(rows);
+        els.incompleteWsSubtitle.textContent = `เช็กถึง ${formatDateDisplay(data.cutoffDate)}`;
+        renderIncompleteWsSections(data);
     } catch (error) {
         els.incompleteWsTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
         setStatus(error.message, "error");
@@ -1451,6 +1468,11 @@ async function completeWorksheetLevelWithoutAt() {
 
 async function loadEnrollmentContext(enrollmentId) {
     setStatus("กำลังโหลดข้อมูลเด็ก...");
+    // Any successful load should close out the search dropdown, even when
+    // it wasn't the one that triggered this — e.g. picking a student from
+    // the "หา WS ค้าง" modal leaves a stale search-results list open
+    // otherwise, since that path never touches els.searchResults itself.
+    els.searchResults.classList.add("hidden");
 
     try {
         const context = await worksheetApi.getEnrollmentContext(

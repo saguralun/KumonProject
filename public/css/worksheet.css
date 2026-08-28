@@ -1593,6 +1593,28 @@ html[data-role="staff"] [data-staff-up] {
   background: var(--blue-soft);
 }
 
+.incomplete-ws-section + .incomplete-ws-section {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.incomplete-ws-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.incomplete-ws-section .empty-state {
+  padding: 14px;
+  font-size: 13px;
+}
+
 .incomplete-ws-header {
   display: flex;
   justify-content: space-between;

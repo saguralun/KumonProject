@@ -563,11 +563,10 @@ export async function searchEnrollments({
     return result.rows.map(mapEnrollment);
 }
 
-export async function getIncompleteWorksheetStudents() {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = today.getMonth() + 1;
-    const cutoffDate = `${year}-${String(month).padStart(2, "0")}-21`;
+const INCOMPLETE_WS_REGULAR_LIMIT = 25;
+const INCOMPLETE_WS_KC_LIMIT = 5;
+
+async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, cutoffDate }) {
     const result = await pool.query(`
         WITH latest_ws AS (
             SELECT DISTINCT ON (wu.enrollment_id)
@@ -610,22 +609,21 @@ export async function getIncompleteWorksheetStudents() {
         LEFT JOIN latest_ws
             ON latest_ws.enrollment_id = e.enrollment_id
         WHERE status.status_code = ANY($1::text[])
+          AND COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE) = $2
           AND (
               latest_ws.worksheet_date IS NULL
-              OR latest_ws.worksheet_date < $2::date
+              OR latest_ws.worksheet_date < $3::date
           )
         ORDER BY
             latest_ws.worksheet_date NULLS FIRST,
             student.first_name,
             student.last_name,
             subject.subject_id
-        LIMIT 30
-    `, [ACTIVE_STATUS_CODES, cutoffDate]);
+        LIMIT $4
+    `, [ACTIVE_STATUS_CODES, isKumonConnect, cutoffDate, limit]);
 
     return {
-        cutoffDate,
         totalRows: Number(result.rows[0]?.total_rows || 0),
-        returnedRows: result.rows.length,
         rows: result.rows.map((row) => ({
             enrollmentId: row.enrollment_id,
             studentId: row.student_id,
@@ -639,6 +637,32 @@ export async function getIncompleteWorksheetStudents() {
                 : "",
             latestPacketWorksheetNo: row.latest_packet_worksheet_no || null
         }))
+    };
+}
+
+export async function getIncompleteWorksheetStudents() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth() + 1;
+    const cutoffDate = `${year}-${String(month).padStart(2, "0")}-21`;
+
+    const [regular, kc] = await Promise.all([
+        queryIncompleteWorksheetStudents({
+            isKumonConnect: false,
+            limit: INCOMPLETE_WS_REGULAR_LIMIT,
+            cutoffDate
+        }),
+        queryIncompleteWorksheetStudents({
+            isKumonConnect: true,
+            limit: INCOMPLETE_WS_KC_LIMIT,
+            cutoffDate
+        })
+    ]);
+
+    return {
+        cutoffDate,
+        regular,
+        kc
     };
 }
 
