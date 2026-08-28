@@ -179,6 +179,50 @@ body {
   text-align: center;
 }
 
+.update-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+  border: 1px solid #fbcf7a;
+  border-radius: 8px;
+  background: #fffbeb;
+  padding: 10px 12px;
+}
+
+.update-banner-text {
+  font-size: 12px;
+  font-weight: 700;
+  color: #92650a;
+}
+
+.update-banner-message {
+  margin-top: 2px;
+  color: #b8720a;
+  font-weight: 500;
+}
+
+.update-banner-button {
+  flex: 0 0 auto;
+  min-height: 32px;
+  border: 1px solid #d99018;
+  border-radius: 7px;
+  padding: 0 12px;
+  background: #f59e0b;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.update-banner-button:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.update-banner-button:disabled {
+  opacity: 0.65;
+}
+
 .login-lan-info {
   margin-top: 14px;
   border: 1px solid var(--line);

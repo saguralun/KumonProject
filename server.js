@@ -14,6 +14,7 @@ import reportRoutes from "./routes/reportRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import migrationRoutes from "./migration/migrationRoutes.js";
+import systemRoutes from "./routes/systemRoutes.js";
 import { requireAuth, requireStaff, requireAdmin, requirePage, requireStaffPage, requireAdminPage } from "./middleware/auth.js";
 
 const app = express();
@@ -60,6 +61,11 @@ app.get("/api/server-info", (req, res) => {
     lanAddresses
   });
 });
+
+// Public: lets the login page show "a newer version is on GitHub" and
+// offer a one-click update, before anyone has logged in — this repo is
+// public, so the check itself needs no credentials either way.
+app.use("/api/system", systemRoutes);
 
 // Page shells. Registered before express.static so unauthenticated
 // visitors get redirected instead of receiving the (empty, since the

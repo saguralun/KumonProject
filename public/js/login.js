@@ -5,7 +5,10 @@ const els = {
   guestForm: document.getElementById("guestForm"),
   adminSubmit: document.getElementById("adminSubmit"),
   guestSubmit: document.getElementById("guestSubmit"),
-  lanInfo: document.getElementById("loginLanInfo")
+  lanInfo: document.getElementById("loginLanInfo"),
+  updateBanner: document.getElementById("updateBanner"),
+  updateBannerMessage: document.getElementById("updateBannerMessage"),
+  updateBannerButton: document.getElementById("updateBannerButton")
 };
 
 async function loadLanInfo() {
@@ -31,6 +34,62 @@ async function loadLanInfo() {
 }
 
 loadLanInfo();
+
+// Waits for the server to come back after a git pull (nodemon restarts it
+// automatically once files change) before reloading, instead of reloading
+// immediately into a brief window where it's still down.
+async function waitForServerAndReload() {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    try {
+      const response = await fetch("/api/auth/me");
+
+      if (response.ok) {
+        window.location.reload();
+        return;
+      }
+    } catch (error) {
+      // Server mid-restart — keep polling.
+    }
+  }
+
+  // Gave up waiting — reload anyway, the update itself already succeeded.
+  window.location.reload();
+}
+
+async function checkUpdateStatus() {
+  try {
+    const response = await fetch("/api/system/update-check");
+    const data = await response.json();
+
+    if (!data.checked || data.upToDate) {
+      return;
+    }
+
+    els.updateBannerMessage.textContent = data.remoteMessage || `commit ${data.remoteCommit}`;
+    els.updateBanner.classList.remove("hidden");
+  } catch (error) {
+    // Non-critical — just skip showing it if the endpoint is unreachable.
+  }
+}
+
+checkUpdateStatus();
+
+els.updateBannerButton.addEventListener("click", async () => {
+  els.updateBannerButton.disabled = true;
+  els.updateBannerButton.textContent = "กำลังอัพเดท...";
+
+  try {
+    await requestJson("/api/system/update-apply", { method: "POST" });
+    els.updateBannerButton.textContent = "อัพเดทสำเร็จ กำลังโหลดใหม่...";
+    await waitForServerAndReload();
+  } catch (error) {
+    els.updateBannerMessage.textContent = error.message;
+    els.updateBannerButton.disabled = false;
+    els.updateBannerButton.textContent = "อัพเดทตอนนี้";
+  }
+});
 
 function setMessage(text) {
   if (!text) {
