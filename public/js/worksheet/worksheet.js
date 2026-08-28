@@ -895,9 +895,13 @@ function updateSecondaryActions() {
         canUseFreeLevelButton ? "🎯" : "📝",
         canUseFreeLevelButton ? "จบ Level" : "สอบ AT"
     );
-    const canCompleteZun = Boolean(context.completionState?.zunCompletion?.canComplete);
+    const canUseZunButton = Boolean(
+        state.progressKind === "zun"
+        && context.completionState?.zunCompletion?.canComplete
+    );
 
-    els.completeZunLevel.disabled = !canCompleteZun || state.isCompletingZun;
+    els.completeZunLevel.disabled = !canUseZunButton || state.isCompletingZun;
+    els.completeZunLevel.classList.toggle("hidden", !canUseZunButton);
     setActionButton(els.completeZunLevel, "🎯", "จบ Zun");
 
     const cdRequirement = currentCdRequirement();
