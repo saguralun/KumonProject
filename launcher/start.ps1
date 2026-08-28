@@ -80,7 +80,12 @@ function Resolve-ChromePath {
 $chromePath = Resolve-ChromePath
 
 if ($chromePath) {
-    Start-Process -FilePath $chromePath -ArgumentList @("--app=$AppUrl", "--start-maximized")
+    # --kiosk-printing skips Chrome's print preview dialog entirely and
+    # sends the job straight to whatever is set as the Windows default
+    # printer (the receipt layout is already sized for an 80mm thermal
+    # printer via @page in payment.css). Only affects this dedicated
+    # app-mode window, not the user's regular Chrome.
+    Start-Process -FilePath $chromePath -ArgumentList @("--app=$AppUrl", "--start-maximized", "--kiosk-printing")
 }
 else {
     # Chrome not found anywhere expected — fall back to the OS default
