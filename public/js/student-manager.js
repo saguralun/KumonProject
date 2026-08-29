@@ -394,7 +394,7 @@ function scheduleWeekdays() {
     const seen = new Set();
 
     return (state.masters?.schedules || []).reduce((rows, schedule) => {
-        if (!schedule.weekdayCode || seen.has(schedule.weekdayCode)) {
+        if (!schedule.isActive || !schedule.weekdayCode || seen.has(schedule.weekdayCode)) {
             return rows;
         }
 
@@ -411,7 +411,12 @@ function scheduleTimesForWeekday(weekdayCode) {
     const seen = new Set();
 
     return (state.masters?.schedules || []).reduce((rows, schedule) => {
-        if (schedule.weekdayCode !== weekdayCode || !schedule.startTime || seen.has(schedule.startTime)) {
+        if (
+            !schedule.isActive
+            || schedule.weekdayCode !== weekdayCode
+            || !schedule.startTime
+            || seen.has(schedule.startTime)
+        ) {
             return rows;
         }
 
@@ -426,6 +431,8 @@ function scheduleTimesForWeekday(weekdayCode) {
 
 function matchingSchedule(weekdayCode, startTime) {
     return (state.masters?.schedules || []).find((schedule) =>
+        schedule.isActive
+        &&
         schedule.weekdayCode === weekdayCode
         && schedule.startTime === startTime
     );
@@ -755,10 +762,13 @@ function refreshAddOpeningScheduleOptions() {
     const form = els.addEnrollmentForm;
 
     ["1", "2"].forEach((slot) => {
-        form.elements[`openingScheduleId${slot}`].innerHTML = optionHtml(state.masters.schedules, {
-            value: (row) => row.id,
-            label: (row) => row.label
-        });
+        form.elements[`openingScheduleId${slot}`].innerHTML = optionHtml(
+            state.masters.schedules.filter((schedule) => schedule.isActive),
+            {
+                value: (row) => row.id,
+                label: (row) => row.label
+            }
+        );
     });
 
     refreshAddOpeningDayOptions();

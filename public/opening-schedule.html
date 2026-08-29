@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Opening Schedule</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/opening-schedule.css?v=20260828-schedule-layout-fix">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260828-schedule-active-toggle">
+</head>
+<body>
+  <main class="schedule-page">
+    <aside class="schedule-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <div class="home-link active current-page">🕒 Opening Schedule</div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/worksheet.html">📝 WS Input</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/student-manager.html">👤 Students</a>
+            <a class="home-link" href="/payment.html" data-staff-up>💰 Payment</a>
+            <a class="home-link" href="/report.html" data-staff-up>📊 Report</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/stock-receive.html" data-staff-up>📦 Stock</a>
+            <a class="home-link" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/" data-admin-only>🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+          </div>
+        </div>
+      </nav>
+
+      <div class="side-header">
+        <h1>System</h1>
+        <div class="subtle">จัดการวันและเวลาเปิดเรียน</div>
+      </div>
+
+      <section class="sidebar-note">
+        <div class="note-title">กติกา</div>
+        <div>เพิ่มเวลาได้จากวัน + เวลาเริ่ม/จบ</div>
+        <div>ลบได้เฉพาะเวลาที่ยังไม่มีเด็กใช้งาน</div>
+      </section>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="schedule-workspace">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Opening Schedule</div>
+          <div class="subtle">จัดการ slot ที่ใช้เลือกในหน้า Enrollment</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="schedule-layout">
+        <form class="panel schedule-form" id="scheduleForm">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">เพิ่มเวลาเปิด</div>
+              <div class="subtle">weekday_master + opening_schedule</div>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <label>
+              <span>วัน</span>
+              <select name="weekdayId" id="weekdaySelect" required></select>
+            </label>
+            <label>
+              <span>เวลาเริ่ม</span>
+              <input name="startTime" type="time" required>
+            </label>
+            <label>
+              <span>เวลาจบ</span>
+              <input name="endTime" type="time" required>
+            </label>
+          </div>
+
+          <button type="submit" class="primary-button" id="addScheduleButton">➕ เพิ่มเวลา</button>
+          <div class="form-message hidden" id="formMessage"></div>
+        </form>
+
+        <section class="panel summary-panel">
+          <div class="metric">
+            <span>วันทั้งหมด</span>
+            <strong id="weekdayCount">0</strong>
+          </div>
+          <div class="metric">
+            <span>เวลาเปิด</span>
+            <strong id="slotCount">0</strong>
+          </div>
+          <div class="metric">
+            <span>เปิดใช้งาน</span>
+            <strong id="activeCount">0</strong>
+          </div>
+          <div class="metric">
+            <span>ปิดใช้งาน</span>
+            <strong id="inactiveCount">0</strong>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel schedule-list-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">รายการเวลาเปิด</div>
+            <div class="subtle" id="listSubtitle">กำลังโหลด...</div>
+          </div>
+          <button type="button" class="secondary-button" id="refreshButton">🔄 Refresh</button>
+        </div>
+
+        <div class="weekday-grid" id="weekdayGrid"></div>
+      </section>
+    </section>
+  </main>
+
+  <script src="/js/authClient.js?v=20260828-cache-bust"></script>
+  <script src="/js/opening-schedule.js?v=20260828-schedule-active-toggle"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB Stock Cut</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/stock-receive.css?v=20260828-cache-bust">
+  <link rel="stylesheet" href="/css/stock-cut.css?v=20260828-01">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260828-schedule-active-toggle">
+</head>
+<body>
+  <main class="stock-page">
+    <aside class="stock-sidebar">
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link active current-page" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/worksheet.html">📝 WS Input</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/student-manager.html">👤 Students</a>
+            <a class="home-link" href="/payment.html" data-staff-up>💰 Payment</a>
+            <a class="home-link" href="/report.html" data-staff-up>📊 Report</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/stock-receive.html" data-staff-up>📦 Stock</a>
+            <a class="home-link" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/" data-admin-only>🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+          </div>
+        </div>
+      </nav>
+
+      <div class="side-header">
+        <h1>Stock Cut</h1>
+        <div class="subtle">ตัด stock ตามที่ใช้ไปจริง</div>
+      </div>
+
+      <section class="filter-panel">
+        <label>
+          <span>ประเภท</span>
+          <div class="subject-buttons two-up" id="typeButtons"></div>
+        </label>
+      </section>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="stock-workspace">
+      <header class="topbar">
+        <div>
+          <div class="page-title">Stock Cut</div>
+          <div class="subtle">รายการที่นักเรียนใช้ไปแล้ว แต่ยังไม่ได้ตัดออกจาก stock — กดเข้าไปดูรายละเอียด หรือตัดทั้งหมดทีเดียว</div>
+        </div>
+        <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
+      </header>
+
+      <section class="content-grid stock-cut-grid">
+        <section class="panel stock-cut-list-panel">
+          <div class="panel-header">
+            <div class="panel-title">วันที่ค้างตัด</div>
+            <div class="stock-cut-header-actions">
+              <div class="subtle" id="pendingSubtitle">กำลังโหลด...</div>
+              <button type="button" class="danger-button" id="cutAllButton" disabled>🔪 ตัดทั้งหมด</button>
+            </div>
+          </div>
+          <div class="do-table-wrap" id="pendingTableWrap">
+            <div class="empty-state">กำลังโหลด...</div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <div class="modal-backdrop hidden" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="do-detail-dialog">
+      <div class="modal-header">
+        <div>
+          <div class="panel-title" id="detailTitle">รายละเอียด</div>
+          <div class="subtle" id="detailSubtitle"></div>
+        </div>
+        <button type="button" class="modal-close" id="detailClose" aria-label="Close">✕</button>
+      </div>
+      <div class="do-detail-body" id="detailBody"></div>
+      <div class="modal-actions">
+        <div></div>
+        <button type="button" class="danger-button" id="cutDayButton">🔪 ตัด Stock วันนี้</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/authClient.js?v=20260828-cache-bust"></script>
+  <script src="/js/stock-cut.js?v=20260828-01"></script>
+</body>
+</html>

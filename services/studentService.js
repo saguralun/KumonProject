@@ -9,6 +9,18 @@ const COMPLETER_LEVEL_BY_SUBJECT = new Map([
     ["TRP", "III"]
 ]);
 
+async function hasOpeningScheduleActiveColumn() {
+    const result = await pool.query(`
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_schema = $1
+          AND table_name = 'opening_schedule'
+          AND column_name = 'is_active'
+    `, [TABLE_SCHEMA]);
+
+    return result.rows.length > 0;
+}
+
 function httpError(statusCode, message) {
     const error = new Error(message);
     error.statusCode = statusCode;
@@ -403,6 +415,10 @@ async function assertEnrollmentMasters(client, data) {
 }
 
 export async function getStudentMasters() {
+    const supportsScheduleActive = await hasOpeningScheduleActiveColumn();
+    const scheduleActiveSelect = supportsScheduleActive
+        ? "os.is_active"
+        : "TRUE AS is_active";
     const [
         prefixes,
         genders,
@@ -442,7 +458,8 @@ export async function getStudentMasters() {
                 wd.weekday_code,
                 wd.weekday_name,
                 os.start_time::text AS start_time,
-                os.end_time::text AS end_time
+                os.end_time::text AS end_time,
+                ${scheduleActiveSelect}
             FROM ${TABLE_SCHEMA}.opening_schedule os
             JOIN ${TABLE_SCHEMA}.weekday_master wd
                 ON wd.weekday_id = os.weekday_id
@@ -530,7 +547,8 @@ export async function getStudentMasters() {
             weekdayCode: row.weekday_code,
             weekdayName: row.weekday_name,
             startTime: row.start_time.slice(0, 5),
-            endTime: row.end_time.slice(0, 5)
+            endTime: row.end_time.slice(0, 5),
+            isActive: row.is_active !== false
         })),
         dtMasters: dtMasters.rows.map((row) => ({
             id: row.dt_master_id,

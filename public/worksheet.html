@@ -10,20 +10,43 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/worksheet.css?v=20260827-zun-complete-button-fix">
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260825-progress-at-hidden">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260828-schedule-active-toggle">
 </head>
 
 <body>
   <main class="worksheet-page">
     <aside class="subject-rail" aria-label="Subject filter">
       <nav class="rail-nav" aria-label="Main navigation">
-        <a class="home-link" href="/" data-admin-only>Tables</a>
-        <a class="home-link active" href="/worksheet.html">WS Input</a>
-        <a class="home-link" href="/student-manager.html">Students</a>
-        <a class="home-link" href="/payment.html" data-staff-up>Payment</a>
-        <a class="home-link" href="/stock-receive.html" data-staff-up>Stock</a>
-        <a class="home-link" href="/report.html" data-staff-up>Report</a>
-        <a class="home-link" href="/users.html" data-admin-only>Users</a>
+        <a class="home-link active current-page" href="/worksheet.html">📝 WS Input</a>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/worksheet.html">📝 WS Input</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/student-manager.html">👤 Students</a>
+            <a class="home-link" href="/payment.html" data-staff-up>💰 Payment</a>
+            <a class="home-link" href="/report.html" data-staff-up>📊 Report</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/stock-receive.html" data-staff-up>📦 Stock</a>
+            <a class="home-link" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/" data-admin-only>🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+          </div>
+        </div>
       </nav>
       <div class="rail-title">Subject</div>
       <div class="subject-buttons" id="subjectButtons">

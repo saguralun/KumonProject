@@ -78,9 +78,24 @@ button:disabled {
 }
 
 .side-nav {
-  display: grid;
-  gap: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   margin-bottom: 18px;
+}
+
+.nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-group-label {
+  padding: 0 4px;
+  color: #7c8ba3;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .home-link {
@@ -122,6 +137,29 @@ button:disabled {
   margin-top: 18px;
 }
 
+.mode-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mode-button {
+  min-height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #dbeafe;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mode-button.active {
+  border-color: #dbeafe;
+  background: #eaf2ff;
+  color: var(--blue);
+}
+
 .filter-panel label {
   display: grid;
   gap: 5px;
@@ -138,6 +176,17 @@ button:disabled {
   padding: 0 10px;
   color: var(--text);
   font-weight: 700;
+}
+
+.filter-panel .check-row {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.filter-panel .check-row input {
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
 }
 
 .filter-panel .primary-button,
@@ -327,6 +376,57 @@ html[data-role="staff"] [data-staff-up] {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 10px;
+}
+
+.forecast-summary {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.forecast-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: var(--surface-soft);
+}
+
+.forecast-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.forecast-card strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.source-badge {
+  display: inline-flex;
+  min-width: 38px;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: var(--blue-soft);
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.source-badge.all {
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.hidden {
+  display: none !important;
 }
 
 .panel-title {

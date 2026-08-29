@@ -1,0 +1,29 @@
+.stock-cut-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.stock-cut-list-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.stock-cut-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.do-table-wrap tbody tr {
+  cursor: pointer;
+}
+
+.do-detail-items tbody tr.is-negative-stock {
+  background: #fdecec;
+  color: #a32d2d;
+  font-weight: 700;
+}
+
+.do-detail-items tbody tr.is-negative-stock:hover {
+  background: #fbdcdc;
+}

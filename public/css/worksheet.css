@@ -136,9 +136,24 @@ button:focus-visible {
 }
 
 .rail-nav {
-  display: grid;
-  gap: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   margin-bottom: 18px;
+}
+
+.nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-group-label {
+  padding: 0 4px;
+  color: #95a3b8;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .home-link {

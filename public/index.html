@@ -112,9 +112,24 @@
     }
 
     .side-nav {
-      display: grid;
-      gap: 9px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
       margin-bottom: 10px;
+    }
+
+    .nav-group {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav-group-label {
+      padding: 0 4px;
+      color: #7c8ba3;
+      font-size: 10.5px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
     }
 
     .home-link {
@@ -137,24 +152,8 @@
       color: var(--blue);
     }
 
-    .side-header {
-      margin: 8px 0 2px;
-    }
-
-    .side-header h1 {
-      margin: 0;
-      color: #ffffff;
-      font-size: 24px;
-      line-height: 1.15;
-    }
-
-    .tables-panel {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow: auto;
-    }
-
     .auth-bar {
+      margin-top: auto;
       display: grid;
       gap: 8px;
       padding-top: 12px;
@@ -221,29 +220,50 @@
       padding: 18px;
     }
 
+    .table-workspace .topbar {
+      flex: 0 0 auto;
+      margin-bottom: 10px;
+    }
+
     .panel {
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 10px;
     }
 
-    .section + .section {
-      margin-top: 18px;
-      padding-top: 18px;
-      border-top: 1px solid var(--line);
+    .tables-panel {
+      flex: 0 0 auto;
+      display: grid;
+      gap: 8px;
+      max-height: 178px;
+      min-height: 0;
+      margin-bottom: 10px;
+      padding: 10px;
+      overflow: auto;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+
+    .section {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
     }
 
     .section-title {
-      margin-bottom: 10px;
-      color: #a9b8cc;
+      padding: 7px 0 0;
+      color: #475569;
       font-size: 12px;
       font-weight: 800;
       text-transform: uppercase;
     }
 
     .table-buttons {
-      display: grid;
-      gap: 7px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
     }
 
     button,
@@ -277,21 +297,21 @@
     }
 
     .table-button {
-      width: 100%;
-      min-height: 34px;
-      padding: 8px 10px;
-      text-align: left;
+      min-height: 30px;
+      max-width: 220px;
+      padding: 6px 10px;
       overflow: hidden;
-      border-color: rgba(226, 232, 240, 0.14);
-      background: transparent;
-      color: #dbeafe;
+      border-color: #dbe4f0;
+      background: #f8fafc;
+      color: #334155;
       font-size: 13px;
       font-weight: 700;
       text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .table-button.active {
-      border-color: #dbeafe;
+      border-color: #93c5fd;
       background: #eaf2ff;
       color: var(--blue);
       box-shadow: var(--shadow-sm);
@@ -304,7 +324,7 @@
       min-height: 0;
       min-width: 0;
       overflow: hidden;
-      padding: 16px;
+      padding: 12px;
     }
 
     .result-header {
@@ -313,11 +333,11 @@
       justify-content: space-between;
       align-items: flex-start;
       gap: 16px;
-      margin-bottom: 14px;
+      margin-bottom: 10px;
     }
 
     .table-title {
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 600;
     }
 
@@ -442,6 +462,10 @@
         min-height: auto;
       }
 
+      .section {
+        grid-template-columns: 1fr;
+      }
+
       .result-header {
         flex-direction: column;
       }
@@ -452,30 +476,44 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260828-cache-bust">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260828-schedule-active-toggle">
 </head>
 
 <body>
   <main class="table-page">
     <aside class="table-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="home-link active" href="/">Tables</a>
-        <a class="home-link" href="/worksheet.html">WS Input</a>
-        <a class="home-link" href="/student-manager.html">Students</a>
-        <a class="home-link" href="/payment.html">Payment</a>
-        <a class="home-link" href="/stock-receive.html">Stock</a>
-        <a class="home-link" href="/report.html">Report</a>
-        <a class="home-link" href="/users.html">Users</a>
+        <a class="home-link active current-page" href="/">🗂️ Tables</a>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/worksheet.html">📝 WS Input</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/student-manager.html">👤 Students</a>
+            <a class="home-link" href="/payment.html">💰 Payment</a>
+            <a class="home-link" href="/report.html">📊 Report</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/stock-receive.html">📦 Stock</a>
+            <a class="home-link" href="/stock-cut.html">✂️ Stock Cut</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/">🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html">👥 Users</a>
+          </div>
+        </div>
       </nav>
-
-      <div class="side-header">
-        <h1>Tables</h1>
-        <div class="subtle">Master / transaction data</div>
-      </div>
-
-      <div class="tables-panel" id="tablesPanel">
-        <div class="loading">กำลังโหลดตาราง...</div>
-      </div>
 
       <div class="auth-bar" id="authBar"></div>
     </aside>
@@ -487,6 +525,9 @@
           <div class="subtitle">Browse master and transaction data</div>
         </div>
       </header>
+      <section class="tables-panel" id="tablesPanel">
+        <div class="loading">กำลังโหลดตาราง...</div>
+      </section>
       <section class="panel content" id="result">
         <div class="empty">เลือกตารางเพื่อดูข้อมูล</div>
       </section>

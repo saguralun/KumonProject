@@ -421,6 +421,8 @@ CREATE TABLE opening_schedule (
 
 	end_time TIME NOT NULL,
 
+	is_active BOOLEAN NOT NULL DEFAULT TRUE,
+
 	CONSTRAINT fk_opening_schedule_weekday
 		FOREIGN KEY (weekday_id)
 		REFERENCES weekday_master(weekday_id),

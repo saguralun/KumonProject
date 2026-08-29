@@ -2,6 +2,10 @@ import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 
 const TABLE_SCHEMA = "kumon";
+const FORECAST_CACHE_TABLE = "worksheet_forecast_average";
+const FORECAST_CACHE_MAX_AGE_DAYS = 7;
+const FORECAST_PACKET_NUMBERS = Array.from({ length: 20 }, (_, index) => (index * 10) + 1);
+const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
 
 // Matches the same "day 21+ rolls to next month" Kumon period rule used
 // elsewhere (worksheetService.js / studentService.js / stockReceiveService.js)
@@ -54,6 +58,467 @@ function boolText(value) {
 
 function packetLabel(levelCode, worksheetNo) {
     return worksheetNo === null || worksheetNo === undefined ? "" : `${levelCode || ""}${worksheetNo}`;
+}
+
+function round2(value) {
+    return Math.round(Number(value || 0) * 100) / 100;
+}
+
+async function hasForecastAverageTable(client = pool) {
+    const result = await client.query(`
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = $1
+          AND table_name = $2
+          AND table_type = 'BASE TABLE'
+    `, [TABLE_SCHEMA, FORECAST_CACHE_TABLE]);
+
+    return result.rows.length > 0;
+}
+
+async function assertForecastAverageTable(client = pool) {
+    if (!(await hasForecastAverageTable(client))) {
+        throw httpError(409, "ยังไม่มีตาราง worksheet_forecast_average กรุณารัน database/006_create_worksheet_forecast_average.sql ก่อน");
+    }
+}
+
+async function loadForecastCacheStatus(client = pool) {
+    await assertForecastAverageTable(client);
+
+    const result = await client.query(`
+        SELECT
+            MAX(calculated_at) AS calculated_at,
+            COUNT(*)::int AS rows_count
+        FROM ${TABLE_SCHEMA}.${FORECAST_CACHE_TABLE}
+    `);
+    const row = result.rows[0];
+    const calculatedAt = row.calculated_at;
+    const isFresh = Boolean(calculatedAt)
+        && new Date(calculatedAt).getTime() >= Date.now() - (FORECAST_CACHE_MAX_AGE_DAYS * 24 * 60 * 60 * 1000);
+
+    return {
+        calculatedAt,
+        rowsCount: Number(row.rows_count || 0),
+        isFresh
+    };
+}
+
+async function insertForecastAverages(client, sourceScope, fromDate = null) {
+    const dateFilter = fromDate ? "AND wu.worksheet_date >= $1" : "";
+    const params = fromDate ? [fromDate] : [];
+    const result = await client.query(`
+        WITH per_student_packet AS (
+            SELECT
+                e.subject_id,
+                lm.level_master_id,
+                wm.worksheet_no AS worksheet_packet_no,
+                wu.enrollment_id,
+                COUNT(DISTINCT wu.worksheet_date)::int AS days_count,
+                COUNT(*)::int AS cpws_count,
+                MIN(wu.worksheet_date) AS first_date,
+                MAX(wu.worksheet_date) AS last_date
+            FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm
+              ON wm.worksheet_master_id = wu.worksheet_master_id
+            JOIN ${TABLE_SCHEMA}.level_master lm
+              ON lm.level_master_id = wm.level_master_id
+            JOIN ${TABLE_SCHEMA}.enrollment e
+              ON e.enrollment_id = wu.enrollment_id
+            WHERE wu.cpws = TRUE
+              AND lm.level_type = 1
+              ${dateFilter}
+            GROUP BY
+                e.subject_id,
+                lm.level_master_id,
+                wm.worksheet_no,
+                wu.enrollment_id
+        )
+        INSERT INTO ${TABLE_SCHEMA}.${FORECAST_CACHE_TABLE} (
+            subject_id,
+            level_master_id,
+            worksheet_packet_no,
+            source_scope,
+            student_count,
+            sample_count,
+            avg_days_per_student,
+            avg_cpws_per_student,
+            min_days,
+            max_days,
+            min_cpws,
+            max_cpws,
+            calculated_from,
+            calculated_to,
+            calculated_at
+        )
+        SELECT
+            subject_id,
+            level_master_id,
+            worksheet_packet_no,
+            $${params.length + 1} AS source_scope,
+            COUNT(*)::int AS student_count,
+            SUM(cpws_count)::int AS sample_count,
+            ROUND(AVG(days_count)::numeric, 2) AS avg_days_per_student,
+            ROUND(AVG(cpws_count)::numeric, 2) AS avg_cpws_per_student,
+            MIN(days_count)::int AS min_days,
+            MAX(days_count)::int AS max_days,
+            MIN(cpws_count)::int AS min_cpws,
+            MAX(cpws_count)::int AS max_cpws,
+            MIN(first_date) AS calculated_from,
+            MAX(last_date) AS calculated_to,
+            CURRENT_TIMESTAMP AS calculated_at
+        FROM per_student_packet
+        GROUP BY subject_id, level_master_id, worksheet_packet_no
+        RETURNING worksheet_forecast_average_id
+    `, [...params, sourceScope]);
+
+    return result.rowCount;
+}
+
+export async function recalculateWorksheetForecastAverages() {
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+        await assertForecastAverageTable(client);
+        await client.query(`DELETE FROM ${TABLE_SCHEMA}.${FORECAST_CACHE_TABLE}`);
+
+        const twoYearsAgoResult = await client.query("SELECT (CURRENT_DATE - INTERVAL '2 years')::date AS from_date");
+        const twoYearsAgo = twoYearsAgoResult.rows[0].from_date;
+        const twoYearRows = await insertForecastAverages(client, "2Y", twoYearsAgo);
+        const allRows = await insertForecastAverages(client, "ALL");
+
+        await client.query("COMMIT");
+
+        return {
+            recalculated: true,
+            twoYearRows,
+            allRows,
+            totalRows: twoYearRows + allRows,
+            calculatedAt: new Date().toISOString()
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+async function ensureFreshForecastAverage({ force = false } = {}) {
+    const before = await loadForecastCacheStatus();
+
+    if (!force && before.isFresh && before.rowsCount > 0) {
+        return {
+            cacheAction: "ใช้ cache เดิม",
+            recalculated: false,
+            calculatedAt: before.calculatedAt,
+            averageRows: before.rowsCount
+        };
+    }
+
+    const recalculation = await recalculateWorksheetForecastAverages();
+
+    return {
+        cacheAction: "คำนวณค่าเฉลี่ยใหม่",
+        recalculated: true,
+        calculatedAt: recalculation.calculatedAt,
+        averageRows: recalculation.totalRows,
+        twoYearRows: recalculation.twoYearRows,
+        allRows: recalculation.allRows
+    };
+}
+
+async function loadForecastMasters() {
+    const [levelResult, worksheetResult, averageResult] = await Promise.all([
+        pool.query(`
+            SELECT
+                lm.level_master_id,
+                lm.subject_id,
+                sm.subject_code,
+                lm.level_code,
+                lm.next_level_master_id
+            FROM ${TABLE_SCHEMA}.level_master lm
+            JOIN ${TABLE_SCHEMA}.subject_master sm
+              ON sm.subject_id = lm.subject_id
+            WHERE lm.level_type = 1
+            ORDER BY lm.subject_id, lm.level_master_id
+        `),
+        pool.query(`
+            SELECT worksheet_master_id, level_master_id, worksheet_no, next_worksheet_master_id
+            FROM ${TABLE_SCHEMA}.worksheet_master
+            ORDER BY level_master_id, worksheet_no
+        `),
+        pool.query(`
+            SELECT
+                subject_id,
+                level_master_id,
+                worksheet_packet_no,
+                source_scope,
+                student_count,
+                sample_count,
+                avg_days_per_student,
+                avg_cpws_per_student,
+                calculated_at
+            FROM ${TABLE_SCHEMA}.${FORECAST_CACHE_TABLE}
+            ORDER BY subject_id, level_master_id, worksheet_packet_no, source_scope
+        `)
+    ]);
+
+    const levelsById = new Map(levelResult.rows.map((row) => [Number(row.level_master_id), row]));
+    const worksheetsByLevel = new Map();
+    const worksheetById = new Map();
+
+    worksheetResult.rows.forEach((row) => {
+        const levelId = Number(row.level_master_id);
+        const normalized = {
+            worksheetMasterId: Number(row.worksheet_master_id),
+            levelMasterId: levelId,
+            worksheetNo: Number(row.worksheet_no),
+            nextWorksheetMasterId: row.next_worksheet_master_id ? Number(row.next_worksheet_master_id) : null
+        };
+
+        worksheetById.set(normalized.worksheetMasterId, normalized);
+
+        if (!worksheetsByLevel.has(levelId)) {
+            worksheetsByLevel.set(levelId, []);
+        }
+
+        worksheetsByLevel.get(levelId).push(normalized);
+    });
+
+    const averages = new Map();
+
+    averageResult.rows.forEach((row) => {
+        const key = `${row.subject_id}:${row.level_master_id}:${row.worksheet_packet_no}`;
+        const entry = {
+            sourceScope: row.source_scope,
+            studentCount: Number(row.student_count || 0),
+            sampleCount: Number(row.sample_count || 0),
+            avgDaysPerStudent: Number(row.avg_days_per_student || 0),
+            avgCpwsPerStudent: Number(row.avg_cpws_per_student || 0),
+            calculatedAt: row.calculated_at
+        };
+
+        if (!averages.has(key)) {
+            averages.set(key, {});
+        }
+
+        averages.get(key)[row.source_scope] = entry;
+    });
+
+    return {
+        levelsById,
+        worksheetsByLevel,
+        worksheetById,
+        averages
+    };
+}
+
+function averageForPacket(averages, subjectId, levelMasterId, packetNo) {
+    const scopes = averages.get(`${subjectId}:${levelMasterId}:${packetNo}`) || {};
+
+    return scopes["2Y"] || scopes.ALL || null;
+}
+
+function firstPacketForLevel(worksheetsByLevel, levelMasterId) {
+    return (worksheetsByLevel.get(Number(levelMasterId)) || [])[0] || null;
+}
+
+function nextPacket({ current, levelsById, worksheetsByLevel, worksheetById }) {
+    if (current?.nextWorksheetMasterId && worksheetById.has(current.nextWorksheetMasterId)) {
+        return worksheetById.get(current.nextWorksheetMasterId);
+    }
+
+    const level = levelsById.get(Number(current?.levelMasterId));
+
+    if (!level?.next_level_master_id) {
+        return null;
+    }
+
+    return firstPacketForLevel(worksheetsByLevel, Number(level.next_level_master_id));
+}
+
+async function loadActiveForecastEnrollments(subjectCode) {
+    const params = [ACTIVE_STATUS_CODES];
+    const subjectFilter = subjectCode && subjectCode !== "all"
+        ? `AND sm.subject_code = $${params.push(subjectCode)}`
+        : "";
+
+    const result = await pool.query(`
+        WITH latest_ws AS (
+            SELECT DISTINCT ON (wu.enrollment_id)
+                wu.enrollment_id,
+                wu.worksheet_master_id
+            FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm
+              ON wm.worksheet_master_id = wu.worksheet_master_id
+            JOIN ${TABLE_SCHEMA}.level_master lm
+              ON lm.level_master_id = wm.level_master_id
+            WHERE wu.cpws = TRUE
+              AND lm.level_type = 1
+            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
+        )
+        SELECT
+            e.enrollment_id,
+            e.student_id,
+            e.subject_id,
+            sm.subject_code,
+            e.current_level_master_id,
+            e.starting_worksheet_master_id,
+            e.is_kumon_connect,
+            s.first_name,
+            s.last_name,
+            s.nickname,
+            current_level.level_code AS current_level_code,
+            latest_ws.worksheet_master_id AS latest_worksheet_master_id
+        FROM ${TABLE_SCHEMA}.enrollment e
+        JOIN ${TABLE_SCHEMA}.student s
+          ON s.student_id = e.student_id
+        JOIN ${TABLE_SCHEMA}.subject_master sm
+          ON sm.subject_id = e.subject_id
+        JOIN ${TABLE_SCHEMA}.status_master status
+          ON status.status_id = e.current_status_group1_id
+        JOIN ${TABLE_SCHEMA}.level_master current_level
+          ON current_level.level_master_id = e.current_level_master_id
+        LEFT JOIN latest_ws
+          ON latest_ws.enrollment_id = e.enrollment_id
+        WHERE status.status_code = ANY($1::text[])
+          ${subjectFilter}
+        ORDER BY sm.subject_id, e.enrollment_id
+    `, params);
+
+    return result.rows;
+}
+
+function enrollmentStartPacket(enrollment, masters) {
+    const latest = masters.worksheetById.get(Number(enrollment.latest_worksheet_master_id));
+
+    if (latest && latest.levelMasterId === Number(enrollment.current_level_master_id)) {
+        return latest;
+    }
+
+    const starting = masters.worksheetById.get(Number(enrollment.starting_worksheet_master_id));
+
+    if (starting && starting.levelMasterId === Number(enrollment.current_level_master_id)) {
+        return starting;
+    }
+
+    return firstPacketForLevel(masters.worksheetsByLevel, Number(enrollment.current_level_master_id));
+}
+
+function addForecastRow(rowMap, enrollment, packet, level, average) {
+    const key = `${enrollment.subject_id}:${packet.levelMasterId}:${packet.worksheetNo}`;
+
+    if (!rowMap.has(key)) {
+        rowMap.set(key, {
+            subjectId: Number(enrollment.subject_id),
+            subject: enrollment.subject_code,
+            levelMasterId: packet.levelMasterId,
+            level: level?.level_code || enrollment.current_level_code,
+            packet: packet.worksheetNo,
+            label: packetLabel(level?.level_code || enrollment.current_level_code, packet.worksheetNo),
+            neededCpws: 0,
+            prepareQty: 0,
+            students: 0,
+            enrollments: [],
+            avgDays: average.avgDaysPerStudent,
+            avgCpws: average.avgCpwsPerStudent,
+            avgSource: average.sourceScope,
+            avgStudentCount: average.studentCount
+        });
+    }
+
+    const row = rowMap.get(key);
+    row.neededCpws = round2(row.neededCpws + average.avgCpwsPerStudent);
+    row.prepareQty = Math.ceil(row.neededCpws);
+    row.students += 1;
+
+    if (row.enrollments.length < 8) {
+        row.enrollments.push({
+            enrollmentId: enrollment.enrollment_id,
+            studentId: enrollment.student_id,
+            name: `${enrollment.first_name || ""} ${enrollment.last_name || ""}`.trim(),
+            nickname: enrollment.nickname || "",
+            isKc: enrollment.is_kumon_connect === true
+        });
+    }
+}
+
+export async function buildWorksheetForecast({ days = 15, subject = "all", includeKc = "false", force = false } = {}) {
+    const normalizedDays = Number(days);
+
+    if (!Number.isFinite(normalizedDays) || normalizedDays <= 0 || normalizedDays > 365) {
+        throw httpError(400, "จำนวนวัน forecast ต้องอยู่ระหว่าง 1-365");
+    }
+
+    const normalizedSubject = String(subject || "all").toUpperCase();
+    const selectedSubject = normalizedSubject === "ALL" ? "all" : normalizedSubject;
+    const includeKumonConnect = includeKc === true || includeKc === "true" || includeKc === "1";
+    const cache = await ensureFreshForecastAverage({ force });
+    const masters = await loadForecastMasters();
+    const enrollments = (await loadActiveForecastEnrollments(selectedSubject))
+        .filter((enrollment) => includeKumonConnect || enrollment.is_kumon_connect !== true);
+    const rowsByPacket = new Map();
+    const missingAverage = [];
+
+    enrollments.forEach((enrollment) => {
+        let remainingDays = normalizedDays;
+        let packet = enrollmentStartPacket(enrollment, masters);
+        let guard = 0;
+
+        while (packet && remainingDays > 0 && guard < 80) {
+            const level = masters.levelsById.get(Number(packet.levelMasterId));
+            const average = averageForPacket(
+                masters.averages,
+                Number(enrollment.subject_id),
+                Number(packet.levelMasterId),
+                Number(packet.worksheetNo)
+            );
+
+            if (!average || average.avgDaysPerStudent <= 0 || average.avgCpwsPerStudent <= 0) {
+                missingAverage.push({
+                    enrollmentId: enrollment.enrollment_id,
+                    subject: enrollment.subject_code,
+                    level: level?.level_code || enrollment.current_level_code,
+                    packet: packet.worksheetNo
+                });
+                break;
+            }
+
+            addForecastRow(rowsByPacket, enrollment, packet, level, average);
+            remainingDays -= average.avgDaysPerStudent;
+            packet = nextPacket({ current: packet, ...masters });
+            guard += 1;
+        }
+    });
+
+    const rows = [...rowsByPacket.values()]
+        .sort((a, b) =>
+            a.subjectId - b.subjectId
+            || a.levelMasterId - b.levelMasterId
+            || a.packet - b.packet
+        );
+    const totalPrepareQty = rows.reduce((sum, row) => sum + row.prepareQty, 0);
+    const totalEstimatedCpws = round2(rows.reduce((sum, row) => sum + row.neededCpws, 0));
+
+    return {
+        cache,
+        params: {
+            days: normalizedDays,
+            subject: selectedSubject,
+            includeKc: includeKumonConnect
+        },
+        summary: {
+            activeEnrollments: enrollments.length,
+            forecastPackets: rows.length,
+            totalPrepareQty,
+            totalEstimatedCpws,
+            missingAverage: missingAverage.length,
+            cacheMaxAgeDays: FORECAST_CACHE_MAX_AGE_DAYS
+        },
+        rows,
+        missingAverage: missingAverage.slice(0, 50)
+    };
 }
 
 async function loadEnrollmentIdsWithActivity({ month, year, start, end }) {

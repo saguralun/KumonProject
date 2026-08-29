@@ -10,6 +10,7 @@ import worksheetRoutes from "./routes/worksheetRoutes.js";
 import studentRoutes from "./routes/studentRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import stockReceiveRoutes from "./routes/stockReceiveRoutes.js";
+import stockCutRoutes from "./routes/stockCutRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -91,8 +92,16 @@ app.get("/users.html", requireAdminPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "users.html"));
 });
 
+app.get("/opening-schedule.html", requireAdminPage, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "opening-schedule.html"));
+});
+
 app.get("/stock-receive.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock-receive.html"));
+});
+
+app.get("/stock-cut.html", requireStaffPage, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "stock-cut.html"));
 });
 
 app.get("/report.html", requireStaffPage, (req, res) => {
@@ -106,6 +115,7 @@ app.use("/api/worksheet", requireAuth, worksheetRoutes);
 app.use("/api/students", requireAuth, studentRoutes);
 app.use("/api/payment", requireStaff, paymentRoutes);
 app.use("/api/stock-receive", requireStaff, stockReceiveRoutes);
+app.use("/api/stock-cut", requireStaff, stockCutRoutes);
 app.use("/api/report", requireStaff, reportRoutes);
 app.use("/api/users", requireAdmin, userRoutes);
 app.use("/api/migration", requireAdmin, migrationRoutes);
