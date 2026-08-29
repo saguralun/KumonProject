@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/opening-schedule.css?v=20260828-schedule-layout-fix">
+  <link rel="stylesheet" href="/css/opening-schedule.css?v=20260829-duration-dropdown">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260828-schedule-active-toggle">
 </head>
 <body>
@@ -85,16 +85,22 @@
             </label>
             <label>
               <span>เวลาเริ่ม</span>
-              <input name="startTime" type="time" required>
+              <input name="startTime" id="startTime" type="time" required>
+            </label>
+            <label>
+              <span>ช่วงเวลา</span>
+              <select name="duration" id="durationSelect">
+                <option value="30">30 นาที</option>
+                <option value="60" selected>1 ชม.</option>
+              </select>
             </label>
             <label>
               <span>เวลาจบ</span>
-              <input name="endTime" type="time" required>
+              <input name="endTime" id="endTime" type="time" required readonly>
             </label>
           </div>
 
           <button type="submit" class="primary-button" id="addScheduleButton">➕ เพิ่มเวลา</button>
-          <div class="form-message hidden" id="formMessage"></div>
         </form>
 
         <section class="panel summary-panel">
@@ -132,6 +138,6 @@
   </main>
 
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/opening-schedule.js?v=20260828-schedule-active-toggle"></script>
+  <script src="/js/opening-schedule.js?v=20260829-duration-dropdown"></script>
 </body>
 </html>

@@ -75,6 +75,12 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
 }
 
+input[readonly] {
+  background: var(--surface-soft);
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
 .schedule-page {
   display: grid;
   grid-template-columns: 320px minmax(0, 1fr);
@@ -299,7 +305,7 @@ html[data-role="staff"] [data-staff-up] {
 
 .form-grid {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) 130px 130px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 8px;
 }
 
@@ -342,23 +348,6 @@ label {
 .danger-button:hover:not(:disabled) {
   border-color: #fca5a5;
   background: #fee2e2;
-}
-
-.form-message {
-  margin-top: 8px;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: var(--red-soft);
-  color: var(--red);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.form-message.is-success {
-  border-color: #bbf7d0;
-  background: var(--green-soft);
-  color: var(--green);
 }
 
 .hidden {
@@ -453,14 +442,44 @@ label {
 }
 
 .slot-item {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px;
   background: #ffffff;
+}
+
+.slot-body {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+}
+
+.slot-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 999px;
+  background: var(--red);
+  color: #ffffff;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 900;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.25);
+}
+
+.slot-delete:hover:not(:disabled) {
+  background: #b91c1c;
 }
 
 .slot-item.is-inactive {
@@ -474,14 +493,20 @@ label {
 }
 
 .slot-time {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 900;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .slot-meta {
   color: var(--muted);
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .slot-meta.is-used {
@@ -491,8 +516,8 @@ label {
 .switch {
   position: relative;
   display: inline-flex;
-  width: 44px;
-  height: 24px;
+  width: 72px;
+  height: 22px;
   align-items: center;
 }
 
@@ -506,8 +531,8 @@ label {
 .switch span {
   position: relative;
   display: block;
-  width: 44px;
-  height: 24px;
+  width: 72px;
+  height: 22px;
   border-radius: 999px;
   background: #cbd5e1;
   box-shadow: inset 0 0 0 1px rgba(100, 116, 139, 0.28);
@@ -518,8 +543,8 @@ label {
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 999px;
   background: #ffffff;
   box-shadow: 0 2px 5px rgba(15, 23, 42, 0.25);
@@ -533,7 +558,7 @@ label {
 }
 
 .switch input:checked + span::after {
-  transform: translateX(20px);
+  transform: translateX(50px);
 }
 
 .empty-day {

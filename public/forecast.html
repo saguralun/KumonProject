@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KumonDB Report</title>
+  <title>KumonDB Forecast</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/report.css?v=20260829-report-monthly-only">
+  <link rel="stylesheet" href="/css/forecast.css?v=20260829-forecast-page">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260829-forecast-nav">
 </head>
 <body>
-  <main class="report-page">
-    <aside class="report-sidebar">
+  <main class="forecast-page">
+    <aside class="forecast-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="home-link active current-page" href="/report.html" data-staff-up>📊 Report</a>
+        <a class="home-link active current-page" href="/forecast.html" data-staff-up>🔮 Forecast</a>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
           <div class="nav-flyout-menu">
@@ -48,48 +48,58 @@
       </nav>
 
       <div class="side-header">
-        <h1>Report</h1>
-        <div class="subtle">รายงานรายเดือน</div>
+        <h1>Forecast</h1>
+        <div class="subtle">คำนวณชุดที่ควรเตรียมเข้าคลัง</div>
       </div>
 
       <section class="filter-panel">
         <label>
-          <span>เดือน</span>
-          <select id="reportMonth"></select>
+          <span>Forecast วัน</span>
+          <input id="forecastDays" type="number" min="1" max="365" step="1" value="15">
         </label>
         <label>
-          <span>ปี</span>
-          <input id="reportYear" type="number" min="2000" max="2600" step="1">
+          <span>Subject</span>
+          <select id="forecastSubject">
+            <option value="all">All</option>
+            <option value="ME">ME</option>
+            <option value="EFL">EFL</option>
+            <option value="TRP">TRP</option>
+          </select>
         </label>
-        <button type="button" class="primary-button" id="generateButton">📊 สร้างรายงาน</button>
-        <button type="button" class="secondary-button" id="exportButton" disabled>⬇️ Export CSV</button>
+        <label class="check-row">
+          <input id="forecastIncludeKc" type="checkbox">
+          <span>รวม KC</span>
+        </label>
+        <button type="button" class="primary-button" id="forecastButton">🔮 Forecast</button>
+        <button type="button" class="secondary-button" id="recalculateForecastButton">🔄 คำนวณ average ใหม่</button>
       </section>
 
       <div class="auth-bar" id="authBar"></div>
     </aside>
 
-    <section class="report-workspace">
+    <section class="forecast-workspace">
       <header class="topbar">
         <div>
-          <div class="page-title">Monthly Report</div>
-          <div class="subtle">รายชื่อ enrollment ที่มีกิจกรรม (WS / AT / DT / CD) ในเดือนที่เลือก</div>
+          <div class="page-title">Stock Forecast</div>
+          <div class="subtle">ใช้ค่าเฉลี่ย WS/CPWS เพื่อประเมินชุดที่คลังควรเตรียมล่วงหน้า</div>
         </div>
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
-      <section class="panel report-table-panel">
+      <section class="panel forecast-table-panel">
         <div class="panel-header">
-          <div class="panel-title">ผลลัพธ์</div>
-          <div class="subtle" id="resultSubtitle">เลือกเดือน/ปี แล้วกดสร้างรายงาน</div>
+          <div class="panel-title">ผลลัพธ์ Forecast</div>
+          <div class="subtle" id="resultSubtitle">เลือกจำนวนวัน แล้วกด Forecast</div>
         </div>
-        <div class="report-table-wrap" id="reportTableWrap">
-          <div class="empty-state">ยังไม่มีรายงาน</div>
+        <div class="forecast-summary" id="forecastSummary"></div>
+        <div class="forecast-table-wrap" id="forecastTableWrap">
+          <div class="empty-state">ยังไม่มี Forecast</div>
         </div>
       </section>
     </section>
   </main>
 
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/report.js?v=20260829-report-monthly-only"></script>
+  <script src="/js/forecast.js?v=20260829-forecast-page"></script>
 </body>
 </html>

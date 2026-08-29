@@ -1,8 +1,6 @@
 import express from "express";
 import {
     buildMonthlyReport,
-    buildWorksheetForecast,
-    recalculateWorksheetForecastAverages,
     REPORT_COLUMNS
 } from "../services/reportService.js";
 
@@ -32,33 +30,6 @@ router.get("/monthly", async (req, res) => {
             success: true,
             columns: REPORT_COLUMNS,
             rows
-        });
-    } catch (error) {
-        sendError(res, error);
-    }
-});
-
-router.post("/worksheet-forecast/averages/recalculate", async (req, res) => {
-    try {
-        res.json({
-            success: true,
-            ...(await recalculateWorksheetForecastAverages())
-        });
-    } catch (error) {
-        sendError(res, error);
-    }
-});
-
-router.get("/worksheet-forecast", async (req, res) => {
-    try {
-        res.json({
-            success: true,
-            ...(await buildWorksheetForecast({
-                days: req.query.days,
-                subject: req.query.subject,
-                includeKc: req.query.includeKc,
-                force: req.query.force === "true"
-            }))
         });
     } catch (error) {
         sendError(res, error);

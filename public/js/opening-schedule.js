@@ -1,8 +1,10 @@
 const els = {
   form: document.getElementById("scheduleForm"),
   weekdaySelect: document.getElementById("weekdaySelect"),
+  startTime: document.getElementById("startTime"),
+  durationSelect: document.getElementById("durationSelect"),
+  endTime: document.getElementById("endTime"),
   addButton: document.getElementById("addScheduleButton"),
-  formMessage: document.getElementById("formMessage"),
   statusLine: document.getElementById("statusLine"),
   weekdayCount: document.getElementById("weekdayCount"),
   slotCount: document.getElementById("slotCount"),
@@ -40,15 +42,21 @@ function setStatus(text, isError = false) {
   els.statusLine.classList.toggle("is-error", isError);
 }
 
-function setFormMessage(text, isSuccess = false) {
-  if (!text) {
-    els.formMessage.classList.add("hidden");
+// เวลาจบ = เวลาเริ่ม + ช่วงเวลา (30 / 60 นาที) คำนวณให้อัตโนมัติ ผู้ใช้แก้เองไม่ได้
+function syncEndTime() {
+  const start = els.startTime.value;
+
+  if (!start) {
+    els.endTime.value = "";
     return;
   }
 
-  els.formMessage.textContent = text;
-  els.formMessage.classList.remove("hidden");
-  els.formMessage.classList.toggle("is-success", isSuccess);
+  const [hours, minutes] = start.split(":").map(Number);
+  const total = Math.min(hours * 60 + minutes + Number(els.durationSelect.value), 24 * 60 - 1);
+  const endHours = String(Math.floor(total / 60)).padStart(2, "0");
+  const endMinutes = String(total % 60).padStart(2, "0");
+
+  els.endTime.value = `${endHours}:${endMinutes}`;
 }
 
 function renderWeekdayOptions(weekdays) {
@@ -67,13 +75,17 @@ function renderSummary(summary) {
 
 function renderSlot(schedule) {
   const usageText = schedule.usageCount > 0
-    ? `ใช้อยู่ ${schedule.usageCount} enrollment`
-    : "ยังไม่มี enrollment ใช้";
+    ? `${schedule.usageCount} ID`
+    : "ยังไม่มี ID";
   const statusText = schedule.isActive ? "เปิด" : "ปิด";
+  const deleteButton = schedule.usageCount > 0
+    ? ""
+    : `<button type="button" class="slot-delete" data-delete-id="${schedule.id}" title="ลบเวลาเปิดนี้" aria-label="ลบเวลาเปิดนี้">✕</button>`;
 
   return `
     <div class="slot-item ${schedule.isActive ? "" : "is-inactive"}">
-      <div>
+      ${deleteButton}
+      <div class="slot-body">
         <div class="slot-time">${escapeHtml(schedule.startTime)}-${escapeHtml(schedule.endTime)}</div>
         <div class="slot-meta ${schedule.usageCount > 0 ? "is-used" : ""}">
           ${escapeHtml(statusText)} • ${escapeHtml(usageText)}
@@ -105,6 +117,10 @@ function renderWeekdays(groups) {
   els.weekdayGrid.querySelectorAll("[data-toggle-id]").forEach((input) => {
     input.addEventListener("change", () => toggleSchedule(input));
   });
+
+  els.weekdayGrid.querySelectorAll("[data-delete-id]").forEach((button) => {
+    button.addEventListener("click", () => deleteSchedule(button));
+  });
 }
 
 async function loadSchedules() {
@@ -124,7 +140,6 @@ async function loadSchedules() {
 
 async function addSchedule(event) {
   event.preventDefault();
-  setFormMessage("");
   els.addButton.disabled = true;
 
   try {
@@ -139,12 +154,11 @@ async function addSchedule(event) {
     });
 
     els.form.reset();
+    syncEndTime();
     renderSummary(data.summary);
     renderWeekdays(data.schedulesByWeekday);
-    setFormMessage("เพิ่มเวลาเปิดแล้ว", true);
-    setStatus("บันทึกแล้ว");
+    setStatus("เพิ่มเวลาเปิดแล้ว");
   } catch (error) {
-    setFormMessage(error.message);
     setStatus(error.message, true);
   } finally {
     els.addButton.disabled = false;
@@ -165,17 +179,40 @@ async function toggleSchedule(input) {
 
     renderSummary(data.summary);
     renderWeekdays(data.schedulesByWeekday);
-    setFormMessage(isActive ? "เปิดเวลาเรียนแล้ว" : "ปิดเวลาเรียนแล้ว", true);
-    setStatus("บันทึกแล้ว");
+    setStatus(isActive ? "เปิดเวลาเรียนแล้ว" : "ปิดเวลาเรียนแล้ว");
   } catch (error) {
-    setFormMessage(error.message);
     setStatus(error.message, true);
     input.checked = !isActive;
     input.disabled = false;
   }
 }
 
+async function deleteSchedule(button) {
+  const scheduleId = button.dataset.deleteId;
+
+  if (!window.confirm("ลบเวลาเปิดนี้? (ยังไม่มี ID ผูกอยู่)")) {
+    return;
+  }
+
+  button.disabled = true;
+
+  try {
+    const data = await requestJson(`/api/system/opening-schedules/${scheduleId}`, {
+      method: "DELETE"
+    });
+
+    renderSummary(data.summary);
+    renderWeekdays(data.schedulesByWeekday);
+    setStatus("ลบเวลาเปิดแล้ว");
+  } catch (error) {
+    setStatus(error.message, true);
+    button.disabled = false;
+  }
+}
+
 els.form.addEventListener("submit", addSchedule);
+els.startTime.addEventListener("input", syncEndTime);
+els.durationSelect.addEventListener("change", syncEndTime);
 els.refreshButton.addEventListener("click", loadSchedules);
 
 loadSchedules();

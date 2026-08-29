@@ -82,13 +82,23 @@ els.updateBannerButton.addEventListener("click", async () => {
 
   try {
     await requestJson("/api/system/update-apply", { method: "POST" });
-    els.updateBannerButton.textContent = "สำเร็จ กำลังโหลด...";
-    await waitForServerAndReload();
   } catch (error) {
-    els.updateBannerMessage.textContent = error.message;
-    els.updateBannerButton.disabled = false;
-    els.updateBannerButton.textContent = "อัพเดทตอนนี้";
+    // `git pull` changes files, so nodemon often restarts the server before
+    // the HTTP response makes it back — fetch then rejects with a TypeError
+    // ("Failed to fetch") even though the update itself already ran. Treat
+    // that as "restarting" and wait for it to come back. A genuine refusal
+    // (wrong branch, uncommitted changes, git pull failed) arrives as a
+    // proper HTTP error with a message instead.
+    if (!(error instanceof TypeError)) {
+      els.updateBannerMessage.textContent = error.message;
+      els.updateBannerButton.disabled = false;
+      els.updateBannerButton.textContent = "อัพเดทตอนนี้";
+      return;
+    }
   }
+
+  els.updateBannerButton.textContent = "สำเร็จ กำลังโหลด...";
+  await waitForServerAndReload();
 });
 
 function setMessage(text) {

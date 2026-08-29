@@ -12,6 +12,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import stockReceiveRoutes from "./routes/stockReceiveRoutes.js";
 import stockCutRoutes from "./routes/stockCutRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
+import forecastRoutes from "./routes/forecastRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import migrationRoutes from "./migration/migrationRoutes.js";
@@ -104,6 +105,10 @@ app.get("/stock-cut.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock-cut.html"));
 });
 
+app.get("/forecast.html", requireStaffPage, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "forecast.html"));
+});
+
 app.get("/report.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "report.html"));
 });
@@ -116,6 +121,7 @@ app.use("/api/students", requireAuth, studentRoutes);
 app.use("/api/payment", requireStaff, paymentRoutes);
 app.use("/api/stock-receive", requireStaff, stockReceiveRoutes);
 app.use("/api/stock-cut", requireStaff, stockCutRoutes);
+app.use("/api/forecast", requireStaff, forecastRoutes);
 app.use("/api/report", requireStaff, reportRoutes);
 app.use("/api/users", requireAdmin, userRoutes);
 app.use("/api/migration", requireAdmin, migrationRoutes);
