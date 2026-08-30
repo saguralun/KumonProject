@@ -235,7 +235,7 @@ textarea:focus {
 .auth-bar {
   display: grid;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: auto;
   padding-top: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.12);
 }

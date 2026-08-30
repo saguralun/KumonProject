@@ -185,6 +185,21 @@ input[readonly] {
   text-transform: uppercase;
 }
 
+.auth-role-admin {
+  background: var(--blue-soft);
+  color: #1d4ed8;
+}
+
+.auth-role-staff {
+  background: #f0eaff;
+  color: #6d3fc4;
+}
+
+.auth-role-guest {
+  background: var(--orange-soft);
+  color: #8a5c08;
+}
+
 .auth-name {
   overflow: hidden;
   color: #dbe4f3;
