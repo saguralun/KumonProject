@@ -168,7 +168,7 @@ export async function setOpeningScheduleActive(scheduleId, isActive) {
     }
 
     if (!(await hasScheduleActiveColumn())) {
-        throw httpError(409, "ยังไม่มี column is_active กรุณารัน database/005_add_opening_schedule_is_active.sql ก่อน");
+        throw httpError(409, "ยังไม่มี column is_active ในตาราง opening_schedule กรุณารัน database/001_create_master_tables.sql (เวอร์ชันล่าสุด) ก่อน");
     }
 
     const result = await pool.query(`

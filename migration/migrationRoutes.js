@@ -1,4 +1,8 @@
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 import express from "express";
+import pool from "../config/db.js";
 import { importStudent, previewStudent } from "./migrationStudent.js";
 import { importEnrollment, previewEnrollment } from "./migrationEnrollment.js";
 import { importEnrollmentStatus, previewEnrollmentStatus } from "./migrationEnrollmentStatus.js";
@@ -10,6 +14,64 @@ import { importStock, previewStock } from "./migrationStock.js";
 import { buildPagination } from "./migrationPreviewCommon.js";
 
 const router = express.Router();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const databaseDir = path.join(__dirname, "..", "database");
+
+// Order matters — 002 seeds data into tables 001 creates, 003 creates
+// transaction tables (and its own default admin/123456 login) that
+// reference 001's master tables. Each file DROPs its own tables with
+// CASCADE before recreating them, so running these three in order is a
+// full schema wipe + rebuild, not an incremental migration.
+const DATABASE_SETUP_FILES = [
+    "001_create_master_tables.sql",
+    "002_insert_master_data.sql",
+    "003_create_transaction_tables.sql"
+];
+
+router.post("/database/setup", async (req, res) => {
+    const steps = [];
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        for (const fileName of DATABASE_SETUP_FILES) {
+            try {
+                const filePath = path.join(databaseDir, fileName);
+                const sql = fs.readFileSync(filePath, "utf8");
+
+                await client.query(sql);
+                steps.push({ file: fileName, status: "OK" });
+            } catch (stepError) {
+                steps.push({ file: fileName, status: "ERROR", message: stepError.message });
+                throw stepError;
+            }
+        }
+
+        await client.query("COMMIT");
+
+        res.json({
+            status: "OK",
+            message: "Database schema recreated. Default login: admin / 123456 — change it on the Users page after logging in. Restart the app server so its connection pool picks up the new schema.",
+            steps
+        });
+    } catch (error) {
+        await client.query("ROLLBACK").catch(() => {});
+
+        console.error("Database Setup Error:");
+        console.error(error);
+
+        res.status(500).json({
+            status: "ERROR",
+            message: error.message,
+            steps
+        });
+    } finally {
+        client.release();
+    }
+});
 
 const migrationModules = [
     {

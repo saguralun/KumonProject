@@ -702,6 +702,11 @@
     <header class="header">
 
         <div>
+            <a
+                href="/"
+                style="display:inline-block;margin-bottom:10px;color:var(--blue);text-decoration:none;font-weight:600;font-size:14px;"
+            >← กลับหน้าหลัก</a>
+
             <h1>Migration Center</h1>
 
             <div class="subtitle">
@@ -714,6 +719,47 @@
         </div>
 
     </header>
+
+
+    <!-- =====================================
+         DATABASE SETUP
+    ====================================== -->
+
+    <section class="overall" style="border:1px solid #fecaca;background:#fff5f5;">
+
+        <div class="overall-top">
+
+            <div>
+
+                <div class="overall-title">
+                    🗄️ Database Setup
+                </div>
+
+                <div class="overall-detail">
+                    รัน 001 → 002 → 003 ใหม่ทั้งหมด (ไม่ต้องเข้า psql)
+                    <strong>ล้างข้อมูลทั้งหมดในฐานข้อมูลปัจจุบันถาวร แก้กลับไม่ได้</strong>
+                    — ใช้เมื่อจะติดตั้งใหม่/ล้างข้อมูลทดสอบเท่านั้น
+                    หลังรันเสร็จต้อง restart server ด้วย (connection pool เก่ายัง cache schema เดิมอยู่)
+                </div>
+
+            </div>
+
+            <button
+                id="databaseSetupButton"
+                class="danger"
+                onclick="runDatabaseSetup()"
+            >
+                🗄️ Reinstall Database (001 → 002 → 003)
+            </button>
+
+        </div>
+
+        <div
+            id="databaseSetupResult"
+            class="result"
+        ></div>
+
+    </section>
 
 
     <!-- =====================================
@@ -1961,6 +2007,66 @@ async function previewStudent() {
 
         button.textContent =
             "🔄 Preview Again";
+
+    }
+
+}
+
+
+/* =========================================================
+   DATABASE SETUP BUTTON (run 001 -> 002 -> 003)
+========================================================= */
+
+async function runDatabaseSetup() {
+
+    const confirmed = confirm(
+        "จะรัน 001 -> 002 -> 003 ใหม่ทั้งหมด — ข้อมูลทั้งหมดในฐานข้อมูลปัจจุบันจะถูกลบถาวร แก้กลับไม่ได้\n\nยืนยันว่าจะดำเนินการต่อ?"
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    const button = document.getElementById("databaseSetupButton");
+    const result = document.getElementById("databaseSetupResult");
+
+    button.disabled = true;
+    button.textContent = "⏳ Running...";
+
+    result.className = "result show";
+    result.textContent = "กำลังรัน 001 -> 002 -> 003 ...";
+
+    try {
+
+        const response = await fetch(
+            "/api/migration/database/setup",
+            { method: "POST" }
+        );
+
+        const data = await response.json();
+
+        const stepLines = (data.steps || [])
+            .map((step) => `${step.status === "OK" ? "✅" : "❌"} ${step.file || ""} ${step.message || ""}`.trim())
+            .join("\n");
+
+        if (!response.ok) {
+            throw new Error(data.message || "Database setup failed");
+        }
+
+        result.className = "result show ready";
+        result.textContent = `${data.message}\n\n${stepLines}`;
+
+    } catch (error) {
+
+        console.error(error);
+
+        result.className = "result show error";
+        result.textContent = `เกิดข้อผิดพลาด: ${error.message}`;
+
+    } finally {
+
+        button.disabled = false;
+        button.textContent = "🗄️ Reinstall Database (001 → 002 → 003)";
 
     }
 
