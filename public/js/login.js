@@ -137,8 +137,8 @@ async function requestJson(url, options = {}) {
   return data;
 }
 
-function redirectForRole(role) {
-  window.location.href = role === "admin" ? "/" : "/worksheet.html";
+function redirectForRole() {
+  window.location.href = "/worksheet.html";
 }
 
 els.tabs.addEventListener("click", (event) => {

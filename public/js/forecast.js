@@ -468,6 +468,14 @@ function computeOrderPlan(forecastRows, stockData) {
     subject.ws.levels.forEach((level) => {
       const levelKey = `${subject.subjectId}:${level.levelMasterId}`;
       const levelTotal = levelTotals.get(levelKey) || 0;
+
+      // No forecasted demand anywhere in this level at all (not one packet)
+      // — skip it entirely rather than ordering to a bare 5-unit baseline
+      // nobody's about to touch.
+      if (levelTotal === 0) {
+        return;
+      }
+
       const targetStock = 5 + Math.ceil(levelTotal / 10);
 
       Object.entries(level.values).forEach(([packet, currentStock]) => {
@@ -522,6 +530,11 @@ function computeCdOrderPlan(cdForecastRows, stockData) {
     subject.cd.levels.forEach((level) => {
       const levelKey = `${subject.subjectId}:${level.levelMasterId}`;
       const levelTotal = levelTotals.get(levelKey) || 0;
+
+      if (levelTotal === 0) {
+        return;
+      }
+
       const targetStock = 5 + Math.ceil(levelTotal / 10);
 
       Object.entries(level.values).forEach(([cdNo, currentStock]) => {
