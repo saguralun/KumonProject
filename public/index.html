@@ -181,6 +181,11 @@
       color: #1d4ed8;
     }
 
+    .auth-role-staff {
+      background: #f0eaff;
+      color: #6d3fc4;
+    }
+
     .auth-role-guest {
       background: #fff6db;
       color: #8a5c08;
@@ -476,7 +481,7 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260828-schedule-active-toggle">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260829-forecast-nav">
 </head>
 
 <body>
@@ -501,8 +506,10 @@
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/stock-receive.html">📦 Stock</a>
+            <a class="home-link" href="/stock.html">📊 Stock</a>
+            <a class="home-link" href="/stock-receive.html">📦 Stock Receive</a>
             <a class="home-link" href="/stock-cut.html">✂️ Stock Cut</a>
+            <a class="home-link" href="/forecast.html">🔮 Forecast & Order</a>
           </div>
         </div>
         <div class="nav-flyout">
@@ -511,6 +518,7 @@
             <a class="home-link" href="/">🗂️ Tables</a>
             <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
             <a class="home-link" href="/users.html">👥 Users</a>
+            <a class="home-link" href="/migration.html">📥 Migration</a>
           </div>
         </div>
       </nav>

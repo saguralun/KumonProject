@@ -3,19 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KumonDB Stock Cut</title>
+  <title>KumonDB Stock</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/stock-receive.css?v=20260828-cache-bust">
-  <link rel="stylesheet" href="/css/stock-cut.css?v=20260828-01">
+  <link rel="stylesheet" href="/css/stock.css?v=20260830-stock-thresholds">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260829-forecast-nav">
 </head>
 <body>
-  <main class="stock-page">
-    <aside class="stock-sidebar">
+  <main class="stock-summary-page">
+    <aside class="stock-summary-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="home-link active current-page" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
+        <a class="home-link active current-page" href="/stock.html" data-staff-up>📊 Stock</a>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
           <div class="nav-flyout-menu">
@@ -51,64 +50,59 @@
       </nav>
 
       <div class="side-header">
-        <h1>Stock Cut</h1>
-        <div class="subtle">ตัด stock ตามที่ใช้ไปจริง</div>
+        <h1>Stock</h1>
+        <div class="subtle">สรุปสต๊อกคงเหลือแยกรายวิชา</div>
       </div>
 
       <section class="filter-panel">
-        <label>
-          <span>ประเภท</span>
-          <div class="subject-buttons two-up" id="typeButtons"></div>
-        </label>
+        <div class="subject-tabs" id="subjectTabs"></div>
+        <button type="button" class="secondary-button" id="refreshStockButton">🔄 Refresh</button>
       </section>
+
+      <div class="stock-legend">
+        <div class="stock-legend-title">สีของช่อง</div>
+        <div class="stock-legend-row"><span class="legend-swatch is-out"></span> วิกฤต (&lt; 5)</div>
+        <div class="stock-legend-row"><span class="legend-swatch is-low"></span> ใกล้หมด (&lt; 10)</div>
+        <div class="stock-legend-row"><span class="legend-swatch is-ok"></span> ปกติ</div>
+      </div>
 
       <div class="auth-bar" id="authBar"></div>
     </aside>
 
-    <section class="stock-workspace">
+    <section class="stock-summary-workspace">
       <header class="topbar">
         <div>
-          <div class="page-title">Stock Cut</div>
-          <div class="subtle">รายการที่นักเรียนใช้ไปแล้ว แต่ยังไม่ได้ตัดออกจาก stock — กดเข้าไปดูรายละเอียด หรือตัดทั้งหมดทีเดียว</div>
+          <div class="page-title">Stock Summary</div>
+          <div class="subtle" id="pageSubtitle">สต๊อก WS/CD คงเหลือปัจจุบัน แยกตามระดับและวิชา</div>
         </div>
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
-      <section class="content-grid stock-cut-grid">
-        <section class="panel stock-cut-list-panel">
-          <div class="panel-header">
-            <div class="panel-title">วันที่ค้างตัด</div>
-            <div class="stock-cut-header-actions">
-              <div class="subtle" id="pendingSubtitle">กำลังโหลด...</div>
-              <button type="button" class="danger-button" id="cutAllButton" disabled>🔪 ตัดทั้งหมด</button>
-            </div>
-          </div>
-          <div class="do-table-wrap" id="pendingTableWrap">
-            <div class="empty-state">กำลังโหลด...</div>
-          </div>
-        </section>
+      <section class="stock-summary-cards" id="stockSummaryCards"></section>
+
+      <section class="panel stock-panel stock-panel-ws">
+        <div class="panel-header">
+          <div class="panel-title">Worksheet (WS)</div>
+          <div class="subtle" id="wsPanelSubtitle">จำนวนคงเหลือแยกตามชุด (Packet)</div>
+        </div>
+        <div class="stock-table-wrap" id="wsTableWrap">
+          <div class="empty-state">กำลังโหลด...</div>
+        </div>
+      </section>
+
+      <section class="panel stock-panel stock-panel-cd">
+        <div class="panel-header">
+          <div class="panel-title">CD</div>
+          <div class="subtle" id="cdPanelSubtitle">จำนวนคงเหลือแยกตามระดับ</div>
+        </div>
+        <div class="stock-table-wrap" id="cdTableWrap">
+          <div class="empty-state">กำลังโหลด...</div>
+        </div>
       </section>
     </section>
   </main>
 
-  <div class="modal-backdrop hidden" id="detailModal" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
-    <div class="do-detail-dialog">
-      <div class="modal-header">
-        <div>
-          <div class="panel-title" id="detailTitle">รายละเอียด</div>
-          <div class="subtle" id="detailSubtitle"></div>
-        </div>
-        <button type="button" class="modal-close" id="detailClose" aria-label="Close">✕</button>
-      </div>
-      <div class="do-detail-body" id="detailBody"></div>
-      <div class="modal-actions">
-        <div></div>
-        <button type="button" class="danger-button" id="cutDayButton">🔪 ตัด Stock วันนี้</button>
-      </div>
-    </div>
-  </div>
-
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/stock-cut.js?v=20260828-01"></script>
+  <script src="/js/stock.js?v=20260830-stock-thresholds"></script>
 </body>
 </html>

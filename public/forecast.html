@@ -7,14 +7,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/forecast.css?v=20260829-forecast-page">
+  <link rel="stylesheet" href="/css/forecast.css?v=20260830-forecast-cd-order">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260829-forecast-nav">
 </head>
 <body>
   <main class="forecast-page">
     <aside class="forecast-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="home-link active current-page" href="/forecast.html" data-staff-up>🔮 Forecast</a>
+        <a class="home-link active current-page" href="/forecast.html" data-staff-up>🔮 Forecast & Order</a>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
           <div class="nav-flyout-menu">
@@ -32,9 +32,10 @@
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/stock-receive.html" data-staff-up>📦 Stock</a>
+            <a class="home-link" href="/stock.html" data-staff-up>📊 Stock</a>
+            <a class="home-link" href="/stock-receive.html" data-staff-up>📦 Stock Receive</a>
             <a class="home-link" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
-            <a class="home-link" href="/forecast.html" data-staff-up>🔮 Forecast</a>
+            <a class="home-link" href="/forecast.html" data-staff-up>🔮 Forecast & Order</a>
           </div>
         </div>
         <div class="nav-flyout">
@@ -43,6 +44,7 @@
             <a class="home-link" href="/" data-admin-only>🗂️ Tables</a>
             <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
             <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+            <a class="home-link" href="/migration.html" data-admin-only>📥 Migration</a>
           </div>
         </div>
       </nav>
@@ -57,22 +59,13 @@
           <span>Forecast วัน</span>
           <input id="forecastDays" type="number" min="1" max="365" step="1" value="15">
         </label>
-        <label>
-          <span>Subject</span>
-          <select id="forecastSubject">
-            <option value="all">All</option>
-            <option value="ME">ME</option>
-            <option value="EFL">EFL</option>
-            <option value="TRP">TRP</option>
-          </select>
-        </label>
-        <label class="check-row">
-          <input id="forecastIncludeKc" type="checkbox">
-          <span>รวม KC</span>
-        </label>
-        <button type="button" class="primary-button" id="forecastButton">🔮 Forecast</button>
+        <div class="subtle">ไม่รวมเด็กที่เป็น Kumon Connect (KC)</div>
         <button type="button" class="secondary-button" id="recalculateForecastButton">🔄 คำนวณ average ใหม่</button>
+        <button type="button" class="primary-button" id="forecastButton">🔮 Forecast</button>
+        <button type="button" class="secondary-button" id="orderButton" disabled title="กด Forecast ก่อน">🛒 สั่งซื้อ</button>
       </section>
+
+      <div class="subject-tabs" id="subjectTabs"></div>
 
       <div class="auth-bar" id="authBar"></div>
     </aside>
@@ -86,20 +79,73 @@
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
-      <section class="panel forecast-table-panel">
-        <div class="panel-header">
-          <div class="panel-title">ผลลัพธ์ Forecast</div>
-          <div class="subtle" id="resultSubtitle">เลือกจำนวนวัน แล้วกด Forecast</div>
-        </div>
-        <div class="forecast-summary" id="forecastSummary"></div>
-        <div class="forecast-table-wrap" id="forecastTableWrap">
-          <div class="empty-state">ยังไม่มี Forecast</div>
-        </div>
-      </section>
+      <div class="forecast-view" id="forecastResultsView">
+        <section class="panel forecast-table-panel">
+          <div class="panel-header">
+            <div class="panel-title">ผลลัพธ์ Forecast — WS</div>
+            <div class="subtle" id="resultSubtitle">เลือกจำนวนวัน แล้วกด Forecast</div>
+          </div>
+          <div class="forecast-summary" id="forecastSummary"></div>
+          <div class="forecast-table-wrap" id="forecastTableWrap">
+            <div class="empty-state">ยังไม่มี Forecast</div>
+          </div>
+        </section>
+
+        <section class="panel forecast-table-panel forecast-table-panel-cd">
+          <div class="panel-header">
+            <div class="panel-title">ผลลัพธ์ Forecast — CD</div>
+            <div class="subtle">CD ที่ต้องเตรียม เมื่อเด็กข้าม level ที่ต้องแจก CD (EFL / TRP)</div>
+          </div>
+          <div class="forecast-table-wrap" id="cdForecastTableWrap">
+            <div class="empty-state">ยังไม่มี Forecast</div>
+          </div>
+        </section>
+      </div>
+
+      <div class="forecast-view hidden" id="orderResultsView">
+        <section class="panel forecast-table-panel forecast-table-panel-order">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">🛒 แนะนำสั่งซื้อ</div>
+              <div class="subtle">ต้องมี = 5 (base) + เพดาน(รวม Forecast เลเวล ÷ 10) — order ปัดเป็นเลขลงท้าย 0/5 (หรือ 0/3/6/9 ถ้ารวม Forecast เลเวล &lt; 30) — สลับวิชาได้จากแท็บด้านซ้าย</div>
+            </div>
+          </div>
+          <div class="forecast-table-wrap" id="orderSuggestionTableWrap">
+            <div class="empty-state">ยังไม่มี Forecast</div>
+          </div>
+        </section>
+
+        <section class="panel forecast-table-panel forecast-table-panel-cd">
+          <div class="panel-header">
+            <div class="panel-title">🛒 แนะนำสั่งซื้อ — CD</div>
+            <div class="subtle">สูตรเดียวกับ WS แต่ระดับละ 1 แผ่น (cd_no เดียว)</div>
+          </div>
+          <div class="forecast-table-wrap" id="orderCdSuggestionTableWrap">
+            <div class="empty-state">ยังไม่มี Forecast</div>
+          </div>
+        </section>
+      </div>
     </section>
   </main>
 
+  <div class="modal-backdrop hidden" id="forecastDetailModal" role="dialog" aria-modal="true" aria-labelledby="forecastDetailTitle">
+    <div class="forecast-detail-dialog">
+      <div class="forecast-detail-header">
+        <div>
+          <div class="panel-title" id="forecastDetailTitle">Packet</div>
+          <div class="subtle" id="forecastDetailSubtitle"></div>
+        </div>
+        <button type="button" class="icon-button" id="forecastDetailClose" aria-label="Close">✕</button>
+      </div>
+      <div class="forecast-detail-stats" id="forecastDetailStats"></div>
+      <div class="forecast-detail-students">
+        <div class="forecast-detail-students-title">เด็กที่เกี่ยวข้อง (ตัวอย่าง)</div>
+        <div class="forecast-detail-students-list" id="forecastDetailStudents"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/forecast.js?v=20260829-forecast-page"></script>
+  <script src="/js/forecast.js?v=20260830-forecast-cd-order"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ import studentRoutes from "./routes/studentRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import stockReceiveRoutes from "./routes/stockReceiveRoutes.js";
 import stockCutRoutes from "./routes/stockCutRoutes.js";
+import stockSummaryRoutes from "./routes/stockSummaryRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import forecastRoutes from "./routes/forecastRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -101,6 +102,10 @@ app.get("/stock-receive.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock-receive.html"));
 });
 
+app.get("/stock.html", requireStaffPage, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "stock.html"));
+});
+
 app.get("/stock-cut.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock-cut.html"));
 });
@@ -113,6 +118,13 @@ app.get("/report.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "report.html"));
 });
 
+// The Migration Center page lives under migration/ (alongside its import
+// scripts), not public/. Give it a clean, page-guarded URL like the others;
+// the static mount below still serves it at /migration/migrationCenter.html.
+app.get("/migration.html", requireAdminPage, (req, res) => {
+  res.sendFile(path.join(process.cwd(), "migration", "migrationCenter.html"));
+});
+
 // Specific /api/* mounts must come before the generic "/api" one below —
 // Express tries middleware in registration order, and a broader prefix
 // registered first would swallow requests meant for these.
@@ -121,6 +133,7 @@ app.use("/api/students", requireAuth, studentRoutes);
 app.use("/api/payment", requireStaff, paymentRoutes);
 app.use("/api/stock-receive", requireStaff, stockReceiveRoutes);
 app.use("/api/stock-cut", requireStaff, stockCutRoutes);
+app.use("/api/stock-summary", requireStaff, stockSummaryRoutes);
 app.use("/api/forecast", requireStaff, forecastRoutes);
 app.use("/api/report", requireStaff, reportRoutes);
 app.use("/api/users", requireAdmin, userRoutes);

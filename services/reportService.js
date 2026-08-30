@@ -1,11 +1,18 @@
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
+import { loadCdSummary, loadWsSummary } from "./stockSummaryService.js";
 
 const TABLE_SCHEMA = "kumon";
 const FORECAST_CACHE_TABLE = "worksheet_forecast_average";
 const FORECAST_CACHE_MAX_AGE_DAYS = 7;
 const FORECAST_PACKET_NUMBERS = Array.from({ length: 20 }, (_, index) => (index * 10) + 1);
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
+
+// Order suggestion defaults — how many days it takes new stock to actually
+// arrive after ordering (lead time), and a safety margin on top of raw
+// forecast need to absorb demand spikes/miscounts. Both are tunable per call.
+const DEFAULT_LEAD_TIME_DAYS = 7;
+const DEFAULT_BUFFER_PERCENT = 25;
 
 // Matches the same "day 21+ rolls to next month" Kumon period rule used
 // elsewhere (worksheetService.js / studentService.js / stockReceiveService.js)
@@ -78,7 +85,7 @@ async function hasForecastAverageTable(client = pool) {
 
 async function assertForecastAverageTable(client = pool) {
     if (!(await hasForecastAverageTable(client))) {
-        throw httpError(409, "ยังไม่มีตาราง worksheet_forecast_average กรุณารัน database/006_create_worksheet_forecast_average.sql ก่อน");
+        throw httpError(409, "ยังไม่มีตาราง worksheet_forecast_average กรุณารัน database/001_create_master_tables.sql (เวอร์ชันล่าสุด) ก่อน");
     }
 }
 
@@ -113,8 +120,14 @@ async function insertForecastAverages(client, sourceScope, fromDate = null) {
                 lm.level_master_id,
                 wm.worksheet_no AS worksheet_packet_no,
                 wu.enrollment_id,
+                -- days_count spans EVERY worksheet_used row for this packet
+                -- (cpws = TRUE completions and their cpws = FALSE retries/decoys
+                -- alike — 97.9% of FALSE rows share the exact worksheet_no of a
+                -- TRUE row for the same enrollment, so no separate "packet"
+                -- grouping is needed). cpws_count only counts the TRUE rows —
+                -- one per actual completion/retry cycle.
                 COUNT(DISTINCT wu.worksheet_date)::int AS days_count,
-                COUNT(*)::int AS cpws_count,
+                COUNT(*) FILTER (WHERE wu.cpws = TRUE)::int AS cpws_count,
                 MIN(wu.worksheet_date) AS first_date,
                 MAX(wu.worksheet_date) AS last_date
             FROM ${TABLE_SCHEMA}.worksheet_used wu
@@ -124,8 +137,7 @@ async function insertForecastAverages(client, sourceScope, fromDate = null) {
               ON lm.level_master_id = wm.level_master_id
             JOIN ${TABLE_SCHEMA}.enrollment e
               ON e.enrollment_id = wu.enrollment_id
-            WHERE wu.cpws = TRUE
-              AND lm.level_type = 1
+            WHERE lm.level_type = 1
               ${dateFilter}
             GROUP BY
                 e.subject_id,
@@ -157,8 +169,22 @@ async function insertForecastAverages(client, sourceScope, fromDate = null) {
             $${params.length + 1} AS source_scope,
             COUNT(*)::int AS student_count,
             SUM(cpws_count)::int AS sample_count,
-            ROUND(AVG(days_count)::numeric, 2) AS avg_days_per_student,
-            ROUND(AVG(cpws_count)::numeric, 2) AS avg_cpws_per_student,
+            -- avg_days_per_student = days per single completion cycle, pooled
+            -- across every student/cycle sampled for this packet (SUM/SUM, not
+            -- an average of per-student totals) — this is the number the
+            -- forecast simulation subtracts one packet-step at a time, and
+            -- multiplying it back by avg_cpws_per_student recovers a given
+            -- student's real total days on the packet across all their retries.
+            ROUND(
+                CASE WHEN SUM(cpws_count) > 0
+                    THEN SUM(days_count)::numeric / SUM(cpws_count)
+                    ELSE NULL
+                END,
+            2) AS avg_days_per_student,
+            -- avg_cpws_per_student = completions per student (including
+            -- retries), averaged across students — this is what the forecast
+            -- multiplies by student count to get sheets/CDs to prepare.
+            ROUND(SUM(cpws_count)::numeric / COUNT(*), 2) AS avg_cpws_per_student,
             MIN(days_count)::int AS min_days,
             MAX(days_count)::int AS max_days,
             MIN(cpws_count)::int AS min_cpws,
@@ -229,7 +255,7 @@ async function ensureFreshForecastAverage({ force = false } = {}) {
 }
 
 async function loadForecastMasters() {
-    const [levelResult, worksheetResult, averageResult] = await Promise.all([
+    const [levelResult, worksheetResult, cdLevelResult, averageResult] = await Promise.all([
         pool.query(`
             SELECT
                 lm.level_master_id,
@@ -248,6 +274,13 @@ async function loadForecastMasters() {
             FROM ${TABLE_SCHEMA}.worksheet_master
             ORDER BY level_master_id, worksheet_no
         `),
+        // Levels that hand out a CD (currently EFL and TRP levels) — used to
+        // add 1 CD to the forecast whenever the simulation crosses into one
+        // of these levels.
+        pool.query(`
+            SELECT DISTINCT level_master_id
+            FROM ${TABLE_SCHEMA}.cd_master
+        `),
         pool.query(`
             SELECT
                 subject_id,
@@ -265,6 +298,7 @@ async function loadForecastMasters() {
     ]);
 
     const levelsById = new Map(levelResult.rows.map((row) => [Number(row.level_master_id), row]));
+    const cdLevelIds = new Set(cdLevelResult.rows.map((row) => Number(row.level_master_id)));
     const worksheetsByLevel = new Map();
     const worksheetById = new Map();
 
@@ -308,6 +342,7 @@ async function loadForecastMasters() {
 
     return {
         levelsById,
+        cdLevelIds,
         worksheetsByLevel,
         worksheetById,
         averages
@@ -406,7 +441,7 @@ function enrollmentStartPacket(enrollment, masters) {
     return firstPacketForLevel(masters.worksheetsByLevel, Number(enrollment.current_level_master_id));
 }
 
-function addForecastRow(rowMap, enrollment, packet, level, average) {
+function addForecastRow(rowMap, enrollment, packet, level, average, cpwsAmount) {
     const key = `${enrollment.subject_id}:${packet.levelMasterId}:${packet.worksheetNo}`;
 
     if (!rowMap.has(key)) {
@@ -429,8 +464,47 @@ function addForecastRow(rowMap, enrollment, packet, level, average) {
     }
 
     const row = rowMap.get(key);
-    row.neededCpws = round2(row.neededCpws + average.avgCpwsPerStudent);
+    // Accumulate fractional cpws across every student who touches this
+    // packet — never round per-student. Only the final prepareQty (what
+    // to actually order) gets rounded up, once, after every student who
+    // could possibly land on this packet within the window has been added.
+    row.neededCpws = round2(row.neededCpws + cpwsAmount);
     row.prepareQty = Math.ceil(row.neededCpws);
+    row.students += 1;
+
+    if (row.enrollments.length < 8) {
+        row.enrollments.push({
+            enrollmentId: enrollment.enrollment_id,
+            studentId: enrollment.student_id,
+            name: `${enrollment.first_name || ""} ${enrollment.last_name || ""}`.trim(),
+            nickname: enrollment.nickname || "",
+            isKc: enrollment.is_kumon_connect === true
+        });
+    }
+}
+
+// EFL/TRP levels each hand out 1 CD when a student starts them. Called only
+// when the simulation actually crosses INTO a CD-level mid-forecast (not for
+// the level the student is already on — they'd have gotten that CD already).
+function addForecastCdRow(cdRowMap, enrollment, newLevel) {
+    const key = `${enrollment.subject_id}:${newLevel.level_master_id}`;
+
+    if (!cdRowMap.has(key)) {
+        cdRowMap.set(key, {
+            subjectId: Number(enrollment.subject_id),
+            subject: newLevel.subject_code,
+            levelMasterId: Number(newLevel.level_master_id),
+            level: newLevel.level_code,
+            neededCd: 0,
+            prepareQty: 0,
+            students: 0,
+            enrollments: []
+        });
+    }
+
+    const row = cdRowMap.get(key);
+    row.neededCd += 1;
+    row.prepareQty = row.neededCd;
     row.students += 1;
 
     if (row.enrollments.length < 8) {
@@ -459,6 +533,7 @@ export async function buildWorksheetForecast({ days = 15, subject = "all", inclu
     const enrollments = (await loadActiveForecastEnrollments(selectedSubject))
         .filter((enrollment) => includeKumonConnect || enrollment.is_kumon_connect !== true);
     const rowsByPacket = new Map();
+    const cdRowsByLevel = new Map();
     const missingAverage = [];
 
     enrollments.forEach((enrollment) => {
@@ -485,9 +560,38 @@ export async function buildWorksheetForecast({ days = 15, subject = "all", inclu
                 break;
             }
 
-            addForecastRow(rowsByPacket, enrollment, packet, level, average);
-            remainingDays -= average.avgDaysPerStudent;
-            packet = nextPacket({ current: packet, ...masters });
+            // A full pass through this packet — including its typical
+            // retries — takes avgDaysPerStudent days per completion times
+            // avgCpwsPerStudent completions.
+            const fullPacketDays = round2(average.avgDaysPerStudent * average.avgCpwsPerStudent);
+
+            if (remainingDays >= fullPacketDays) {
+                addForecastRow(rowsByPacket, enrollment, packet, level, average, average.avgCpwsPerStudent);
+                remainingDays -= fullPacketDays;
+
+                const previousLevelMasterId = Number(packet.levelMasterId);
+
+                packet = nextPacket({ current: packet, ...masters });
+
+                if (packet && Number(packet.levelMasterId) !== previousLevelMasterId) {
+                    const newLevel = masters.levelsById.get(Number(packet.levelMasterId));
+
+                    if (newLevel && masters.cdLevelIds.has(Number(packet.levelMasterId))) {
+                        addForecastCdRow(cdRowsByLevel, enrollment, newLevel);
+                    }
+                }
+            } else {
+                // Not enough days left in the window for a full pass — the
+                // student only gets partway through this packet. Convert
+                // whatever days remain into completions (days ÷ days per
+                // completion) instead of borrowing time from a packet the
+                // student won't actually reach within the window.
+                const partialCompletions = round2(remainingDays / average.avgDaysPerStudent);
+
+                addForecastRow(rowsByPacket, enrollment, packet, level, average, partialCompletions);
+                remainingDays = 0;
+            }
+
             guard += 1;
         }
     });
@@ -501,6 +605,13 @@ export async function buildWorksheetForecast({ days = 15, subject = "all", inclu
     const totalPrepareQty = rows.reduce((sum, row) => sum + row.prepareQty, 0);
     const totalEstimatedCpws = round2(rows.reduce((sum, row) => sum + row.neededCpws, 0));
 
+    const cdRows = [...cdRowsByLevel.values()]
+        .sort((a, b) =>
+            a.subjectId - b.subjectId
+            || a.levelMasterId - b.levelMasterId
+        );
+    const totalPrepareCd = cdRows.reduce((sum, row) => sum + row.prepareQty, 0);
+
     return {
         cache,
         params: {
@@ -513,11 +624,124 @@ export async function buildWorksheetForecast({ days = 15, subject = "all", inclu
             forecastPackets: rows.length,
             totalPrepareQty,
             totalEstimatedCpws,
+            forecastCdLevels: cdRows.length,
+            totalPrepareCd,
             missingAverage: missingAverage.length,
             cacheMaxAgeDays: FORECAST_CACHE_MAX_AGE_DAYS
         },
         rows,
+        cdRows,
         missingAverage: missingAverage.slice(0, 50)
+    };
+}
+
+// Net "what will be consumed before new stock can arrive" against "what's
+// already on the shelf" — this is what actually answers "how many do I need
+// to order right now", as opposed to buildWorksheetForecast's raw future-need
+// number which says nothing about existing stock and over-orders every time
+// it's used directly. leadTimeDays sizes the forecast window to just the
+// replenishment cycle (not an arbitrary planning horizon); bufferPercent adds
+// a safety margin on top for demand variance.
+export async function getOrderSuggestion({
+    leadTimeDays = DEFAULT_LEAD_TIME_DAYS,
+    bufferPercent = DEFAULT_BUFFER_PERCENT
+} = {}) {
+    const normalizedLeadTime = Number(leadTimeDays);
+    const normalizedBuffer = Number(bufferPercent);
+
+    if (!Number.isFinite(normalizedLeadTime) || normalizedLeadTime <= 0 || normalizedLeadTime > 90) {
+        throw httpError(400, "lead time ต้องอยู่ระหว่าง 1-90 วัน");
+    }
+
+    if (!Number.isFinite(normalizedBuffer) || normalizedBuffer < 0 || normalizedBuffer > 200) {
+        throw httpError(400, "buffer ต้องอยู่ระหว่าง 0-200%");
+    }
+
+    const bufferMultiplier = 1 + (normalizedBuffer / 100);
+
+    const [forecast, wsStockRows, cdStockRows] = await Promise.all([
+        buildWorksheetForecast({
+            days: normalizedLeadTime,
+            subject: "all",
+            includeKc: "false"
+        }),
+        loadWsSummary(),
+        loadCdSummary()
+    ]);
+
+    const wsStockByKey = new Map(
+        wsStockRows.map((row) => [
+            `${row.subject_id}:${row.level_master_id}:${row.packet_no}`,
+            Number(row.quantity || 0)
+        ])
+    );
+    const cdStockByKey = new Map();
+
+    cdStockRows.forEach((row) => {
+        const key = `${row.subject_id}:${row.level_master_id}`;
+
+        cdStockByKey.set(key, (cdStockByKey.get(key) || 0) + Number(row.quantity || 0));
+    });
+
+    const wsOrders = forecast.rows
+        .map((row) => {
+            const currentStock = wsStockByKey.get(`${row.subjectId}:${row.levelMasterId}:${row.packet}`) || 0;
+            const targetStock = Math.ceil(row.neededCpws * bufferMultiplier);
+            const orderQty = Math.max(0, targetStock - currentStock);
+
+            return {
+                subjectId: row.subjectId,
+                subject: row.subject,
+                levelMasterId: row.levelMasterId,
+                level: row.level,
+                packet: row.packet,
+                label: row.label,
+                forecastNeed: round2(row.neededCpws),
+                targetStock,
+                currentStock,
+                orderQty,
+                students: row.students
+            };
+        })
+        .filter((row) => row.orderQty > 0)
+        .sort((a, b) => b.orderQty - a.orderQty);
+
+    const cdOrders = forecast.cdRows
+        .map((row) => {
+            const currentStock = cdStockByKey.get(`${row.subjectId}:${row.levelMasterId}`) || 0;
+            const targetStock = Math.ceil(row.prepareQty * bufferMultiplier);
+            const orderQty = Math.max(0, targetStock - currentStock);
+
+            return {
+                subjectId: row.subjectId,
+                subject: row.subject,
+                levelMasterId: row.levelMasterId,
+                level: row.level,
+                forecastNeed: row.prepareQty,
+                targetStock,
+                currentStock,
+                orderQty,
+                students: row.students
+            };
+        })
+        .filter((row) => row.orderQty > 0)
+        .sort((a, b) => b.orderQty - a.orderQty);
+
+    return {
+        params: {
+            leadTimeDays: normalizedLeadTime,
+            bufferPercent: normalizedBuffer
+        },
+        cache: forecast.cache,
+        summary: {
+            wsItemsToOrder: wsOrders.length,
+            wsTotalOrderQty: wsOrders.reduce((sum, row) => sum + row.orderQty, 0),
+            cdItemsToOrder: cdOrders.length,
+            cdTotalOrderQty: cdOrders.reduce((sum, row) => sum + row.orderQty, 0)
+        },
+        wsOrders,
+        cdOrders,
+        generatedAt: new Date().toISOString()
     };
 }
 
