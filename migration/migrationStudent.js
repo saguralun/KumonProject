@@ -1,7 +1,5 @@
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { parse } from "csv-parse/sync";
 import pool from "../config/db.js";
 import {
     buildNewOnlySummary,
@@ -10,11 +8,62 @@ import {
     PAGE_SIZE_OPTIONS,
     statusFromIssueCounts
 } from "./migrationPreviewCommon.js";
+import { readSourceRecords } from "./migrationImportCommon.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const csvPath = path.join(__dirname, "tblKumonData.csv");
+const csvPath = path.join(__dirname, "tblKumonData.txt");
+
+// tblKumonData.txt has no header row (Access "Export - Text File" export) —
+// this is the column order from the original tblKumonData.csv header.
+const SOURCE_COLUMNS = [
+    "ID",
+    "Prefix",
+    "FirstName",
+    "LastName",
+    "NickName",
+    "IDKumonStudent",
+    "BirthDate",
+    "EnrolmentDate",
+    "Sex",
+    "School",
+    "Class",
+    "Grade",
+    "Telephone",
+    "Kumon",
+    "Day1",
+    "Time1",
+    "Day2",
+    "Time2",
+    "StartDate",
+    "StartLevel",
+    "Subject",
+    "Level",
+    "LevelZ",
+    "FreeStudy",
+    "IDFreeStudy",
+    "FullExemption",
+    "Parents",
+    "ParentStatus",
+    "Address1",
+    "Address2",
+    "Address3",
+    "Address_Number",
+    "Address_Village",
+    "Address_Alley",
+    "Address_Road",
+    "Address_District1",
+    "Address_District2",
+    "Address_Province",
+    "Address_Zipcode",
+    "Status",
+    "MonthStatus",
+    "YearStatus",
+    "DTTest",
+    "TestDate",
+    "Detail"
+];
 
 const ISSUE_SAMPLE_COUNT = 5;
 const STUDENT_TEXT_LIMITS = [
@@ -84,8 +133,8 @@ function parseDateToAd(value) {
     let month;
     let year;
 
-    const dmyMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
-    const ymdMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    const dmyMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+    const ymdMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
 
     if (dmyMatch) {
         day = Number(dmyMatch[1]);
@@ -437,14 +486,7 @@ function validationErrorCount(previewResult) {
 }
 
 async function prepareStudentPreviewData(db = pool) {
-    const csvText = fs.readFileSync(csvPath, "utf8");
-    const records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        bom: true,
-        relax_quotes: true,
-        relax_column_count: true
-    });
+    const records = readSourceRecords(csvPath, SOURCE_COLUMNS);
 
     const masters = await loadMasterData(db);
     const students = new Map();

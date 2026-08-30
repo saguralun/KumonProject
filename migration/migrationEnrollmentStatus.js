@@ -1,7 +1,5 @@
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { parse } from "csv-parse/sync";
 import pool from "../config/db.js";
 import {
     buildNewOnlySummary,
@@ -12,13 +10,27 @@ import {
     emptyImportResult,
     hasBlockingPreviewError,
     insertRowsInBatches,
+    readSourceRecords,
     summaryValue
 } from "./migrationImportCommon.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const csvPath = path.join(__dirname, "tblStatusDetail.csv");
+const csvPath = path.join(__dirname, "tblStatusDetail.txt");
+
+// tblStatusDetail.txt has no header row (Access "Export - Text File" export)
+// — this is the column order from the original tblStatusDetail.csv header.
+const SOURCE_COLUMNS = [
+    "IDStatusKey",
+    "ID",
+    "IDStatus",
+    "Subject",
+    "MonthStatus",
+    "YearStatus",
+    "Status",
+    "FreeStudy"
+];
 
 const ISSUE_SAMPLE_COUNT = 5;
 
@@ -406,14 +418,7 @@ const HISTORY_COLUMNS = [
 ];
 
 export async function previewEnrollmentStatus() {
-    const csvText = fs.readFileSync(csvPath, "utf8");
-    const records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        bom: true,
-        relax_quotes: true,
-        relax_column_count: true
-    });
+    const records = readSourceRecords(csvPath, SOURCE_COLUMNS);
 
     const masters = await loadMasterData();
     const issues = {

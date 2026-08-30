@@ -1,7 +1,5 @@
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { parse } from "csv-parse/sync";
 import pool from "../config/db.js";
 import {
     buildNewOnlySummary,
@@ -12,6 +10,7 @@ import {
     emptyImportResult,
     hasBlockingPreviewError,
     insertRowsInBatches,
+    readSourceRecords,
     summaryValue
 } from "./migrationImportCommon.js";
 
@@ -21,9 +20,67 @@ const __dirname = path.dirname(__filename);
 const ISSUE_SAMPLE_COUNT = 5;
 
 const csvPaths = {
-    cd: path.join(__dirname, "tblCD.csv"),
-    dt: path.join(__dirname, "tblDT.csv"),
-    at: path.join(__dirname, "tblAT.csv")
+    cd: path.join(__dirname, "tblCD.txt"),
+    dt: path.join(__dirname, "tblDT.txt"),
+    at: path.join(__dirname, "tblAT.txt")
+};
+
+// None of these three .txt exports have a header row (Access "Export - Text
+// File" export) — these are the column orders from the original .csv headers.
+const SOURCE_COLUMNS = {
+    cd: [
+        "IDAdd",
+        "ID",
+        "NickName",
+        "DateCD",
+        "MonthWS",
+        "YearWS",
+        "Subject",
+        "Level",
+        "LevelWS",
+        "CPCD",
+        "StockBeforeUpdate",
+        "Modify",
+        "DateModify",
+        "CtrStock",
+        "ModifyConfirm",
+        "DateModifyConfirm"
+    ],
+    dt: [
+        "IDAdd",
+        "ID",
+        "NickName",
+        "DateDT",
+        "Subject",
+        "Level",
+        "Score",
+        "MaxScore",
+        "Time",
+        "MaxTime",
+        "StartingPoint",
+        "Detail"
+    ],
+    at: [
+        "IDAdd",
+        "ID",
+        "NickName",
+        "DateAT",
+        "Subject",
+        "Level",
+        "Score",
+        "MaxScore",
+        "Time",
+        "MaxTime",
+        "Group",
+        "Pass",
+        "CPAT",
+        "StockBeforeUpdate",
+        "Modify",
+        "DateModify",
+        "CtrStock",
+        "ModifyConfirm",
+        "DateModifyConfirm"
+    ]
 };
 
 function clean(value) {
@@ -79,7 +136,7 @@ function parseDateToAd(value, label) {
         };
     }
 
-    const match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+    const match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
 
     if (!match) {
         return {
@@ -1242,20 +1299,14 @@ async function buildActivityPreview({
     module,
     title,
     csvPath,
+    sourceColumns,
     buildRow,
     columns,
     validation,
     summaryDetails,
     newOnlyOptions
 }) {
-    const csvText = fs.readFileSync(csvPath, "utf8");
-    const records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        bom: true,
-        relax_quotes: true,
-        relax_column_count: true
-    });
+    const records = readSourceRecords(csvPath, sourceColumns);
 
     const masters = await loadMasterData(module);
     const issues = {
@@ -1551,6 +1602,7 @@ export async function previewCd() {
         module: "cd",
         title: "CD",
         csvPath: csvPaths.cd,
+        sourceColumns: SOURCE_COLUMNS.cd,
         buildRow: buildCdRow,
         columns: CD_COLUMNS,
         validation: cdValidationItems,
@@ -1564,6 +1616,7 @@ export async function previewDt() {
         module: "dt",
         title: "DT",
         csvPath: csvPaths.dt,
+        sourceColumns: SOURCE_COLUMNS.dt,
         buildRow: buildDtRow,
         columns: DT_COLUMNS,
         validation: dtValidationItems,
@@ -1577,6 +1630,7 @@ export async function previewAt() {
         module: "at",
         title: "AT",
         csvPath: csvPaths.at,
+        sourceColumns: SOURCE_COLUMNS.at,
         buildRow: buildAtRow,
         columns: AT_COLUMNS,
         validation: atValidationItems,

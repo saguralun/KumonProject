@@ -1,4 +1,29 @@
+import fs from "fs";
+import iconv from "iconv-lite";
+import { parse } from "csv-parse/sync";
 import { buildPagination } from "./migrationPreviewCommon.js";
+
+// Access "Export - Text File" (used for all current .txt source exports) writes
+// the file in the system ANSI codepage, not UTF-8 — on this Thai-locale machine
+// that's Windows-874. Decode through iconv-lite before handing the text to
+// csv-parse, otherwise every Thai character comes through as U+FFFD.
+//
+// These exports also have no header row (unlike the old .csv exports, which
+// had a header but could get its labels swapped for Access field Captions
+// when "with formatting and layout" was ticked). Callers pass the known
+// column order explicitly via `columns` instead of relying on a header row.
+export function readSourceRecords(csvPath, columns) {
+    const buffer = fs.readFileSync(csvPath);
+    const csvText = iconv.decode(buffer, "win874");
+
+    return parse(csvText, {
+        columns,
+        skip_empty_lines: true,
+        bom: true,
+        relax_quotes: true,
+        relax_column_count: true
+    });
+}
 
 export function hasBlockingPreviewError(previewResult) {
     const status = String(previewResult.status || "").toUpperCase();

@@ -1,18 +1,67 @@
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { parse } from "csv-parse/sync";
 import pool from "../config/db.js";
 import {
     buildNewOnlySummary,
     buildPagination,
     statusFromIssueCounts
 } from "./migrationPreviewCommon.js";
+import { readSourceRecords } from "./migrationImportCommon.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const csvPath = path.join(__dirname, "tblKumonData.csv");
+const csvPath = path.join(__dirname, "tblKumonData.txt");
+
+// tblKumonData.txt has no header row (Access "Export - Text File" export) —
+// this is the column order from the original tblKumonData.csv header.
+const SOURCE_COLUMNS = [
+    "ID",
+    "Prefix",
+    "FirstName",
+    "LastName",
+    "NickName",
+    "IDKumonStudent",
+    "BirthDate",
+    "EnrolmentDate",
+    "Sex",
+    "School",
+    "Class",
+    "Grade",
+    "Telephone",
+    "Kumon",
+    "Day1",
+    "Time1",
+    "Day2",
+    "Time2",
+    "StartDate",
+    "StartLevel",
+    "Subject",
+    "Level",
+    "LevelZ",
+    "FreeStudy",
+    "IDFreeStudy",
+    "FullExemption",
+    "Parents",
+    "ParentStatus",
+    "Address1",
+    "Address2",
+    "Address3",
+    "Address_Number",
+    "Address_Village",
+    "Address_Alley",
+    "Address_Road",
+    "Address_District1",
+    "Address_District2",
+    "Address_Province",
+    "Address_Zipcode",
+    "Status",
+    "MonthStatus",
+    "YearStatus",
+    "DTTest",
+    "TestDate",
+    "Detail"
+];
 
 const ISSUE_SAMPLE_COUNT = 5;
 const ZUN_FALLBACK_SUBJECT_CODE = "ME";
@@ -86,8 +135,10 @@ function parseDateToAd(value) {
     let month;
     let year;
 
-    const dmyMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
-    const ymdMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    // Trailing " H:MM:SS" (Access datetime export) is ignored — the date
+    // portion is all this function ever cared about.
+    const dmyMatch = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+    const ymdMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
 
     if (dmyMatch) {
         day = Number(dmyMatch[1]);
@@ -176,6 +227,44 @@ function parseOpeningTime(value) {
             value: null,
             hasInput: false,
             isPlaceholder: true,
+            warning: null
+        };
+    }
+
+    // Access "Export - Text File" writes Date/Time fields as a full
+    // datetime — a blank time comes through as its date-only epoch
+    // (e.g. 30/12/1899, or 00/01/1900 from other export paths) glued to a
+    // literal 0:00:00. Nobody has a class at midnight, so a zero time here
+    // means "nothing was entered", not a real 00:00 slot.
+    const dateTimeMatch = text.match(
+        /^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s+(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+    );
+
+    if (dateTimeMatch) {
+        const hour = Number(dateTimeMatch[1]);
+        const minute = Number(dateTimeMatch[2]);
+
+        if (hour === 0 && minute === 0) {
+            return {
+                value: null,
+                hasInput: false,
+                isPlaceholder: true,
+                warning: null
+            };
+        }
+
+        if (hour > 23 || minute > 59) {
+            return {
+                value: null,
+                hasInput: true,
+                warning: `Invalid opening time: ${text}`
+            };
+        }
+
+        return {
+            value: `${pad2(hour)}:${pad2(minute)}`,
+            hasInput: true,
+            isPlaceholder: false,
             warning: null
         };
     }
@@ -1218,14 +1307,7 @@ async function syncEnrollmentIdentitySequence(client) {
 }
 
 async function prepareEnrollmentPreviewData(db = pool, options = {}) {
-    const csvText = fs.readFileSync(csvPath, "utf8");
-    const records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        bom: true,
-        relax_quotes: true,
-        relax_column_count: true
-    });
+    const records = readSourceRecords(csvPath, SOURCE_COLUMNS);
 
     const masters = await loadMasterData(records, db);
     const enrollments = new Map();

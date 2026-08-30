@@ -1,7 +1,5 @@
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { parse } from "csv-parse/sync";
 import pool from "../config/db.js";
 import {
     buildPagination,
@@ -10,6 +8,7 @@ import {
 import {
     emptyImportResult,
     hasBlockingPreviewError,
+    readSourceRecords,
     summaryValue,
     tableRows
 } from "./migrationImportCommon.js";
@@ -17,7 +16,39 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const csvPath = path.join(__dirname, "tblKumonPaid.csv");
+const csvPath = path.join(__dirname, "tblKumonPaid.txt");
+
+// tblKumonPaid.txt has no header row (Access "Export - Text File" export) —
+// this is the column order from the original tblKumonPaid.csv header.
+const SOURCE_COLUMNS = [
+    "IDPaid",
+    "ID",
+    "Prefix",
+    "FirstName",
+    "LastName",
+    "NickName",
+    "Sex",
+    "School",
+    "Class",
+    "Money",
+    "HalfMonth",
+    "FreeStudy",
+    "FreeEnrolment",
+    "Discount",
+    "FullExemption",
+    "Payment",
+    "Telephone",
+    "Subject1",
+    "Level",
+    "LevelZ",
+    "Status",
+    "DatePaid",
+    "MonthPaid",
+    "YearPaid",
+    "No1",
+    "BookNo"
+];
+
 const ISSUE_SAMPLE_COUNT = 5;
 const ZUN_FALLBACK_SUBJECT_CODE = "ME";
 const DRAFT_LEVEL_FALLBACK_CODE_BY_SUBJECT = new Map([
@@ -75,7 +106,7 @@ function parseDateToAd(value, label) {
         };
     }
 
-    const match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})$/);
+    const match = text.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
 
     if (!match) {
         return {
@@ -1401,14 +1432,7 @@ function buildBillingHeaderRows(detailRows, receipts) {
 }
 
 export async function previewBilling() {
-    const csvText = fs.readFileSync(csvPath, "utf8");
-    const records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        bom: true,
-        relax_quotes: true,
-        relax_column_count: true
-    });
+    const records = readSourceRecords(csvPath, SOURCE_COLUMNS);
     const masters = await loadMasterData();
     const issues = {
         required: new Map(),

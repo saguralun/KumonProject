@@ -1,14 +1,30 @@
-import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { parse } from "csv-parse/sync";
 import pool from "../config/db.js";
 import { buildPagination, statusFromIssueCounts } from "./migrationPreviewCommon.js";
-import { emptyImportResult, hasBlockingPreviewError, summaryValue } from "./migrationImportCommon.js";
+import {
+    emptyImportResult,
+    hasBlockingPreviewError,
+    readSourceRecords,
+    summaryValue
+} from "./migrationImportCommon.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const csvPath = path.join(__dirname, "tblKumonStock.csv");
+const csvPath = path.join(__dirname, "tblKumonStock.txt");
+
+// tblKumonStock.txt has no header row (Access "Export - Text File" export) —
+// this is the column order from the original tblKumonStock.csv header.
+const SOURCE_COLUMNS = [
+    "ID",
+    "Subject",
+    "Type",
+    "Level",
+    "LevelWS",
+    "QtyTotal",
+    "Status",
+    "DateUpdate"
+];
 
 // AT/DT still aren't wired up: AT keys off level_master directly like CD does
 // (so it's a small extension of the CD path below), but DT keys off a
@@ -390,14 +406,7 @@ function finalizeRows(rows) {
 }
 
 async function buildStockPreview() {
-    const csvText = fs.readFileSync(csvPath, "utf8");
-    const records = parse(csvText, {
-        columns: true,
-        skip_empty_lines: true,
-        bom: true,
-        relax_quotes: true,
-        relax_column_count: true
-    });
+    const records = readSourceRecords(csvPath, SOURCE_COLUMNS);
 
     const masters = await loadMasters();
     const issues = emptyIssueMaps();
