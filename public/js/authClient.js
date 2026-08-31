@@ -30,11 +30,18 @@ function renderAuthBar(user) {
 
   const roleLabels = { admin: "Admin", staff: "Staff", guest: "Guest" };
   const roleLabel = roleLabels[user.role] || user.role;
+  // Guest accounts are for daily front-desk tasks only — an update restarts
+  // the server for the whole LAN, so keep that button out of their reach
+  // entirely rather than fighting the data-staff-up/.hidden cascade over it.
+  const updateButtonHtml = user.role === "guest"
+    ? ""
+    : `<button type="button" class="auth-update-button hidden" id="authUpdateButton">🔄 อัพเดท</button>`;
 
   bar.innerHTML = `
     <div class="auth-user">
       <span class="auth-role auth-role-${user.role}">${roleLabel}</span>
       <span class="auth-name"></span>
+      ${updateButtonHtml}
     </div>
     <button type="button" class="auth-logout" id="authLogoutButton">ออกจากระบบ</button>
   `;
@@ -44,6 +51,84 @@ function renderAuthBar(user) {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login.html";
   });
+
+  bindUpdateButton();
+}
+
+// Same idea as the update banner on the login page, but reachable from every
+// page a staff/admin is already working on — no need to log out first just
+// to notice and pull an update.
+async function waitForServerAndReload() {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    try {
+      const response = await fetch("/api/auth/me");
+
+      if (response.ok) {
+        window.location.reload();
+        return;
+      }
+    } catch (error) {
+      // Server mid-restart — keep polling.
+    }
+  }
+
+  window.location.reload();
+}
+
+function bindUpdateButton() {
+  const button = document.getElementById("authUpdateButton");
+
+  if (!button) {
+    return;
+  }
+
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    button.textContent = "⏳ กำลังอัพเดท...";
+
+    try {
+      const response = await fetch("/api/system/update-apply", { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || "อัพเดทไม่สำเร็จ");
+      }
+    } catch (error) {
+      // `git pull` changes files, so nodemon often restarts the server before
+      // the HTTP response makes it back — fetch then rejects with a
+      // TypeError ("Failed to fetch") even though the update itself already
+      // ran. Treat that as "restarting" and wait for it to come back. A
+      // genuine refusal (wrong branch, uncommitted changes, git pull
+      // failed) arrives as a proper HTTP error with a message instead.
+      if (!(error instanceof TypeError)) {
+        alert(error.message);
+        button.disabled = false;
+        button.textContent = "🔄 อัพเดท";
+        return;
+      }
+    }
+
+    button.textContent = "สำเร็จ";
+    await waitForServerAndReload();
+  });
+
+  checkForUpdateAndShowButton(button);
+}
+
+async function checkForUpdateAndShowButton(button) {
+  try {
+    const response = await fetch("/api/system/update-check");
+    const data = await response.json().catch(() => ({}));
+
+    if (data.checked && !data.upToDate) {
+      button.title = data.remoteMessage || `commit ${data.remoteCommit}`;
+      button.classList.remove("hidden");
+    }
+  } catch (error) {
+    // Non-critical — just skip showing it if the endpoint is unreachable.
+  }
 }
 
 (async function initAuth() {
