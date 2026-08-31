@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/opening-schedule.css?v=20260829-duration-dropdown">
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260831-worksheet-ipad-fix">
+  <link rel="stylesheet" href="/css/opening-schedule.css?v=20260831-role-permission-system">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260831-role-permission-system">
 </head>
 <body>
   <main class="schedule-page">
@@ -25,25 +25,25 @@
           <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
           <div class="nav-flyout-menu">
             <a class="home-link" href="/student-manager.html">👤 Students</a>
-            <a class="home-link" href="/payment.html" data-staff-up>💰 Payment</a>
-            <a class="home-link" href="/report.html" data-staff-up>📊 Report</a>
-            <a class="home-link" href="/progress-chart.html" data-staff-up>📈 Progress Chart</a>
+            <a class="home-link" href="/payment.html" data-requires-permission="page:payment">💰 Payment</a>
+            <a class="home-link" href="/report.html" data-requires-permission="page:report">📊 Report</a>
+            <a class="home-link" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
           </div>
         </div>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/stock.html" data-staff-up>📊 Stock</a>
-            <a class="home-link" href="/stock-receive.html" data-staff-up>📦 Stock Receive</a>
-            <a class="home-link" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
-            <a class="home-link" href="/forecast.html" data-staff-up>🔮 Forecast & Order</a>
+            <a class="home-link" href="/stock.html" data-requires-permission="page:stock">📊 Stock</a>
+            <a class="home-link" href="/stock-receive.html" data-requires-permission="page:stock-receive">📦 Stock Receive</a>
+            <a class="home-link" href="/stock-cut.html" data-requires-permission="page:stock-cut">✂️ Stock Cut</a>
+            <a class="home-link" href="/forecast.html" data-requires-permission="page:forecast">🔮 Forecast & Order</a>
           </div>
         </div>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/" data-admin-only>🗂️ Tables</a>
-            <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
+            <a class="home-link" href="/" data-requires-permission="page:tables">🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-requires-permission="page:opening-schedule">🕒 Opening Schedule</a>
             <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
             <a class="home-link" href="/migration.html" data-admin-only>📥 Migration</a>
           </div>
@@ -141,7 +141,7 @@
     </section>
   </main>
 
-  <script src="/js/authClient.js?v=20260831-auth-bar-update-button"></script>
+  <script src="/js/authClient.js?v=20260831-role-permission-system"></script>
   <script src="/js/opening-schedule.js?v=20260829-duration-dropdown"></script>
 </body>
 </html>

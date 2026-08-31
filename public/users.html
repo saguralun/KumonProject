@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/users.css?v=20260828-cache-bust">
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260831-worksheet-ipad-fix">
+  <link rel="stylesheet" href="/css/users.css?v=20260831-role-permission-system">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260831-role-permission-system">
 </head>
 <body>
   <main class="users-page">
@@ -25,27 +25,27 @@
           <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
           <div class="nav-flyout-menu">
             <a class="home-link" href="/student-manager.html">👤 Students</a>
-            <a class="home-link" href="/payment.html">💰 Payment</a>
-            <a class="home-link" href="/report.html">📊 Report</a>
-            <a class="home-link" href="/progress-chart.html">📈 Progress Chart</a>
+            <a class="home-link" href="/payment.html" data-requires-permission="page:payment">💰 Payment</a>
+            <a class="home-link" href="/report.html" data-requires-permission="page:report">📊 Report</a>
+            <a class="home-link" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
           </div>
         </div>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/stock.html">📊 Stock</a>
-            <a class="home-link" href="/stock-receive.html">📦 Stock Receive</a>
-            <a class="home-link" href="/stock-cut.html">✂️ Stock Cut</a>
-            <a class="home-link" href="/forecast.html">🔮 Forecast & Order</a>
+            <a class="home-link" href="/stock.html" data-requires-permission="page:stock">📊 Stock</a>
+            <a class="home-link" href="/stock-receive.html" data-requires-permission="page:stock-receive">📦 Stock Receive</a>
+            <a class="home-link" href="/stock-cut.html" data-requires-permission="page:stock-cut">✂️ Stock Cut</a>
+            <a class="home-link" href="/forecast.html" data-requires-permission="page:forecast">🔮 Forecast & Order</a>
           </div>
         </div>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/">🗂️ Tables</a>
-            <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
-            <a class="home-link" href="/users.html">👥 Users</a>
-            <a class="home-link" href="/migration.html">📥 Migration</a>
+            <a class="home-link" href="/" data-requires-permission="page:tables">🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-requires-permission="page:opening-schedule">🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+            <a class="home-link" href="/migration.html" data-admin-only>📥 Migration</a>
           </div>
         </div>
       </nav>
@@ -86,10 +86,7 @@
           </label>
           <label>
             <span>Role</span>
-            <select name="role">
-              <option value="admin">Admin</option>
-              <option value="staff">Staff</option>
-            </select>
+            <select name="role" id="createRoleSelect"></select>
           </label>
           <button type="submit" class="primary-button" id="createSubmit">💾 บันทึก</button>
         </form>
@@ -106,10 +103,36 @@
           <div class="empty-state">กำลังโหลด...</div>
         </div>
       </section>
+
+      <section class="panel roles-panel">
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Roles &amp; Permissions</div>
+            <div class="subtle">Admin เข้าถึงได้ทุกอย่างเสมอ • Guest จำกัดสิทธิ์ไว้ตายตัว (งานประจำเท่านั้น) • ทั้งสอง role นี้ไม่อยู่ในตารางด้านล่าง</div>
+          </div>
+        </div>
+
+        <form id="createRoleForm" class="create-role-form">
+          <label>
+            <span>Role code</span>
+            <input name="roleCode" type="text" autocomplete="off" placeholder="เช่น receptionist" required maxlength="20">
+          </label>
+          <label>
+            <span>ชื่อ role</span>
+            <input name="roleName" type="text" autocomplete="off" placeholder="เช่น Receptionist" required>
+          </label>
+          <button type="submit" class="primary-button" id="createRoleSubmit">+ เพิ่ม Role</button>
+        </form>
+        <div class="form-message hidden" id="roleMessage"></div>
+
+        <div class="permission-matrix-wrap" id="permissionMatrixWrap">
+          <div class="empty-state">กำลังโหลด...</div>
+        </div>
+      </section>
     </section>
   </main>
 
-  <script src="/js/authClient.js?v=20260831-auth-bar-update-button"></script>
-  <script src="/js/users.js?v=20260828-cache-bust"></script>
+  <script src="/js/authClient.js?v=20260831-role-permission-system"></script>
+  <script src="/js/users.js?v=20260831-role-permission-system"></script>
 </body>
 </html>

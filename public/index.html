@@ -181,7 +181,7 @@
       color: #1d4ed8;
     }
 
-    .auth-role-staff {
+    .auth-role-instructor {
       background: #f0eaff;
       color: #6d3fc4;
     }
@@ -231,6 +231,19 @@
     .auth-update-button:hover:not(:disabled) {
       background: rgba(37, 99, 235, 0.32);
       color: #ffffff;
+    }
+
+    /* Elements only an admin session may see/use — Users/Migration are
+       hardcoded here (never part of the configurable permission table, see
+       server.js). This page itself used to be admin-only too, but Tables
+       (page:tables) can now be granted to other roles, so this needs to
+       actually gate something for the first time. */
+    [data-admin-only] {
+      display: none !important;
+    }
+
+    html[data-role="admin"] [data-admin-only] {
+      display: revert !important;
     }
 
     .table-workspace {
@@ -500,14 +513,14 @@
       }
     }
   </style>
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260831-worksheet-ipad-fix">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260831-role-permission-system">
 </head>
 
 <body>
   <main class="table-page">
     <aside class="table-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="home-link active current-page" href="/">🗂️ Tables</a>
+        <a class="home-link active current-page" href="/" data-requires-permission="page:tables">🗂️ Tables</a>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
           <div class="nav-flyout-menu">
@@ -518,27 +531,27 @@
           <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
           <div class="nav-flyout-menu">
             <a class="home-link" href="/student-manager.html">👤 Students</a>
-            <a class="home-link" href="/payment.html">💰 Payment</a>
-            <a class="home-link" href="/report.html">📊 Report</a>
-            <a class="home-link" href="/progress-chart.html">📈 Progress Chart</a>
+            <a class="home-link" href="/payment.html" data-requires-permission="page:payment">💰 Payment</a>
+            <a class="home-link" href="/report.html" data-requires-permission="page:report">📊 Report</a>
+            <a class="home-link" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
           </div>
         </div>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/stock.html">📊 Stock</a>
-            <a class="home-link" href="/stock-receive.html">📦 Stock Receive</a>
-            <a class="home-link" href="/stock-cut.html">✂️ Stock Cut</a>
-            <a class="home-link" href="/forecast.html">🔮 Forecast & Order</a>
+            <a class="home-link" href="/stock.html" data-requires-permission="page:stock">📊 Stock</a>
+            <a class="home-link" href="/stock-receive.html" data-requires-permission="page:stock-receive">📦 Stock Receive</a>
+            <a class="home-link" href="/stock-cut.html" data-requires-permission="page:stock-cut">✂️ Stock Cut</a>
+            <a class="home-link" href="/forecast.html" data-requires-permission="page:forecast">🔮 Forecast & Order</a>
           </div>
         </div>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
           <div class="nav-flyout-menu">
-            <a class="home-link" href="/">🗂️ Tables</a>
-            <a class="home-link" href="/opening-schedule.html" data-admin-only>🕒 Opening Schedule</a>
-            <a class="home-link" href="/users.html">👥 Users</a>
-            <a class="home-link" href="/migration.html">📥 Migration</a>
+            <a class="home-link" href="/" data-requires-permission="page:tables">🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-requires-permission="page:opening-schedule">🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+            <a class="home-link" href="/migration.html" data-admin-only>📥 Migration</a>
           </div>
         </div>
       </nav>
@@ -933,6 +946,6 @@
 
     loadTables();
   </script>
-  <script src="/js/authClient.js?v=20260831-auth-bar-update-button"></script>
+  <script src="/js/authClient.js?v=20260831-role-permission-system"></script>
 </body>
 </html>

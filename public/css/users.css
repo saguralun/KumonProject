@@ -185,6 +185,8 @@ h1 {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  background: #eef2f7;
+  color: #475569;
 }
 
 .auth-role-admin {
@@ -192,7 +194,7 @@ h1 {
   color: #1d4ed8;
 }
 
-.auth-role-staff {
+.auth-role-instructor {
   background: #f0eaff;
   color: #6d3fc4;
 }
@@ -421,6 +423,10 @@ tbody tr.is-inactive {
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
+  /* Neutral fallback for any admin-added custom role — only admin/
+     instructor/guest get a dedicated color below. */
+  background: #eef2f7;
+  color: #475569;
 }
 
 .role-badge.admin {
@@ -428,7 +434,7 @@ tbody tr.is-inactive {
   color: #1d4ed8;
 }
 
-.role-badge.staff {
+.role-badge.instructor {
   background: #f0eaff;
   color: #6d3fc4;
 }
@@ -462,6 +468,115 @@ tbody tr.is-inactive {
   font-size: 12px;
 }
 
+.role-select {
+  min-height: 28px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.roles-panel {
+  margin-top: 16px;
+}
+
+.create-role-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.create-role-form label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.permission-matrix-wrap {
+  margin-top: 14px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.permission-matrix {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+}
+
+.permission-matrix th,
+.permission-matrix td {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.permission-matrix th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.matrix-role-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.matrix-role-note {
+  border-radius: 999px;
+  padding: 1px 6px;
+  background: var(--blue-soft);
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.matrix-delete-role {
+  min-height: 22px;
+  min-width: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.matrix-delete-role:hover:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+.matrix-group-row td {
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  white-space: normal;
+}
+
+.matrix-cell {
+  text-align: center;
+}
+
+.matrix-cell input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  min-height: 0;
+  accent-color: var(--blue);
+}
+
 .empty-state {
   padding: 26px 14px;
   color: var(--muted);
@@ -475,6 +590,10 @@ tbody tr.is-inactive {
 
 @media (max-width: 1000px) {
   .create-form {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .create-role-form {
     grid-template-columns: 1fr 1fr;
   }
 }

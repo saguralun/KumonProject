@@ -254,6 +254,8 @@ textarea:focus {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  background: #eef2f7;
+  color: #475569;
 }
 
 .auth-role-admin {
@@ -261,7 +263,7 @@ textarea:focus {
   color: #1d4ed8;
 }
 
-.auth-role-staff {
+.auth-role-instructor {
   background: #f0eaff;
   color: #6d3fc4;
 }
@@ -689,20 +691,24 @@ html[data-role="admin"] [data-admin-only] {
   display: revert !important;
 }
 
-/* Elements a guest session may not see/use, but staff can (everything an
-   admin can do except Table Explorer / migration tools — see [data-admin-only]). */
+/* Student/enrollment master-data edit controls (New/Delete/Save buttons) —
+   guest can view students but not edit them, and now that role names have
+   moved to the configurable permission system for NAV pages, this one
+   specific capability still needs the old hardcoded "admin or instructor"
+   tier (see requireStaff in middleware/auth.js — instructor is the renamed
+   staff, same access, see database/004_add_roles_permissions.sql). */
 [data-staff-up] {
   display: none !important;
 }
 
 html[data-role="admin"] [data-staff-up],
-html[data-role="staff"] [data-staff-up] {
+html[data-role="instructor"] [data-staff-up] {
   display: revert !important;
 }
 
 /* Keep business-state visibility stronger than role visibility. */
 html[data-role="admin"] .hidden,
-html[data-role="staff"] .hidden,
+html[data-role="instructor"] .hidden,
 .hidden {
   display: none !important;
 }

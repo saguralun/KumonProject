@@ -3,7 +3,21 @@ import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 
 const GUEST_PIN = process.env.GUEST_PIN || "";
-const VALID_ROLES = ["admin", "staff"];
+
+// Any role_master row is a valid account role EXCEPT "guest" — guest isn't
+// a DB account at all (shared PIN + free-text display name, see
+// verifyGuestLogin), so it can never be assigned to a real app_user row.
+async function assertAssignableRole(roleCode) {
+    if (roleCode === "guest") {
+        throw httpError(400, `role "guest" กำหนดให้บัญชีจริงไม่ได้ (guest ล็อกอินด้วย PIN ไม่ใช่บัญชี)`);
+    }
+
+    const result = await pool.query(`SELECT 1 FROM role_master WHERE role_code = $1`, [roleCode]);
+
+    if (!result.rows[0]) {
+        throw httpError(400, `ไม่พบ role "${roleCode}" — เพิ่ม role นี้ในหน้า Users ก่อน`);
+    }
+}
 
 function sanitizeAccount(row) {
     return {
@@ -72,8 +86,7 @@ export function verifyGuestLogin({ displayName, pin }) {
     };
 }
 
-// role: "admin" (full access, including Table Explorer + migration tools)
-// or "staff" (everything else an admin can do, but not those two).
+// role: any role_master code except "guest" — see assertAssignableRole.
 export async function upsertAccount({ username, password, displayName, role = "admin" }) {
     const normalizedUsername = String(username || "").trim();
     const normalizedDisplayName = String(displayName || normalizedUsername).trim();
@@ -83,9 +96,7 @@ export async function upsertAccount({ username, password, displayName, role = "a
         throw httpError(400, "username และ password ห้ามว่าง");
     }
 
-    if (!VALID_ROLES.includes(normalizedRole)) {
-        throw httpError(400, `role ต้องเป็นหนึ่งใน: ${VALID_ROLES.join(", ")}`);
-    }
+    await assertAssignableRole(normalizedRole);
 
     if (normalizedRole !== "admin") {
         const existing = await pool.query(
@@ -169,9 +180,7 @@ export async function setAccountActive(userId, isActive) {
 export async function updateAccountRole(userId, role) {
     const normalizedRole = String(role || "").trim();
 
-    if (!VALID_ROLES.includes(normalizedRole)) {
-        throw httpError(400, `role ต้องเป็นหนึ่งใน: ${VALID_ROLES.join(", ")}`);
-    }
+    await assertAssignableRole(normalizedRole);
 
     if (normalizedRole !== "admin") {
         const current = await pool.query(`SELECT role, is_active FROM app_user WHERE user_id = $1`, [userId]);

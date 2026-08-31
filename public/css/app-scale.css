@@ -3,6 +3,16 @@
   --app-compact-font: 13px;
 }
 
+/* Nav links gated by the configurable role-permission system (see
+   authClient.js's applyPermissionVisibility) — hidden until JS confirms the
+   signed-in role was granted that key, then authClient.js adds .is-granted.
+   Kept outside @media screen since this isn't a density concern, and
+   deliberately separate from [data-admin-only] (that one stays hardcoded to
+   role=admin via CSS below — Users/Migration are never part of this table). */
+[data-requires-permission]:not(.is-granted) {
+  display: none !important;
+}
+
 @media screen {
   html,
   body {

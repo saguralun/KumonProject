@@ -177,6 +177,8 @@ button:disabled {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  background: #eef2f7;
+  color: #475569;
 }
 
 .auth-role-admin {
@@ -184,7 +186,7 @@ button:disabled {
   color: #1d4ed8;
 }
 
-.auth-role-staff {
+.auth-role-instructor {
   background: #f0eaff;
   color: #6d3fc4;
 }

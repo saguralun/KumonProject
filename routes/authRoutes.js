@@ -1,5 +1,6 @@
 import express from "express";
 import { verifyAccountLogin, verifyGuestLogin } from "../services/authService.js";
+import { grantedPermissionsFor } from "../services/roleService.js";
 
 const router = express.Router();
 
@@ -63,11 +64,21 @@ router.post("/logout", (req, res) => {
     });
 });
 
-router.get("/me", (req, res) => {
-    res.json({
-        success: true,
-        user: req.session?.user || null
-    });
+router.get("/me", async (req, res) => {
+    const user = req.session?.user || null;
+
+    if (!user) {
+        return res.json({ success: true, user: null, permissions: [] });
+    }
+
+    // admin bypasses role_permission entirely server-side too (see
+    // requirePermission) — the frontend nav just needs to know "show
+    // everything" without the backend enumerating every key for it.
+    const permissions = user.role === "admin"
+        ? ["*"]
+        : await grantedPermissionsFor(user.role);
+
+    res.json({ success: true, user, permissions });
 });
 
 export default router;

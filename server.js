@@ -18,9 +18,17 @@ import reportRoutes from "./routes/reportRoutes.js";
 import forecastRoutes from "./routes/forecastRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import roleRoutes from "./routes/roleRoutes.js";
 import migrationRoutes from "./migration/migrationRoutes.js";
 import systemRoutes from "./routes/systemRoutes.js";
-import { requireAuth, requireStaff, requireAdmin, requirePage, requireStaffPage, requireAdminPage } from "./middleware/auth.js";
+import {
+  requireAuth,
+  requireAdmin,
+  requirePage,
+  requireAdminPage,
+  requirePermission,
+  requirePermissionPage
+} from "./middleware/auth.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -78,7 +86,7 @@ app.use("/api/system", systemRoutes);
 // visitors get redirected instead of receiving the (empty, since the
 // API calls will 401) page. login.html itself is intentionally left
 // ungated and falls through to express.static below.
-app.get(["/", "/index.html"], requireAdminPage, (req, res) => {
+app.get(["/", "/index.html"], requirePermissionPage("page:tables"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "index.html"));
 });
 
@@ -90,39 +98,42 @@ app.get("/student-manager.html", requirePage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "student-manager.html"));
 });
 
-app.get("/payment.html", requireStaffPage, (req, res) => {
+app.get("/payment.html", requirePermissionPage("page:payment"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "payment.html"));
 });
 
+// Hardcoded admin-only, deliberately NOT part of the configurable
+// permission matrix — this is the page that GRANTS permissions, so it can
+// never itself be granted (that would let a role hand itself more access).
 app.get("/users.html", requireAdminPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "users.html"));
 });
 
-app.get("/opening-schedule.html", requireAdminPage, (req, res) => {
+app.get("/opening-schedule.html", requirePermissionPage("page:opening-schedule"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "opening-schedule.html"));
 });
 
-app.get("/stock-receive.html", requireStaffPage, (req, res) => {
+app.get("/stock-receive.html", requirePermissionPage("page:stock-receive"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock-receive.html"));
 });
 
-app.get("/stock.html", requireStaffPage, (req, res) => {
+app.get("/stock.html", requirePermissionPage("page:stock"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock.html"));
 });
 
-app.get("/progress-chart.html", requireStaffPage, (req, res) => {
+app.get("/progress-chart.html", requirePermissionPage("page:progress-chart"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "progress-chart.html"));
 });
 
-app.get("/stock-cut.html", requireStaffPage, (req, res) => {
+app.get("/stock-cut.html", requirePermissionPage("page:stock-cut"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock-cut.html"));
 });
 
-app.get("/forecast.html", requireStaffPage, (req, res) => {
+app.get("/forecast.html", requirePermissionPage("page:forecast"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "forecast.html"));
 });
 
-app.get("/report.html", requireStaffPage, (req, res) => {
+app.get("/report.html", requirePermissionPage("page:report"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "report.html"));
 });
 
@@ -138,17 +149,18 @@ app.get("/migration.html", requireAdminPage, (req, res) => {
 // registered first would swallow requests meant for these.
 app.use("/api/worksheet", requireAuth, worksheetRoutes);
 app.use("/api/students", requireAuth, studentRoutes);
-app.use("/api/payment", requireStaff, paymentRoutes);
-app.use("/api/stock-receive", requireStaff, stockReceiveRoutes);
-app.use("/api/stock-cut", requireStaff, stockCutRoutes);
-app.use("/api/stock-summary", requireStaff, stockSummaryRoutes);
-app.use("/api/export", requireStaff, exportRoutes);
-app.use("/api/progress-chart", requireStaff, progressChartRoutes);
-app.use("/api/forecast", requireStaff, forecastRoutes);
-app.use("/api/report", requireStaff, reportRoutes);
+app.use("/api/payment", requirePermission("page:payment"), paymentRoutes);
+app.use("/api/stock-receive", requirePermission("page:stock-receive"), stockReceiveRoutes);
+app.use("/api/stock-cut", requirePermission("page:stock-cut"), stockCutRoutes);
+app.use("/api/stock-summary", requirePermission("page:stock"), stockSummaryRoutes);
+app.use("/api/export", requirePermission("page:forecast"), exportRoutes);
+app.use("/api/progress-chart", requirePermission("page:progress-chart"), progressChartRoutes);
+app.use("/api/forecast", requirePermission("page:forecast"), forecastRoutes);
+app.use("/api/report", requirePermission("page:report"), reportRoutes);
 app.use("/api/users", requireAdmin, userRoutes);
+app.use("/api/roles", requireAdmin, roleRoutes);
 app.use("/api/migration", requireAdmin, migrationRoutes);
-app.use("/api", requireAdmin, tableRoutes);
+app.use("/api", requirePermission("page:tables"), tableRoutes);
 
 app.use(express.static(PUBLIC_DIR));
 app.use("/migration", requireAdmin, express.static("migration"));
