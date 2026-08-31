@@ -2308,35 +2308,58 @@ function academicYearForTime(time) {
     return month >= 5 ? date.getFullYear() : date.getFullYear() - 1;
 }
 
-// "AI" is deliberately not in here — it's a real level_master row, but
-// only for TRP (subject_id 3; see TRP_PLAN_LEVEL_ORDER below), not ME or
-// EFL. Including it here made it leak into ME/EFL charts' Y-axis whenever
-// the visible range spanned across that position (between 2A and A),
-// showing a level those subjects don't actually have.
-const STANDARD_PLAN_LEVEL_ORDER = [
-    "7A",
-    "6A",
-    "5A",
-    "4A",
-    "3A",
-    "2A",
-    "A",
-    "B",
-    "C",
-    "D",
-    "E",
-    "F",
-    "G",
-    "H",
-    "I",
-    "J",
-    "K",
-    "L",
-    "M",
-    "N",
-    "O"
-];
+// Mirrors services/worksheetService.js's GRADE_LEVEL_GROUPS_BY_SUBJECT —
+// keep these two in sync if the curriculum pacing ever changes. This is
+// now the ONE source both the Y-axis level order AND the dashed Plan line
+// derive from (see subjectLevelOrder/planRangeForLadderIndex below),
+// instead of a separate hand-typed table that could silently drift out of
+// sync with it — which is exactly what caused ME to show a "AI"/"7A"
+// level it doesn't actually have (those came from a level-order array
+// shared across ME/EFL/TRP instead of being derived per-subject from here).
+const GRADE_LEVEL_GROUPS_BY_SUBJECT = {
+    ME: [
+        { schoolClass: "เตรียมอ.", levels: ["6A", "5A"] },
+        { schoolClass: "อ.1", levels: ["4A"] },
+        { schoolClass: "อ.2", levels: ["3A"] },
+        { schoolClass: "อ.3", levels: ["2A"] },
+        { schoolClass: "ป.1", levels: ["A"] },
+        { schoolClass: "ป.2", levels: ["B"] },
+        { schoolClass: "ป.3", levels: ["C"] },
+        { schoolClass: "ป.4", levels: ["D"] },
+        { schoolClass: "ป.5", levels: ["E"] },
+        { schoolClass: "ป.6", levels: ["F"] },
+        { schoolClass: "ม.1", levels: ["G"] },
+        { schoolClass: "ม.2", levels: ["H"] },
+        { schoolClass: "ม.3", levels: ["I"] },
+        { schoolClass: "ม.4", levels: ["J", "K"] },
+        { schoolClass: "ม.5", levels: ["L", "M"] },
+        { schoolClass: "ม.6", levels: ["N", "O"] }
+    ],
+    EFL: [
+        { schoolClass: "เตรียมอ.", levels: ["7A", "6A", "5A"] },
+        { schoolClass: "อ.1", levels: ["4A"] },
+        { schoolClass: "อ.2", levels: ["3A"] },
+        { schoolClass: "อ.3", levels: ["2A"] },
+        { schoolClass: "ป.1", levels: ["A"] },
+        { schoolClass: "ป.2", levels: ["B"] },
+        { schoolClass: "ป.3", levels: ["C"] },
+        { schoolClass: "ป.4", levels: ["D"] },
+        { schoolClass: "ป.5", levels: ["E"] },
+        { schoolClass: "ป.6", levels: ["F"] },
+        { schoolClass: "ม.1", levels: ["G"] },
+        { schoolClass: "ม.2", levels: ["H"] },
+        { schoolClass: "ม.3", levels: ["I"] },
+        { schoolClass: "ม.4", levels: ["J", "K"] },
+        { schoolClass: "ม.5", levels: ["L", "M"] },
+        { schoolClass: "ม.6", levels: ["N", "O"] }
+    ]
+};
 
+// TRP's own real level codes (AI/AII/BI/BII/...) — kept separate from the
+// table above because TRP's plan already shows each grade's own two
+// levels directly (AI->AII) rather than looking ahead to the next grade,
+// and because TRP has no plan before ป.1 (TRP_PLAN_GRADE_RANGES only goes
+// 1-9) — both pre-existing, unchanged.
 const TRP_PLAN_LEVEL_ORDER = [
     "AI",
     "AII",
@@ -2371,35 +2394,18 @@ const TRP_PLAN_GRADE_RANGES = {
     9: { startLevelCode: "II", endLevelCode: "III", endWorksheetNo: 191 }
 };
 
-// Ordered ladder of Kumon-plan grade brackets, เตรียมอนุบาล (index 0)
-// through ม.6 (index 15). Each entry's endLevelCode is exactly the next
-// entry's startLevelCode by curriculum design (เตรียม ends 4A, อ.1 starts
-// 4A; อ.3 ends A, ป.1 starts A; ม.3 ends J, ม.4 starts J; ...) — so shifting
-// a ladder index by however many years and looking the result back up here
-// (see planRangeForLadderIndex/shiftPlanSegment) makes the dashed Plan
-// line's segments connect at every year boundary AND gives each segment
-// its own correct pace, instead of forcing one bracket's span onto every
-// other year. Most brackets span 1 level per year; เตรียม, อ.3, ม.4 and
-// ม.5 span 2 (there's a bridge level — AI, K, M — between their start and
-// end) and that's preserved exactly as-is, not flattened to a constant.
-const PLAN_GRADE_LADDER = [
-    { startLevelCode: "6A", startLevelCodeEfl: "7A", endLevelCode: "4A" }, // เตรียมอนุบาล
-    { startLevelCode: "4A", endLevelCode: "3A" }, // อ.1
-    { startLevelCode: "3A", endLevelCode: "2A" }, // อ.2
-    { startLevelCode: "2A", endLevelCode: "A" }, // อ.3
-    { startLevelCode: "A", endLevelCode: "B", trpGrade: 1 }, // ป.1
-    { startLevelCode: "B", endLevelCode: "C", trpGrade: 2 }, // ป.2
-    { startLevelCode: "C", endLevelCode: "D", trpGrade: 3 }, // ป.3
-    { startLevelCode: "D", endLevelCode: "E", trpGrade: 4 }, // ป.4
-    { startLevelCode: "E", endLevelCode: "F", trpGrade: 5 }, // ป.5
-    { startLevelCode: "F", endLevelCode: "G", trpGrade: 6 }, // ป.6
-    { startLevelCode: "G", endLevelCode: "H", trpGrade: 7 }, // ม.1
-    { startLevelCode: "H", endLevelCode: "I", trpGrade: 8 }, // ม.2
-    { startLevelCode: "I", endLevelCode: "J", trpGrade: 9 }, // ม.3
-    { startLevelCode: "J", endLevelCode: "L", trpGrade: 10 }, // ม.4
-    { startLevelCode: "L", endLevelCode: "N", trpGrade: 11 }, // ม.5
-    { startLevelCode: "N", endLevelCode: "O", endWorksheetNo: 191, trpGrade: 12 } // ม.6
-];
+// Y-axis / gap-filling level order, derived per-subject from the
+// authoritative table above instead of one array shared across subjects.
+function subjectLevelOrder(subjectCode) {
+    if (String(subjectCode || "").toUpperCase() === "TRP") {
+        return TRP_PLAN_LEVEL_ORDER;
+    }
+
+    const groups = GRADE_LEVEL_GROUPS_BY_SUBJECT[String(subjectCode || "").toUpperCase()]
+        || GRADE_LEVEL_GROUPS_BY_SUBJECT.ME;
+
+    return groups.flatMap((group) => group.levels);
+}
 
 function ladderIndexForSchoolClass(schoolClass) {
     const compactClass = String(schoolClass || "").replace(/\s+/g, "");
@@ -2431,32 +2437,42 @@ function ladderIndexForSchoolClass(schoolClass) {
 
 // Single source of truth for "what's the plan bracket for this grade" —
 // used both for the student's actual current grade (yearOffset 0) and for
-// every other year shown on the graph (see shiftPlanSegment), so there's
-// no separate "shift the current one" logic to keep in sync with this.
+// every other year shown on the graph (see shiftPlanSegment). For ME/EFL,
+// each grade's segment runs from its own first level to the NEXT grade's
+// first level — that's the level a student should be starting once this
+// year ends, which is why adjacent segments always connect (เตรียม's own
+// levels are 6A,5A, but its segment is 6A->4A because อ.1 starts at 4A;
+// ม.4's own levels are J,K, but its segment is J->L because ม.5 starts at
+// L — the in-between own-second-level is intentionally not a checkpoint
+// here). The very last grade (ม.6) has no next grade to look ahead to, so
+// it uses its own two levels directly, reaching worksheet 191 (the final
+// worksheet) instead of just starting the next level.
 function planRangeForLadderIndex(ladderIndex, subjectCode) {
-    if (typeof ladderIndex !== "number" || ladderIndex < 0 || ladderIndex >= PLAN_GRADE_LADDER.length) {
-        return null;
-    }
-
-    const entry = PLAN_GRADE_LADDER[ladderIndex];
     const subject = String(subjectCode || "").toUpperCase();
 
     if (subject === "TRP") {
-        const trpRange = entry.trpGrade ? TRP_PLAN_GRADE_RANGES[entry.trpGrade] : null;
-
-        if (!trpRange) {
+        if (typeof ladderIndex !== "number" || ladderIndex < 4) {
             return null;
         }
 
-        return { ...trpRange, planGradeIndex: ladderIndex };
+        const trpRange = TRP_PLAN_GRADE_RANGES[ladderIndex - 3];
+
+        return trpRange ? { ...trpRange, planGradeIndex: ladderIndex } : null;
     }
 
-    const isEfl = subject === "EFL";
+    const groups = GRADE_LEVEL_GROUPS_BY_SUBJECT[subject] || GRADE_LEVEL_GROUPS_BY_SUBJECT.ME;
+
+    if (typeof ladderIndex !== "number" || ladderIndex < 0 || ladderIndex >= groups.length) {
+        return null;
+    }
+
+    const group = groups[ladderIndex];
+    const nextGroup = groups[ladderIndex + 1];
 
     return {
-        startLevelCode: (isEfl && entry.startLevelCodeEfl) || entry.startLevelCode,
-        endLevelCode: entry.endLevelCode,
-        endWorksheetNo: entry.endWorksheetNo || 1,
+        startLevelCode: group.levels[0],
+        endLevelCode: nextGroup ? nextGroup.levels[0] : group.levels[group.levels.length - 1],
+        endWorksheetNo: nextGroup ? 1 : 191,
         planGradeIndex: ladderIndex
     };
 }
@@ -2470,18 +2486,13 @@ function planLevelRangeForSchoolClass(subjectCode) {
 
 function levelSortValue(levelCode, subjectCode) {
     const code = String(levelCode || "").toUpperCase();
-    const order = String(subjectCode || "").toUpperCase() === "TRP"
-        ? TRP_PLAN_LEVEL_ORDER
-        : STANDARD_PLAN_LEVEL_ORDER;
-    const index = order.indexOf(code);
+    const index = subjectLevelOrder(subjectCode).indexOf(code);
 
     return index >= 0 ? index : 999;
 }
 
 function planLevelCodesBetween(subjectCode, startLevelCode, endLevelCode) {
-    const order = String(subjectCode || "").toUpperCase() === "TRP"
-        ? TRP_PLAN_LEVEL_ORDER
-        : STANDARD_PLAN_LEVEL_ORDER;
+    const order = subjectLevelOrder(subjectCode);
     const startIndex = order.indexOf(String(startLevelCode || "").toUpperCase());
     const endIndex = order.indexOf(String(endLevelCode || "").toUpperCase());
 
@@ -2541,9 +2552,7 @@ function planSegmentsForRange(subjectCode, planRange, minTime, maxTime) {
 }
 
 function visibleLevelCodesBetween(subjectCode, levels) {
-    const order = String(subjectCode || "").toUpperCase() === "TRP"
-        ? TRP_PLAN_LEVEL_ORDER
-        : STANDARD_PLAN_LEVEL_ORDER;
+    const order = subjectLevelOrder(subjectCode);
     const indexes = levels
         .map((level) => order.indexOf(String(level.levelCode || "").toUpperCase()))
         .filter((index) => index >= 0);
