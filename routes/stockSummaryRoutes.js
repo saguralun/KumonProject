@@ -1,20 +1,10 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import { getStockSummary } from "../services/stockSummaryService.js";
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected stock summary error"
-    });
-}
+const sendError = createSendError("Unexpected stock summary error");
 
 router.get("/", async (req, res) => {
     try {

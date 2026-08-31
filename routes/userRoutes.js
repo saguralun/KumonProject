@@ -1,4 +1,5 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import {
     listAccounts,
     setAccountActive,
@@ -8,18 +9,7 @@ import {
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected user management error"
-    });
-}
+const sendError = createSendError("Unexpected user management error");
 
 router.get("/", async (req, res) => {
     try {

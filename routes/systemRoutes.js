@@ -1,4 +1,5 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import { applyUpdate, checkForUpdate } from "../services/updateService.js";
 import { requireAdmin } from "../middleware/auth.js";
 import {
@@ -10,18 +11,7 @@ import {
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected system error"
-    });
-}
+const sendError = createSendError("Unexpected system error");
 
 router.get("/update-check", async (req, res) => {
     try {

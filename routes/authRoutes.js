@@ -1,21 +1,11 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import { verifyAccountLogin, verifyGuestLogin } from "../services/authService.js";
 import { grantedPermissionsFor } from "../services/roleService.js";
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected auth error"
-    });
-}
+const sendError = createSendError("Unexpected auth error");
 
 router.post("/login/admin", async (req, res) => {
     try {

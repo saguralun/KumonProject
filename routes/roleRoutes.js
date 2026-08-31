@@ -1,4 +1,5 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import {
     createRole,
     deleteRole,
@@ -11,18 +12,7 @@ import {
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected role management error"
-    });
-}
+const sendError = createSendError("Unexpected role management error");
 
 // Everything a role/permission admin UI needs in one call: the role list,
 // the permission catalog (grouped by nav group), and every current grant —

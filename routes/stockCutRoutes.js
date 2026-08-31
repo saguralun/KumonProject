@@ -1,4 +1,5 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import {
     getPendingDateDetail,
     processPendingDates,
@@ -7,18 +8,7 @@ import {
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected stock cut error"
-    });
-}
+const sendError = createSendError("Unexpected stock cut error");
 
 router.get("/pending-dates", async (req, res) => {
     try {

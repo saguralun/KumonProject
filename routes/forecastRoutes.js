@@ -1,4 +1,5 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import {
     buildWorksheetForecast,
     getOrderSuggestion,
@@ -7,18 +8,7 @@ import {
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected forecast error"
-    });
-}
+const sendError = createSendError("Unexpected forecast error");
 
 router.post("/averages/recalculate", async (req, res) => {
     try {

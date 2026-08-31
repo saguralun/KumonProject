@@ -1,4 +1,5 @@
 import express from "express";
+import { createSendError } from "./routeErrorHandler.js";
 import {
     cancelReceiptPayment,
     getPaymentStatus,
@@ -9,18 +10,7 @@ import { getPrinterStatus } from "../services/printerService.js";
 
 const router = express.Router();
 
-function sendError(res, error) {
-    const statusCode = error.statusCode || 500;
-
-    if (statusCode >= 500) {
-        console.error(error);
-    }
-
-    res.status(statusCode).json({
-        success: false,
-        error: error.message || "Unexpected payment error"
-    });
-}
+const sendError = createSendError("Unexpected payment error");
 
 router.get("/status", async (req, res) => {
     try {
