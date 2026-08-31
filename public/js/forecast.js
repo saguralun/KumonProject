@@ -439,11 +439,30 @@ function renderCdForecastTable(data) {
 // ever gets stocked for them (cpws is essentially never TRUE there).
 const NO_REAL_STOCK_LEVELS = new Set(["TRP:7A", "TRP:6A"]);
 
+// The 20 packets per level split into 4 zones of 5 — the baseline target is
+// computed per zone (zoneTotal / 2.5) instead of once for the whole level
+// (levelTotal / 10), so a level with demand concentrated in one zone (e.g.
+// everyone still early, zone A) doesn't prop up the target for packets in a
+// zone nobody's near yet (zone D). Both old and new formulas scale demand by
+// the same factor overall (2x) — this just applies it per zone instead of
+// spreading it across all 20 packets.
+const ORDER_ZONES = [
+  [1, 11, 21, 31, 41],
+  [51, 61, 71, 81, 91],
+  [101, 111, 121, 131, 141],
+  [151, 161, 171, 181, 191]
+];
+
+function getZoneIndex(packet) {
+  return ORDER_ZONES.findIndex((zone) => zone.includes(packet));
+}
+
 function computeOrderPlan(forecastRows, stockData) {
-  // forecast lookup + level totals — keyed off forecast rows only (packets
-  // with no active student nearby simply aren't in here, and contribute 0).
+  // forecast lookup + per-zone totals — keyed off forecast rows only
+  // (packets with no active student nearby simply aren't in here, and
+  // contribute 0).
   const forecastLookup = new Map();
-  const levelTotals = new Map();
+  const zoneTotals = new Map();
 
   forecastRows.forEach((row) => {
     if (NO_REAL_STOCK_LEVELS.has(`${row.subject}:${row.level}`)) {
@@ -453,7 +472,16 @@ function computeOrderPlan(forecastRows, stockData) {
     const levelKey = `${row.subjectId}:${row.levelMasterId}`;
 
     forecastLookup.set(`${levelKey}:${row.packet}`, row.prepareQty);
-    levelTotals.set(levelKey, (levelTotals.get(levelKey) || 0) + row.prepareQty);
+
+    const zoneIndex = getZoneIndex(Number(row.packet));
+
+    if (zoneIndex !== -1) {
+      if (!zoneTotals.has(levelKey)) {
+        zoneTotals.set(levelKey, [0, 0, 0, 0]);
+      }
+
+      zoneTotals.get(levelKey)[zoneIndex] += row.prepareQty;
+    }
   });
 
   const orders = [];
@@ -467,21 +495,24 @@ function computeOrderPlan(forecastRows, stockData) {
   (stockData.subjects || []).forEach((subject) => {
     subject.ws.levels.forEach((level) => {
       const levelKey = `${subject.subjectId}:${level.levelMasterId}`;
-      const levelTotal = levelTotals.get(levelKey) || 0;
-      const targetStock = 5 + Math.ceil(levelTotal / 10);
+      const zones = zoneTotals.get(levelKey) || [0, 0, 0, 0];
 
       Object.entries(level.values).forEach(([packet, currentStock]) => {
+        const packetNum = Number(packet);
+        const zoneIndex = getZoneIndex(packetNum);
+        const zoneTotal = zoneIndex === -1 ? 0 : zones[zoneIndex];
+        const targetStock = 5 + Math.ceil(zoneTotal / 2.5);
         const packetForecast = forecastLookup.get(`${levelKey}:${packet}`) || 0;
         const remaining = currentStock - packetForecast;
 
-        // No forecasted demand anywhere in this level (not one packet) —
-        // still show the level/packet in the table, just never flag an
-        // order for it (a bare 5-unit baseline nobody's about to touch).
+        // No forecasted demand anywhere in this packet's zone — still show
+        // the level/packet in the table, just never flag an order for it (a
+        // bare 5-unit baseline nobody's about to touch).
         let orderQty = 0;
 
-        if (levelTotal > 0 && remaining < targetStock) {
+        if (zoneTotal > 0 && remaining < targetStock) {
           const rawOrder = targetStock - remaining;
-          const roundTo = levelTotal < 30 ? 3 : 5;
+          const roundTo = zoneTotal < 30 ? 3 : 5;
 
           orderQty = Math.round(rawOrder / roundTo) * roundTo;
         }
@@ -492,8 +523,8 @@ function computeOrderPlan(forecastRows, stockData) {
           levelMasterId: level.levelMasterId,
           levelType: level.levelType,
           level: level.levelCode,
-          packet: Number(packet),
-          levelTotal,
+          packet: packetNum,
+          zoneTotal,
           targetStock,
           currentStock,
           packetForecast,
