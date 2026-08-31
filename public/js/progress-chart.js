@@ -6,7 +6,8 @@ const els = {
   statusLine: document.getElementById("statusLine"),
   summaryCards: document.getElementById("summaryCards"),
   chartScroll: document.getElementById("chartScroll"),
-  chartTooltip: document.getElementById("chartTooltip")
+  chartTooltip: document.getElementById("chartTooltip"),
+  loadBar: document.getElementById("loadBar")
 };
 
 const SUBJECTS = ["ME", "EFL", "TRP"];
@@ -254,7 +255,8 @@ function attachTooltipHandlers(container, data) {
 }
 
 async function renderChart() {
-  els.chartScroll.innerHTML = `<div class="empty-state">กำลังโหลด...</div>`;
+  els.chartScroll.innerHTML = `<div class="empty-state"><div class="spinner"></div>กำลังโหลด...</div>`;
+  els.loadBar.classList.remove("hidden");
   setStatus("กำลังโหลด...");
 
   try {
@@ -279,6 +281,8 @@ async function renderChart() {
     els.chartScroll.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.summaryCards.innerHTML = "";
     setStatus(error.message, "error");
+  } finally {
+    els.loadBar.classList.add("hidden");
   }
 }
 

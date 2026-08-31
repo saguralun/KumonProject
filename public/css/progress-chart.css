@@ -379,11 +379,64 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   padding: 28px 16px;
   color: var(--muted);
   text-align: center;
   font-size: 13px;
   font-weight: 700;
+}
+
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--line);
+  border-top-color: var(--blue);
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Slim indeterminate bar shown at the top of the chart panel while a
+   request is in flight — the fill sweeps left-right since we don't know
+   real progress, just that something is happening. */
+.load-bar {
+  flex: 0 0 auto;
+  height: 3px;
+  margin-bottom: 10px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.load-bar.hidden {
+  display: none;
+}
+
+.load-bar-fill {
+  width: 40%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue);
+  animation: load-sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes load-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  100% {
+    transform: translateX(350%);
+  }
 }
 
 .progress-svg text {

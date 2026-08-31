@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/progress-chart.css?v=20260831-progress-chart">
+  <link rel="stylesheet" href="/css/progress-chart.css?v=20260831-progress-chart-loading">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260829-forecast-nav">
 </head>
 <body>
@@ -82,8 +82,12 @@
       <section class="progress-summary-cards" id="summaryCards"></section>
 
       <section class="panel chart-panel">
+        <div class="load-bar hidden" id="loadBar"><div class="load-bar-fill"></div></div>
         <div class="chart-scroll" id="chartScroll">
-          <div class="empty-state">กำลังโหลด...</div>
+          <div class="empty-state">
+            <div class="spinner"></div>
+            กำลังโหลด...
+          </div>
         </div>
       </section>
     </section>
@@ -92,6 +96,6 @@
   <div class="chart-tooltip hidden" id="chartTooltip"></div>
 
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/progress-chart.js?v=20260831-progress-chart"></script>
+  <script src="/js/progress-chart.js?v=20260831-progress-chart-loading"></script>
 </body>
 </html>
