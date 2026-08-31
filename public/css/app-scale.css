@@ -20,6 +20,7 @@
   .table-page,
   .stock-page,
   .stock-summary-page,
+  .progress-page,
   .users-page,
   .report-page,
   .forecast-page,
@@ -40,6 +41,7 @@
   .users-sidebar,
   .stock-sidebar,
   .stock-summary-sidebar,
+  .progress-sidebar,
   .report-sidebar,
   .forecast-sidebar,
   .schedule-sidebar {
@@ -174,6 +176,7 @@
   .users-workspace,
   .stock-workspace,
   .stock-summary-workspace,
+  .progress-workspace,
   .report-workspace,
   .forecast-workspace,
   .schedule-workspace {

@@ -17,7 +17,7 @@ const MAX_HISTORY_LIMIT = 100;
 // splits its year into N equal slices (e.g. ม.4 covers J then K, 6 months
 // each) — this mirrors how TRP already splits one letter into two DB rows
 // (e.g. "AI"/"AII") to cover one year.
-const GRADE_LEVEL_GROUPS_BY_SUBJECT = new Map([
+export const GRADE_LEVEL_GROUPS_BY_SUBJECT = new Map([
     ["ME", [
         { schoolClass: "เตรียมอ.", levels: ["6A", "5A"] },
         { schoolClass: "อ.1", levels: ["4A"] },
@@ -77,7 +77,7 @@ const GRADE_LEVEL_GROUPS_BY_SUBJECT = new Map([
 // gap clears wins. A negative gap (behind grade level) intentionally
 // returns null: the center only wants this badge to celebrate being on
 // pace or ahead, never to flag a child as behind.
-const GRADE_SYNC_THRESHOLDS = [
+export const GRADE_SYNC_THRESHOLDS = [
     { minMonths: 84, code: "7Y" },
     { minMonths: 60, code: "5Y" },
     { minMonths: 36, code: "3Y" },

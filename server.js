@@ -13,6 +13,7 @@ import stockReceiveRoutes from "./routes/stockReceiveRoutes.js";
 import stockCutRoutes from "./routes/stockCutRoutes.js";
 import stockSummaryRoutes from "./routes/stockSummaryRoutes.js";
 import exportRoutes from "./routes/exportRoutes.js";
+import progressChartRoutes from "./routes/progressChartRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import forecastRoutes from "./routes/forecastRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -109,6 +110,10 @@ app.get("/stock.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock.html"));
 });
 
+app.get("/progress-chart.html", requireStaffPage, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "progress-chart.html"));
+});
+
 app.get("/stock-cut.html", requireStaffPage, (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "stock-cut.html"));
 });
@@ -138,6 +143,7 @@ app.use("/api/stock-receive", requireStaff, stockReceiveRoutes);
 app.use("/api/stock-cut", requireStaff, stockCutRoutes);
 app.use("/api/stock-summary", requireStaff, stockSummaryRoutes);
 app.use("/api/export", requireStaff, exportRoutes);
+app.use("/api/progress-chart", requireStaff, progressChartRoutes);
 app.use("/api/forecast", requireStaff, forecastRoutes);
 app.use("/api/report", requireStaff, reportRoutes);
 app.use("/api/users", requireAdmin, userRoutes);

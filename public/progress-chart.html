@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KumonDB Report</title>
+  <title>KumonDB Progress Chart</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/report.css?v=20260829-report-monthly-only">
+  <link rel="stylesheet" href="/css/progress-chart.css?v=20260831-progress-chart">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260829-forecast-nav">
 </head>
 <body>
-  <main class="report-page">
-    <aside class="report-sidebar">
+  <main class="progress-page">
+    <aside class="progress-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="home-link active current-page" href="/report.html" data-staff-up>📊 Report</a>
+        <a class="home-link active current-page" href="/progress-chart.html" data-staff-up>📈 Progress Chart</a>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
           <div class="nav-flyout-menu">
@@ -36,7 +36,7 @@
             <a class="home-link" href="/stock.html" data-staff-up>📊 Stock</a>
             <a class="home-link" href="/stock-receive.html" data-staff-up>📦 Stock Receive</a>
             <a class="home-link" href="/stock-cut.html" data-staff-up>✂️ Stock Cut</a>
-            <a class="home-link" href="/forecast.html" data-staff-up>🔮 Forecast & Order</a>
+            <a class="home-link" href="/forecast.html" data-staff-up>🔮 Forecast &amp; Order</a>
           </div>
         </div>
         <div class="nav-flyout">
@@ -51,48 +51,47 @@
       </nav>
 
       <div class="side-header">
-        <h1>Report</h1>
-        <div class="subtle">รายงานรายเดือน</div>
+        <h1>Progress Chart</h1>
+        <div class="subtle">ระดับปัจจุบัน เทียบกับชั้นเรียน (เฉพาะเด็ก active)</div>
       </div>
 
       <section class="filter-panel">
-        <label>
-          <span>เดือน</span>
-          <select id="reportMonth"></select>
-        </label>
-        <label>
-          <span>ปี</span>
-          <input id="reportYear" type="number" min="2000" max="2600" step="1">
-        </label>
-        <button type="button" class="primary-button" id="generateButton">📊 สร้างรายงาน</button>
-        <button type="button" class="secondary-button" id="exportButton" disabled>⬇️ Export CSV</button>
+        <div class="subject-tabs" id="subjectTabs"></div>
+        <button type="button" class="secondary-button" id="refreshButton">🔄 Refresh</button>
       </section>
+
+      <div class="progress-legend">
+        <div class="progress-legend-title">เส้นอ้างอิง (เกินชั้นเรียน)</div>
+        <div id="lineLegend"></div>
+        <div class="progress-legend-title" style="margin-top:10px;">จุดนักเรียน</div>
+        <div id="dotLegend"></div>
+      </div>
 
       <div class="auth-bar" id="authBar"></div>
     </aside>
 
-    <section class="report-workspace">
+    <section class="progress-workspace">
       <header class="topbar">
         <div>
-          <div class="page-title">Monthly Report</div>
-          <div class="subtle">รายชื่อ enrollment ที่มีกิจกรรม (WS / AT / DT / CD) ในเดือนที่เลือก</div>
+          <div class="page-title">Progress Chart</div>
+          <div class="subtle" id="pageSubtitle">แกน X = ชั้นเรียน, แกน Y = เลเวล, จุด = นักเรียนแต่ละคน</div>
         </div>
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
-      <section class="panel report-table-panel">
-        <div class="panel-header">
-          <div class="panel-title">ผลลัพธ์</div>
-          <div class="subtle" id="resultSubtitle">เลือกเดือน/ปี แล้วกดสร้างรายงาน</div>
-        </div>
-        <div class="report-table-wrap" id="reportTableWrap">
-          <div class="empty-state">ยังไม่มีรายงาน</div>
+      <section class="progress-summary-cards" id="summaryCards"></section>
+
+      <section class="panel chart-panel">
+        <div class="chart-scroll" id="chartScroll">
+          <div class="empty-state">กำลังโหลด...</div>
         </div>
       </section>
     </section>
   </main>
 
+  <div class="chart-tooltip hidden" id="chartTooltip"></div>
+
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/report.js?v=20260829-report-monthly-only"></script>
+  <script src="/js/progress-chart.js?v=20260831-progress-chart"></script>
 </body>
 </html>
