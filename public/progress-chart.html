@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/progress-chart.css?v=20260831-progress-chart-real-percent">
+  <link rel="stylesheet" href="/css/progress-chart.css?v=20260831-progress-chart-simple-loading">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260829-forecast-nav">
 </head>
 <body>
@@ -82,10 +82,6 @@
       <section class="progress-summary-cards" id="summaryCards"></section>
 
       <section class="panel chart-panel">
-        <div class="load-bar-row hidden" id="loadBarRow">
-          <div class="load-bar"><div class="load-bar-fill" id="loadBarFill"></div></div>
-          <div class="load-bar-percent" id="loadBarPercent">0%</div>
-        </div>
         <div class="chart-scroll" id="chartScroll">
           <div class="empty-state">
             <div class="spinner"></div>
@@ -99,6 +95,6 @@
   <div class="chart-tooltip hidden" id="chartTooltip"></div>
 
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/progress-chart.js?v=20260831-progress-chart-real-percent"></script>
+  <script src="/js/progress-chart.js?v=20260831-progress-chart-simple-loading"></script>
 </body>
 </html>

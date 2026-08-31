@@ -6,10 +6,7 @@ const els = {
   statusLine: document.getElementById("statusLine"),
   summaryCards: document.getElementById("summaryCards"),
   chartScroll: document.getElementById("chartScroll"),
-  chartTooltip: document.getElementById("chartTooltip"),
-  loadBarRow: document.getElementById("loadBarRow"),
-  loadBarFill: document.getElementById("loadBarFill"),
-  loadBarPercent: document.getElementById("loadBarPercent")
+  chartTooltip: document.getElementById("chartTooltip")
 };
 
 const SUBJECTS = ["ME", "EFL", "TRP"];
@@ -52,73 +49,11 @@ function setStatus(message, type = "neutral") {
   els.statusLine.classList.toggle("is-error", type === "error");
 }
 
-function setLoadProgress(percent) {
-  els.loadBarFill.classList.remove("is-indeterminate");
-  els.loadBarFill.style.width = `${percent}%`;
-  els.loadBarPercent.textContent = `${percent}%`;
-}
-
-function setLoadIndeterminate() {
-  els.loadBarFill.classList.add("is-indeterminate");
-  els.loadBarPercent.textContent = "";
-}
-
-// Real 0-100% download progress via the response body's stream, measured
-// against Content-Length (Express sets this on res.json() by default).
-// Falls back to an indeterminate sweep if a response ever arrives without
-// it (e.g. something upstream switches to chunked transfer).
 async function requestJson(url) {
   const response = await fetch(url);
+  const data = await response.json().catch(() => ({}));
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-
-    throw new Error(data.error || "Request failed");
-  }
-
-  const contentLength = Number(response.headers.get("Content-Length")) || 0;
-
-  if (!contentLength || !response.body || !response.body.getReader) {
-    setLoadIndeterminate();
-
-    const data = await response.json();
-
-    if (data.success === false) {
-      throw new Error(data.error || "Request failed");
-    }
-
-    return data;
-  }
-
-  const reader = response.body.getReader();
-  const chunks = [];
-  let received = 0;
-
-  setLoadProgress(0);
-
-  for (;;) {
-    const { done, value } = await reader.read();
-
-    if (done) {
-      break;
-    }
-
-    chunks.push(value);
-    received += value.length;
-    setLoadProgress(Math.min(100, Math.round((received / contentLength) * 100)));
-  }
-
-  const buffer = new Uint8Array(received);
-  let offset = 0;
-
-  chunks.forEach((chunk) => {
-    buffer.set(chunk, offset);
-    offset += chunk.length;
-  });
-
-  const data = JSON.parse(new TextDecoder("utf-8").decode(buffer));
-
-  if (data.success === false) {
+  if (!response.ok || data.success === false) {
     throw new Error(data.error || "Request failed");
   }
 
@@ -322,15 +257,8 @@ async function renderChart() {
   els.chartScroll.innerHTML = `<div class="empty-state"><div class="spinner"></div>กำลังโหลด...</div>`;
   setStatus("กำลังโหลด...");
 
-  const needsFetch = !dataCache[activeSubject];
-
-  if (needsFetch) {
-    setLoadProgress(0);
-    els.loadBarRow.classList.remove("hidden");
-  }
-
   try {
-    if (needsFetch) {
+    if (!dataCache[activeSubject]) {
       dataCache[activeSubject] = await requestJson(`/api/progress-chart?subject=${encodeURIComponent(activeSubject)}`);
     }
 
@@ -351,8 +279,6 @@ async function renderChart() {
     els.chartScroll.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.summaryCards.innerHTML = "";
     setStatus(error.message, "error");
-  } finally {
-    els.loadBarRow.classList.add("hidden");
   }
 }
 
