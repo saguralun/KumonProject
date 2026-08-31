@@ -605,6 +605,21 @@ html[data-role="staff"] [data-staff-up] {
   font-weight: 800;
 }
 
+/* Expected Stock pivot — same red/orange thresholds as the Stock page
+   (< 5 critical, < 10 low), since these cells are a projected quantity,
+   not an order flag. */
+.forecast-pivot-table td.is-out {
+  background: var(--red-soft, #fdecec);
+  color: #a32d2d;
+  font-weight: 800;
+}
+
+.forecast-pivot-table td.is-low {
+  background: var(--orange-soft);
+  color: #8a5c08;
+  font-weight: 800;
+}
+
 .forecast-pivot-table td.is-cell {
   cursor: pointer;
   transition: background-color var(--ease), color var(--ease);

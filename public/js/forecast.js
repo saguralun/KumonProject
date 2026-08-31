@@ -2,10 +2,12 @@ const els = {
   forecastDays: document.getElementById("forecastDays"),
   forecastButton: document.getElementById("forecastButton"),
   orderButton: document.getElementById("orderButton"),
+  expectedStockButton: document.getElementById("expectedStockButton"),
   recalculateForecastButton: document.getElementById("recalculateForecastButton"),
   subjectTabs: document.getElementById("subjectTabs"),
   forecastResultsView: document.getElementById("forecastResultsView"),
   orderResultsView: document.getElementById("orderResultsView"),
+  expectedStockResultsView: document.getElementById("expectedStockResultsView"),
   statusLine: document.getElementById("statusLine"),
   resultSubtitle: document.getElementById("resultSubtitle"),
   forecastSummary: document.getElementById("forecastSummary"),
@@ -18,7 +20,10 @@ const els = {
   forecastDetailStats: document.getElementById("forecastDetailStats"),
   forecastDetailStudents: document.getElementById("forecastDetailStudents"),
   orderSuggestionTableWrap: document.getElementById("orderSuggestionTableWrap"),
-  orderCdSuggestionTableWrap: document.getElementById("orderCdSuggestionTableWrap")
+  orderCdSuggestionTableWrap: document.getElementById("orderCdSuggestionTableWrap"),
+  expectedStockSubtitle: document.getElementById("expectedStockSubtitle"),
+  expectedStockTableWrap: document.getElementById("expectedStockTableWrap"),
+  expectedStockCdTableWrap: document.getElementById("expectedStockCdTableWrap")
 };
 
 let lastForecastData = null;
@@ -120,6 +125,8 @@ function renderSubjectTabs() {
 
       if (currentView === "order") {
         renderOrderSuggestionTable();
+      } else if (currentView === "expected") {
+        renderExpectedStockTable();
       } else {
         renderActiveSubject();
       }
@@ -528,7 +535,8 @@ function computeOrderPlan(forecastRows, stockData) {
           targetStock,
           currentStock,
           packetForecast,
-          orderQty
+          orderQty,
+          expectedStock: currentStock - packetForecast + orderQty
         });
       });
     });
@@ -583,7 +591,8 @@ function computeCdOrderPlan(cdForecastRows, stockData) {
           targetStock,
           currentStock,
           packetForecast,
-          orderQty
+          orderQty,
+          expectedStock: currentStock - packetForecast + orderQty
         });
       });
     });
@@ -592,7 +601,7 @@ function computeCdOrderPlan(cdForecastRows, stockData) {
   return orders.sort((a, b) => b.orderQty - a.orderQty);
 }
 
-function buildOrderPivot(orders) {
+function buildOrderPivot(orders, valueKey = "orderQty") {
   const columnSet = new Set();
   const levelMap = new Map();
   const levelOrder = [];
@@ -615,9 +624,10 @@ function buildOrderPivot(orders) {
     }
 
     const level = levelMap.get(levelKey);
+    const value = row[valueKey];
 
-    level.values[row.packet] = row.orderQty;
-    level.total += row.orderQty;
+    level.values[row.packet] = value;
+    level.total += value;
   });
 
   // Main levels (level_type 1) before Zun (level_type 2) — Zun levels have
@@ -644,13 +654,36 @@ function buildOrderPivot(orders) {
   return { columns, levels, columnTotals, grandTotal };
 }
 
-function renderOrderPivotInto(wrapEl, orders, { columnPrefix = "", emptyMessage = "ไม่มีข้อมูล" } = {}) {
+function orderCellClass(value) {
+  return value > 0 ? "is-order" : "is-zero";
+}
+
+// Same red/orange bands as the Stock page, since these cells are a
+// projected quantity (not an order flag).
+function expectedStockCellClass(value) {
+  if (value < 5) {
+    return "is-out";
+  }
+
+  if (value < 10) {
+    return "is-low";
+  }
+
+  return "is-zero";
+}
+
+function renderOrderPivotInto(wrapEl, orders, {
+  columnPrefix = "",
+  emptyMessage = "ไม่มีข้อมูล",
+  valueKey = "orderQty",
+  cellClass = orderCellClass
+} = {}) {
   if (!activeSubjectCode) {
     wrapEl.innerHTML = `<div class="empty-state">ยังไม่มี Forecast</div>`;
     return;
   }
 
-  const pivot = buildOrderPivot(orders.filter((row) => row.subject === activeSubjectCode));
+  const pivot = buildOrderPivot(orders.filter((row) => row.subject === activeSubjectCode), valueKey);
 
   if (!pivot.levels.length) {
     wrapEl.innerHTML = `<div class="empty-state">${escapeHtml(emptyMessage)}</div>`;
@@ -675,7 +708,7 @@ function renderOrderPivotInto(wrapEl, orders, { columnPrefix = "", emptyMessage 
 
               return value === undefined
                 ? `<td class="is-blank"></td>`
-                : `<td class="${value > 0 ? "is-order" : "is-zero"}">${formatNumber(value)}</td>`;
+                : `<td class="${cellClass(value)}">${formatNumber(value)}</td>`;
             }).join("")}
             <td class="is-total-col"><strong>${formatNumber(level.total)}</strong></td>
           </tr>
@@ -721,6 +754,46 @@ async function loadOrderSuggestion() {
   }
 }
 
+// Expect Stock reuses the exact same order plan (each row already carries
+// expectedStock = currentStock - packetForecast + orderQty) — just a
+// different value/coloring on the same pivot renderer.
+function renderExpectedStockTable() {
+  renderSubjectTabs();
+  renderOrderPivotInto(els.expectedStockTableWrap, lastOrderPlan, {
+    valueKey: "expectedStock",
+    cellClass: expectedStockCellClass
+  });
+  renderOrderPivotInto(els.expectedStockCdTableWrap, lastCdOrderPlan, {
+    columnPrefix: "CD",
+    emptyMessage: "วิชานี้ไม่มี CD",
+    valueKey: "expectedStock",
+    cellClass: expectedStockCellClass
+  });
+}
+
+async function loadExpectedStock() {
+  els.expectedStockTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
+  els.expectedStockCdTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
+
+  try {
+    const stockData = await requestJson("/api/stock-summary");
+
+    lastOrderPlan = computeOrderPlan((lastForecastData && lastForecastData.rows) || [], stockData);
+    lastCdOrderPlan = computeCdOrderPlan((lastForecastData && lastForecastData.cdRows) || [], stockData);
+
+    const days = lastForecastData?.params?.days;
+
+    els.expectedStockSubtitle.textContent = days
+      ? `stock ที่มีอยู่ − Forecast ${days} วันที่จะใช้ + จำนวนที่แนะนำสั่ง = stock ที่เหลือ ถ้าสั่งตามนี้จริง`
+      : `stock ที่มีอยู่ − Forecast ที่จะใช้ + จำนวนที่แนะนำสั่ง = stock ที่เหลือ ถ้าสั่งตามนี้จริง`;
+
+    renderExpectedStockTable();
+  } catch (error) {
+    els.expectedStockTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    els.expectedStockCdTableWrap.innerHTML = "";
+  }
+}
+
 async function generateForecast({ force = false } = {}) {
   const days = Number(els.forecastDays.value);
 
@@ -749,6 +822,8 @@ async function generateForecast({ force = false } = {}) {
     renderActiveSubject();
     els.orderButton.disabled = false;
     els.orderButton.title = "";
+    els.expectedStockButton.disabled = false;
+    els.expectedStockButton.title = "";
 
     els.resultSubtitle.textContent = [
       `Forecast ${days} วัน`,
@@ -773,25 +848,40 @@ async function generateForecast({ force = false } = {}) {
 // One-way switch — once you commit to ordering, the forecast controls lock
 // so nothing here (button, days, subject tabs) can quietly recompute the
 // numbers you're about to order against. Refresh the page to forecast again.
-function showOrderView() {
-  currentView = "order";
-  els.forecastResultsView.classList.add("hidden");
-  els.orderResultsView.classList.remove("hidden");
-
-  // Lock everything that would recompute the forecast itself — the subject
-  // tabs stay live since both views (forecast and order) read them, they
-  // just switch which one re-renders.
+// Lock everything that would recompute the forecast itself — the subject
+// tabs stay live since every view reads them, they just switch which one
+// re-renders.
+function lockForecastControls() {
   els.forecastButton.disabled = true;
   els.forecastButton.title = "สั่งซื้อไปแล้ว — refresh หน้าใหม่ถ้าจะ Forecast อีกครั้ง";
   els.recalculateForecastButton.disabled = true;
   els.forecastDays.disabled = true;
+}
 
+function showOrderView() {
+  currentView = "order";
+  els.forecastResultsView.classList.add("hidden");
+  els.expectedStockResultsView.classList.add("hidden");
+  els.orderResultsView.classList.remove("hidden");
+
+  lockForecastControls();
   loadOrderSuggestion();
+}
+
+function showExpectedStockView() {
+  currentView = "expected";
+  els.forecastResultsView.classList.add("hidden");
+  els.orderResultsView.classList.add("hidden");
+  els.expectedStockResultsView.classList.remove("hidden");
+
+  lockForecastControls();
+  loadExpectedStock();
 }
 
 els.forecastButton.addEventListener("click", () => generateForecast());
 els.recalculateForecastButton.addEventListener("click", () => generateForecast({ force: true }));
 els.orderButton.addEventListener("click", showOrderView);
+els.expectedStockButton.addEventListener("click", showExpectedStockView);
 els.forecastDetailClose.addEventListener("click", closeForecastDetail);
 els.forecastDetailModal.addEventListener("click", (event) => {
   if (event.target === els.forecastDetailModal) {

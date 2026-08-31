@@ -63,6 +63,7 @@
         <button type="button" class="secondary-button" id="recalculateForecastButton">🔄 คำนวณ average ใหม่</button>
         <button type="button" class="primary-button" id="forecastButton">🔮 Forecast</button>
         <button type="button" class="secondary-button" id="orderButton" disabled title="กด Forecast ก่อน">🛒 สั่งซื้อ</button>
+        <button type="button" class="secondary-button" id="expectedStockButton" disabled title="กด Forecast ก่อน">📈 Expect Stock</button>
       </section>
 
       <div class="subject-tabs" id="subjectTabs"></div>
@@ -107,7 +108,7 @@
           <div class="panel-header">
             <div>
               <div class="panel-title">🛒 แนะนำสั่งซื้อ</div>
-              <div class="subtle">ต้องมี = 5 (base) + เพดาน(รวม Forecast เลเวล ÷ 10) — order ปัดเป็นเลขลงท้าย 0/5 (หรือ 0/3/6/9 ถ้ารวม Forecast เลเวล &lt; 30) — สลับวิชาได้จากแท็บด้านซ้าย</div>
+              <div class="subtle">ต้องมี = 5 (base) + เพดาน(รวม Forecast ของ zone ÷ 2.5) — order ปัดเป็นเลขลงท้าย 0/5 (หรือ 0/3/6/9 ถ้ารวม Forecast ของ zone &lt; 30) — สลับวิชาได้จากแท็บด้านซ้าย</div>
             </div>
           </div>
           <div class="forecast-table-wrap" id="orderSuggestionTableWrap">
@@ -121,6 +122,29 @@
             <div class="subtle">สูตรเดียวกับ WS แต่ระดับละ 1 แผ่น (cd_no เดียว)</div>
           </div>
           <div class="forecast-table-wrap" id="orderCdSuggestionTableWrap">
+            <div class="empty-state">ยังไม่มี Forecast</div>
+          </div>
+        </section>
+      </div>
+
+      <div class="forecast-view hidden" id="expectedStockResultsView">
+        <section class="panel forecast-table-panel forecast-table-panel-order">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">📈 Expect Stock</div>
+              <div class="subtle" id="expectedStockSubtitle">stock ที่มีอยู่ − Forecast ที่จะใช้ + จำนวนที่แนะนำสั่ง = stock ที่เหลือ ถ้าสั่งตามนี้จริง</div>
+            </div>
+          </div>
+          <div class="forecast-table-wrap" id="expectedStockTableWrap">
+            <div class="empty-state">ยังไม่มี Forecast</div>
+          </div>
+        </section>
+
+        <section class="panel forecast-table-panel forecast-table-panel-cd">
+          <div class="panel-header">
+            <div class="panel-title">📈 Expect Stock — CD</div>
+          </div>
+          <div class="forecast-table-wrap" id="expectedStockCdTableWrap">
             <div class="empty-state">ยังไม่มี Forecast</div>
           </div>
         </section>
@@ -146,6 +170,6 @@
   </div>
 
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/forecast.js?v=20260830-forecast-order-zones"></script>
+  <script src="/js/forecast.js?v=20260830-forecast-expected-stock"></script>
 </body>
 </html>
