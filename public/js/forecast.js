@@ -468,23 +468,18 @@ function computeOrderPlan(forecastRows, stockData) {
     subject.ws.levels.forEach((level) => {
       const levelKey = `${subject.subjectId}:${level.levelMasterId}`;
       const levelTotal = levelTotals.get(levelKey) || 0;
-
-      // No forecasted demand anywhere in this level at all (not one packet)
-      // — skip it entirely rather than ordering to a bare 5-unit baseline
-      // nobody's about to touch.
-      if (levelTotal === 0) {
-        return;
-      }
-
       const targetStock = 5 + Math.ceil(levelTotal / 10);
 
       Object.entries(level.values).forEach(([packet, currentStock]) => {
         const packetForecast = forecastLookup.get(`${levelKey}:${packet}`) || 0;
         const remaining = currentStock - packetForecast;
 
+        // No forecasted demand anywhere in this level (not one packet) —
+        // still show the level/packet in the table, just never flag an
+        // order for it (a bare 5-unit baseline nobody's about to touch).
         let orderQty = 0;
 
-        if (remaining < targetStock) {
+        if (levelTotal > 0 && remaining < targetStock) {
           const rawOrder = targetStock - remaining;
           const roundTo = levelTotal < 30 ? 3 : 5;
 
@@ -530,11 +525,6 @@ function computeCdOrderPlan(cdForecastRows, stockData) {
     subject.cd.levels.forEach((level) => {
       const levelKey = `${subject.subjectId}:${level.levelMasterId}`;
       const levelTotal = levelTotals.get(levelKey) || 0;
-
-      if (levelTotal === 0) {
-        return;
-      }
-
       const targetStock = 5 + Math.ceil(levelTotal / 10);
 
       Object.entries(level.values).forEach(([cdNo, currentStock]) => {
@@ -543,7 +533,7 @@ function computeCdOrderPlan(cdForecastRows, stockData) {
 
         let orderQty = 0;
 
-        if (remaining < targetStock) {
+        if (levelTotal > 0 && remaining < targetStock) {
           const rawOrder = targetStock - remaining;
           const roundTo = levelTotal < 30 ? 3 : 5;
 
