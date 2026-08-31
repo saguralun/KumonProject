@@ -2367,84 +2367,101 @@ const TRP_PLAN_GRADE_RANGES = {
     9: { startLevelCode: "II", endLevelCode: "III", endWorksheetNo: 191 }
 };
 
-function trpPlanRangeForGrade(grade) {
-    const range = TRP_PLAN_GRADE_RANGES[grade];
+// Ordered ladder of Kumon-plan grade brackets, เตรียมอนุบาล (index 0)
+// through ม.6 (index 15). Each entry's endLevelCode is exactly the next
+// entry's startLevelCode by curriculum design (เตรียม ends 4A, อ.1 starts
+// 4A; อ.3 ends A, ป.1 starts A; ม.3 ends J, ม.4 starts J; ...) — so shifting
+// a ladder index by however many years and looking the result back up here
+// (see planRangeForLadderIndex/shiftPlanSegment) makes the dashed Plan
+// line's segments connect at every year boundary AND gives each segment
+// its own correct pace, instead of forcing one bracket's span onto every
+// other year. Most brackets span 1 level per year; เตรียม, อ.3, ม.4 and
+// ม.5 span 2 (there's a bridge level — AI, K, M — between their start and
+// end) and that's preserved exactly as-is, not flattened to a constant.
+const PLAN_GRADE_LADDER = [
+    { startLevelCode: "6A", startLevelCodeEfl: "7A", endLevelCode: "4A" }, // เตรียมอนุบาล
+    { startLevelCode: "4A", endLevelCode: "3A" }, // อ.1
+    { startLevelCode: "3A", endLevelCode: "2A" }, // อ.2
+    { startLevelCode: "2A", endLevelCode: "A" }, // อ.3
+    { startLevelCode: "A", endLevelCode: "B", trpGrade: 1 }, // ป.1
+    { startLevelCode: "B", endLevelCode: "C", trpGrade: 2 }, // ป.2
+    { startLevelCode: "C", endLevelCode: "D", trpGrade: 3 }, // ป.3
+    { startLevelCode: "D", endLevelCode: "E", trpGrade: 4 }, // ป.4
+    { startLevelCode: "E", endLevelCode: "F", trpGrade: 5 }, // ป.5
+    { startLevelCode: "F", endLevelCode: "G", trpGrade: 6 }, // ป.6
+    { startLevelCode: "G", endLevelCode: "H", trpGrade: 7 }, // ม.1
+    { startLevelCode: "H", endLevelCode: "I", trpGrade: 8 }, // ม.2
+    { startLevelCode: "I", endLevelCode: "J", trpGrade: 9 }, // ม.3
+    { startLevelCode: "J", endLevelCode: "L", trpGrade: 10 }, // ม.4
+    { startLevelCode: "L", endLevelCode: "N", trpGrade: 11 }, // ม.5
+    { startLevelCode: "N", endLevelCode: "O", endWorksheetNo: 191, trpGrade: 12 } // ม.6
+];
 
-    if (!range) {
-        return null;
-    }
-
-    return {
-        ...range,
-        planTrack: "TRP",
-        planGradeIndex: grade
-    };
-}
-
-function planLevelRangeForSchoolClass(subjectCode) {
-    const schoolClass = String(state.profile?.student?.schoolClass || "");
-    const compactClass = schoolClass.replace(/\s+/g, "");
-    const subject = String(subjectCode || selectedEnrollment()?.subjectCode || "").toUpperCase();
-    const isEfl = subject === "EFL";
-    const isTrp = subject === "TRP";
+function ladderIndexForSchoolClass(schoolClass) {
+    const compactClass = String(schoolClass || "").replace(/\s+/g, "");
 
     if (/เตรียม/.test(compactClass)) {
-        if (isTrp) {
-            return null;
-        }
-
-        return { startLevelCode: isEfl ? "7A" : "6A", endLevelCode: "4A", endWorksheetNo: 1 };
+        return 0;
     }
 
     const kindergarten = compactClass.match(/(?:อ\.?|อนุบาล)([1-3])/);
 
     if (kindergarten) {
-        if (isTrp) {
-            return null;
-        }
-
-        return {
-            1: { startLevelCode: "4A", endLevelCode: "3A", endWorksheetNo: 1 },
-            2: { startLevelCode: "3A", endLevelCode: "2A", endWorksheetNo: 1 },
-            3: { startLevelCode: "2A", endLevelCode: "A", endWorksheetNo: 1 }
-        }[Number(kindergarten[1])] || null;
+        return Number(kindergarten[1]); // อ.1 -> 1, อ.2 -> 2, อ.3 -> 3
     }
 
     const primary = compactClass.match(/(?:ป\.?|ประถม|p)([1-6])/i);
 
     if (primary) {
-        if (isTrp) {
-            return trpPlanRangeForGrade(Number(primary[1]));
-        }
-
-        return {
-            1: { startLevelCode: "A", endLevelCode: "B", endWorksheetNo: 1 },
-            2: { startLevelCode: "B", endLevelCode: "C", endWorksheetNo: 1 },
-            3: { startLevelCode: "C", endLevelCode: "D", endWorksheetNo: 1 },
-            4: { startLevelCode: "D", endLevelCode: "E", endWorksheetNo: 1 },
-            5: { startLevelCode: "E", endLevelCode: "F", endWorksheetNo: 1 },
-            6: { startLevelCode: "F", endLevelCode: "G", endWorksheetNo: 1 }
-        }[Number(primary[1])] || null;
+        return 3 + Number(primary[1]); // ป.1 -> 4 ... ป.6 -> 9
     }
 
     const secondary = compactClass.match(/(?:ม\.?|มัธยม|m)([1-6])/i);
 
     if (secondary) {
-        if (isTrp) {
-            return trpPlanRangeForGrade(Number(secondary[1]) + 6);
-        }
-
-        return {
-            1: { startLevelCode: "G", endLevelCode: "H", endWorksheetNo: 1 },
-            2: { startLevelCode: "H", endLevelCode: "I", endWorksheetNo: 1 },
-            3: { startLevelCode: "I", endLevelCode: "J", endWorksheetNo: 1 },
-            4: { startLevelCode: "J", endLevelCode: "L", endWorksheetNo: 1 },
-            5: { startLevelCode: "L", endLevelCode: "N", endWorksheetNo: 1 },
-            6: { startLevelCode: "N", endLevelCode: "O", endWorksheetNo: 191 }
-        }[Number(secondary[1])] || null;
+        return 9 + Number(secondary[1]); // ม.1 -> 10 ... ม.6 -> 15
     }
 
     return null;
+}
+
+// Single source of truth for "what's the plan bracket for this grade" —
+// used both for the student's actual current grade (yearOffset 0) and for
+// every other year shown on the graph (see shiftPlanSegment), so there's
+// no separate "shift the current one" logic to keep in sync with this.
+function planRangeForLadderIndex(ladderIndex, subjectCode) {
+    if (typeof ladderIndex !== "number" || ladderIndex < 0 || ladderIndex >= PLAN_GRADE_LADDER.length) {
+        return null;
+    }
+
+    const entry = PLAN_GRADE_LADDER[ladderIndex];
+    const subject = String(subjectCode || "").toUpperCase();
+
+    if (subject === "TRP") {
+        const trpRange = entry.trpGrade ? TRP_PLAN_GRADE_RANGES[entry.trpGrade] : null;
+
+        if (!trpRange) {
+            return null;
+        }
+
+        return { ...trpRange, planGradeIndex: ladderIndex };
+    }
+
+    const isEfl = subject === "EFL";
+
+    return {
+        startLevelCode: (isEfl && entry.startLevelCodeEfl) || entry.startLevelCode,
+        endLevelCode: entry.endLevelCode,
+        endWorksheetNo: entry.endWorksheetNo || 1,
+        planGradeIndex: ladderIndex
+    };
+}
+
+function planLevelRangeForSchoolClass(subjectCode) {
+    const subject = String(subjectCode || selectedEnrollment()?.subjectCode || "").toUpperCase();
+    const ladderIndex = ladderIndexForSchoolClass(state.profile?.student?.schoolClass);
+
+    return planRangeForLadderIndex(ladderIndex, subject);
 }
 
 function levelSortValue(levelCode, subjectCode) {
@@ -2474,45 +2491,18 @@ function planLevelCodesBetween(subjectCode, startLevelCode, endLevelCode) {
     return order.slice(from, to + 1);
 }
 
+// A past/future year is just a different rung of the same ladder
+// (planGradeIndex, set by planRangeForLadderIndex/planLevelRangeForSchoolClass)
+// — moving yearOffset years shifts that many rungs, and each rung already
+// carries its own correct bracket, so there's no separate math here beyond
+// the lookup itself. This is also why every segment connects to the next:
+// PLAN_GRADE_LADDER was built so each entry's end is the next one's start.
 function shiftPlanSegment(subjectCode, planRange, yearOffset) {
-    if (String(subjectCode || "").toUpperCase() === "TRP" && planRange?.planGradeIndex) {
-        return TRP_PLAN_GRADE_RANGES[planRange.planGradeIndex + yearOffset] || null;
-    }
-
-    const order = STANDARD_PLAN_LEVEL_ORDER;
-    const startIndex = order.indexOf(String(planRange.startLevelCode || "").toUpperCase());
-    const endIndex = order.indexOf(String(planRange.endLevelCode || "").toUpperCase());
-
-    if (startIndex < 0 || endIndex < 0) {
+    if (typeof planRange?.planGradeIndex !== "number") {
         return null;
     }
 
-    // Chain every year onto the current bracket's own pace (its
-    // start->end span) rather than shifting both endpoints by 1 level
-    // index each. Shifting both by a flat 1 only stays continuous across
-    // the May 1st year boundary when the current bracket spans exactly 1
-    // level — true for most school years, but เตรียมอนุบาล spans 2
-    // (6A->4A) and similar brackets don't — so past/future segments would
-    // land a level away from where the adjacent segment ends, and the
-    // dashed plan line visibly jumps at each boundary instead of
-    // connecting. Scaling the shift by the span keeps every segment's end
-    // exactly equal to the next segment's start, by construction.
-    const span = endIndex - startIndex;
-    const shiftedStartIndex = startIndex + (yearOffset * span);
-    const shiftedEndIndex = shiftedStartIndex + span;
-
-    if (
-        shiftedStartIndex < 0 || shiftedStartIndex >= order.length
-        || shiftedEndIndex < 0 || shiftedEndIndex >= order.length
-    ) {
-        return null;
-    }
-
-    return {
-        startLevelCode: order[shiftedStartIndex],
-        endLevelCode: order[shiftedEndIndex],
-        endWorksheetNo: planRange.endWorksheetNo || 1
-    };
+    return planRangeForLadderIndex(planRange.planGradeIndex + yearOffset, subjectCode);
 }
 
 function planSegmentsForRange(subjectCode, planRange, minTime, maxTime) {
