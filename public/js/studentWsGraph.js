@@ -9,7 +9,8 @@
 // search/AT/incomplete-ws modules import loadEnrollmentContext from
 // worksheet.js (safe because these three are only ever called from event
 // handlers, never at module-load time).
-import { els, escapeHtml, formatDate, requestJson, selectedEnrollment, state } from "./student-manager.js";
+import { els, selectedEnrollment, state } from "./student-manager.js";
+import { escapeHtml, formatDate, requestJson } from "./studentFormUtil.js";
 
 export function updateWsGraphButtonVisibility() {
     const canShow = Boolean(state.selectedStudentId && state.historyType === "ws");
