@@ -2872,10 +2872,20 @@ async function loadWsGraph() {
     }
 }
 
+const WS_GRAPH_DEFAULT_RANGE = "3";
+
 function openWsGraphModal() {
     if (!state.selectedStudentId) {
         return;
     }
+
+    // Always reopen on the default range instead of carrying over
+    // whatever was last picked (e.g. "12 เดือน" from a previous student)
+    // — every fresh open of the graph should start at 3 months.
+    state.wsGraphRange = WS_GRAPH_DEFAULT_RANGE;
+    els.wsGraphModal.querySelectorAll("[data-ws-graph-range]").forEach((item) => {
+        item.classList.toggle("active", item.dataset.wsGraphRange === WS_GRAPH_DEFAULT_RANGE);
+    });
 
     els.wsGraphModal.classList.remove("hidden");
     loadWsGraph();
