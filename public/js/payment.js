@@ -717,6 +717,10 @@ async function receivePayment() {
         // "Cancel Receipt" view — the flow should end at "received", not
         // linger on a screen whose main action is undoing what just happened.
         closeReceipt();
+        // Straight back into the search box with its text selected, so the
+        // next name typed just replaces it — the till moves on to the next
+        // student without needing a click first.
+        selectInputText(els.paymentSearch);
         await loadPaymentStatus();
     } catch (error) {
         state.isReceivingPayment = false;
