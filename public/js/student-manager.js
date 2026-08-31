@@ -2308,6 +2308,11 @@ function academicYearForTime(time) {
     return month >= 5 ? date.getFullYear() : date.getFullYear() - 1;
 }
 
+// "AI" is deliberately not in here — it's a real level_master row, but
+// only for TRP (subject_id 3; see TRP_PLAN_LEVEL_ORDER below), not ME or
+// EFL. Including it here made it leak into ME/EFL charts' Y-axis whenever
+// the visible range spanned across that position (between 2A and A),
+// showing a level those subjects don't actually have.
 const STANDARD_PLAN_LEVEL_ORDER = [
     "7A",
     "6A",
@@ -2315,7 +2320,6 @@ const STANDARD_PLAN_LEVEL_ORDER = [
     "4A",
     "3A",
     "2A",
-    "AI",
     "A",
     "B",
     "C",
