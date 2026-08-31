@@ -1,5 +1,10 @@
 import express from "express";
-import { getPaymentStatus } from "../services/paymentService.js";
+import {
+    cancelReceiptPayment,
+    getPaymentStatus,
+    previewReceipt,
+    receiveReceiptPayment
+} from "../services/paymentService.js";
 import { getPrinterStatus } from "../services/printerService.js";
 
 const router = express.Router();
@@ -41,6 +46,36 @@ router.get("/printer-status", async (req, res) => {
             success: true,
             ...(await getPrinterStatus())
         });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.post("/receipt/preview", async (req, res) => {
+    try {
+        const result = await previewReceipt(req.body);
+
+        res.json(result);
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.post("/receipt/payment", async (req, res) => {
+    try {
+        const result = await receiveReceiptPayment(req.body);
+
+        res.json(result);
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.post("/receipt/cancel", async (req, res) => {
+    try {
+        const result = await cancelReceiptPayment(req.body);
+
+        res.json(result);
     } catch (error) {
         sendError(res, error);
     }

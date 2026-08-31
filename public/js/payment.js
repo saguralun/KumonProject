@@ -608,7 +608,7 @@ async function refreshReceiptPreview({
     setStatus("กำลังเตรียมใบเสร็จ...");
 
     try {
-        const data = await requestJson("/api/worksheet/receipt/preview", {
+        const data = await requestJson("/api/payment/receipt/preview", {
             method: "POST",
             body: JSON.stringify({
                 enrollmentId: state.selectedRow.sourceEnrollmentId,
@@ -698,7 +698,7 @@ async function receivePayment() {
     els.receiptReceivePayment.textContent = "⏳ กำลังบันทึก";
 
     try {
-        const data = await requestJson("/api/worksheet/receipt/payment", {
+        const data = await requestJson("/api/payment/receipt/payment", {
             method: "POST",
             body: JSON.stringify({
                 enrollmentId: state.selectedRow.sourceEnrollmentId,
@@ -750,7 +750,7 @@ async function cancelPayment() {
     renderReceipt(state.receipt);
 
     try {
-        const data = await requestJson("/api/worksheet/receipt/cancel", {
+        const data = await requestJson("/api/payment/receipt/cancel", {
             method: "POST",
             body: JSON.stringify({
                 billingId: state.receipt.billingId

@@ -8,10 +8,7 @@ import {
     getHistory,
     getIncompleteWorksheetStudents,
     getWorksheetMonthSummary,
-    cancelReceiptPayment,
-    previewReceipt,
     receiveCd,
-    receiveReceiptPayment,
     saveAtCompletion,
     saveWorksheetEntries,
     searchEnrollments
@@ -160,36 +157,6 @@ router.post("/zun-completion", async (req, res) => {
 router.post("/level-completion", async (req, res) => {
     try {
         const result = await completeWorksheetLevelWithoutAt(req.body);
-
-        res.json(result);
-    } catch (error) {
-        sendError(res, error);
-    }
-});
-
-router.post("/receipt/preview", async (req, res) => {
-    try {
-        const result = await previewReceipt(req.body);
-
-        res.json(result);
-    } catch (error) {
-        sendError(res, error);
-    }
-});
-
-router.post("/receipt/payment", async (req, res) => {
-    try {
-        const result = await receiveReceiptPayment(req.body);
-
-        res.json(result);
-    } catch (error) {
-        sendError(res, error);
-    }
-});
-
-router.post("/receipt/cancel", async (req, res) => {
-    try {
-        const result = await cancelReceiptPayment(req.body);
 
         res.json(result);
     } catch (error) {
