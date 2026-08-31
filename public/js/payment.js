@@ -600,9 +600,26 @@ async function refreshReceiptPreview({
         renderPaymentMethods(data.paymentMethods, state.receipt.paymentMethodId);
         renderReceipt(state.receipt);
         els.receiptModal.classList.remove("hidden");
+        focusPrimaryReceiptAction();
         setStatus("พร้อมพิมพ์ใบเสร็จ");
     } catch (error) {
         setStatus(error.message, "error");
+    }
+}
+
+// Keyboard-first flow for the till: default to the Print button so a bare
+// Enter prints right away, and only fall back to รับเงิน when the printer
+// isn't connected (Print stays disabled) so Enter still does something
+// useful. Never auto-focuses Cancel Receipt — that's a destructive action
+// and shouldn't fire from a stray Enter press.
+function focusPrimaryReceiptAction() {
+    if (!els.receiptPrint.disabled) {
+        els.receiptPrint.focus();
+        return;
+    }
+
+    if (!els.receiptReceivePayment.classList.contains("hidden") && !els.receiptReceivePayment.disabled) {
+        els.receiptReceivePayment.focus();
     }
 }
 
@@ -661,13 +678,16 @@ async function receivePayment() {
         });
 
         state.receipt = data.receipt;
-        renderReceipt(state.receipt);
+        state.isReceivingPayment = false;
         setStatus(`รับเงินแล้ว Billing #${data.billingId}`);
+        // Close right away instead of re-rendering into the post-payment
+        // "Cancel Receipt" view — the flow should end at "received", not
+        // linger on a screen whose main action is undoing what just happened.
+        closeReceipt();
         await loadPaymentStatus();
     } catch (error) {
-        setStatus(error.message, "error");
-    } finally {
         state.isReceivingPayment = false;
+        setStatus(error.message, "error");
         renderReceipt(state.receipt);
     }
 }
