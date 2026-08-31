@@ -67,7 +67,7 @@ const state = {
     profile: null,
     selectedEnrollmentId: null,
     historyType: "ws",
-    wsGraphRange: "12",
+    wsGraphRange: "3",
     searchTimer: null,
     addEnrollmentValidationActive: false,
     addStudentValidationActive: false,
@@ -2216,11 +2216,10 @@ function monthYearLabel(dateText) {
     return `${month}/${String(year).slice(-2)}`;
 }
 
-function wsGraphTickLimit(range, totalTicks) {
-    if (range === "3") {
-        return Math.min(3, totalTicks);
-    }
-
+// Only used for range "all" now — the numbered ranges (3/6/12) get a fixed
+// window with one tick per real calendar month instead (see
+// monthStartsInRange), so there's no need to thin those out.
+function wsGraphTickLimit(totalTicks) {
     return Math.min(6, totalTicks);
 }
 
@@ -2266,6 +2265,40 @@ function isoDateFromTime(time) {
     const day = String(date.getDate()).padStart(2, "0");
 
     return `${year}-${month}-${day}`;
+}
+
+// N months before `time`, day-of-month clamped to whatever the target month
+// actually has (plain Date#setMonth rolls Mar 31 - 1 month into early April
+// instead of clamping to Feb 28/29 — this avoids that).
+function monthsAgo(time, months) {
+    const from = new Date(time);
+    const targetMonthIndex = from.getMonth() - months;
+    const target = new Date(from.getFullYear(), targetMonthIndex, 1);
+    const daysInTargetMonth = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+
+    target.setDate(Math.min(from.getDate(), daysInTargetMonth));
+
+    return target.getTime();
+}
+
+// One tick per calendar-month boundary that falls inside [minDate, maxDate]
+// — used for a fixed N-month window so the grid always reads "one column per
+// month" regardless of how much (or little) WS data the student actually has
+// in that window.
+function monthStartsInRange(minDate, maxDate) {
+    const ticks = [];
+    const first = new Date(minDate);
+    const cursor = new Date(first.getFullYear(), first.getMonth(), 1);
+
+    while (cursor.getTime() <= maxDate) {
+        if (cursor.getTime() >= minDate) {
+            ticks.push({ date: isoDateFromTime(cursor.getTime()) });
+        }
+
+        cursor.setMonth(cursor.getMonth() + 1);
+    }
+
+    return ticks;
 }
 
 function academicYearForTime(time) {
@@ -2556,8 +2589,26 @@ function renderWsGraph(data) {
         return;
     }
 
-    let minDate = Math.min(...dates);
-    let maxDate = Math.max(...dates);
+    // For a numbered range (3/6/12 months) the X axis is fixed to that full
+    // trailing window from today — regardless of how much WS data actually
+    // falls inside it — instead of stretching to fit just whatever dates the
+    // student happens to have. "all" has no natural fixed window, so it
+    // keeps auto-fitting to the data's own span like before.
+    const requestedRange = data.range || state.wsGraphRange;
+    const fixedRangeMonths = ["3", "6", "12"].includes(String(requestedRange))
+        ? Number(requestedRange)
+        : null;
+    let minDate;
+    let maxDate;
+
+    if (fixedRangeMonths) {
+        maxDate = localDateTime(isoDateFromTime(Date.now()));
+        minDate = monthsAgo(maxDate, fixedRangeMonths);
+    } else {
+        minDate = Math.min(...dates);
+        maxDate = Math.max(...dates);
+    }
+
     const planSegments = planSegmentsForRange(activeSubjectCode, planRange, minDate, maxDate);
     const levelFirstDate = new Map();
 
@@ -2654,26 +2705,32 @@ function renderWsGraph(data) {
             label: `${level.levelCode}1`
         }
     ]);
-    const monthTickRows = [...rows];
+    let monthTicks;
 
-    if (!hasRows && planSegments.length) {
-        const firstSegment = planSegments[0];
-        const lastSegment = planSegments[planSegments.length - 1];
+    if (fixedRangeMonths) {
+        // Fixed window — one grid line per real calendar month it spans,
+        // whether or not the student has any WS records in that month.
+        monthTicks = monthStartsInRange(minDate, maxDate);
+    } else {
+        const monthTickRows = [...rows];
 
-        monthTickRows.push(
-            { date: firstSegment.startDate },
-            { date: lastSegment.endDate }
-        );
+        if (!hasRows && planSegments.length) {
+            const firstSegment = planSegments[0];
+            const lastSegment = planSegments[planSegments.length - 1];
+
+            monthTickRows.push(
+                { date: firstSegment.startDate },
+                { date: lastSegment.endDate }
+            );
+        }
+
+        const allMonthTicks = [...new Map(monthTickRows.map((row) => [
+            String(row.date).slice(0, 7),
+            row
+        ])).values()];
+
+        monthTicks = pickEvenlySpacedTicks(allMonthTicks, wsGraphTickLimit(allMonthTicks.length));
     }
-
-    const allMonthTicks = [...new Map(monthTickRows.map((row) => [
-        String(row.date).slice(0, 7),
-        row
-    ])).values()];
-    const monthTicks = pickEvenlySpacedTicks(
-        allMonthTicks,
-        wsGraphTickLimit(data.range || state.wsGraphRange, allMonthTicks.length)
-    );
     const grouped = new Map();
 
     rows.forEach((row) => {
