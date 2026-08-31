@@ -490,6 +490,7 @@ function computeOrderPlan(forecastRows, stockData) {
           subjectId: subject.subjectId,
           subject: subject.subjectCode,
           levelMasterId: level.levelMasterId,
+          levelType: level.levelType,
           level: level.levelCode,
           packet: Number(packet),
           levelTotal,
@@ -544,6 +545,7 @@ function computeCdOrderPlan(cdForecastRows, stockData) {
           subjectId: subject.subjectId,
           subject: subject.subjectCode,
           levelMasterId: level.levelMasterId,
+          levelType: level.levelType,
           level: level.levelCode,
           packet: Number(cdNo),
           levelTotal,
@@ -573,6 +575,7 @@ function buildOrderPivot(orders) {
       levelMap.set(levelKey, {
         subjectId: row.subjectId,
         levelMasterId: row.levelMasterId,
+        levelType: row.levelType,
         levelCode: row.level,
         values: {},
         total: 0
@@ -586,11 +589,15 @@ function buildOrderPivot(orders) {
     level.total += row.orderQty;
   });
 
+  // Main levels (level_type 1) before Zun (level_type 2) — Zun levels have
+  // low level_master_id values (they were seeded first), so sorting by id
+  // alone puts them ahead of every main level instead of after O, same fix
+  // Stock/Forecast already apply.
   levelOrder.sort((a, b) => {
     const levelA = levelMap.get(a);
     const levelB = levelMap.get(b);
 
-    return levelA.levelMasterId - levelB.levelMasterId;
+    return levelA.levelType - levelB.levelType || levelA.levelMasterId - levelB.levelMasterId;
   });
 
   const columns = [...columnSet].sort((a, b) => a - b);
