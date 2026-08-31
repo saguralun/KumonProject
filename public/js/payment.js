@@ -15,6 +15,8 @@ const els = {
     totalNetAmount: document.getElementById("totalNetAmount"),
     expectedNetAmount: document.getElementById("expectedNetAmount"),
     unpaidNetAmount: document.getElementById("unpaidNetAmount"),
+    moneySummaryCards: document.getElementById("moneySummaryCards"),
+    moneyVisibilityToggle: document.getElementById("moneyVisibilityToggle"),
     progressPaidSegment: document.getElementById("progressPaidSegment"),
     progressPartialSegment: document.getElementById("progressPartialSegment"),
     progressUnpaidSegment: document.getElementById("progressUnpaidSegment"),
@@ -44,9 +46,15 @@ const state = {
     isCancellingPayment: false,
     printerConnected: false,
     // The sidebar Subject/Status <select> filters were removed as
-    // unnecessary; status filtering still lives in the quick-filter
-    // buttons above the table, backed by this instead of a hidden select.
-    statusFilter: "all"
+    // unnecessary; status filtering lives directly on the status summary
+    // cards now (they double as the quick-filter buttons), backed by this
+    // instead of a hidden select.
+    statusFilter: "unpaid",
+    // Money summary starts masked every page load — these are amounts owed
+    // by named students, and the screen is often visible to whoever's
+    // standing at the counter. Never persisted; resets to hidden on reload.
+    moneyVisible: false,
+    moneySummary: null
 };
 
 function selectInputText(input) {
@@ -217,9 +225,9 @@ function renderSummary(summary) {
     els.paidStudents.textContent = paid;
     els.partialStudents.textContent = partial;
     els.unpaidStudents.textContent = unpaid;
-    els.totalNetAmount.textContent = formatMoney(summary.totalNetAmount || 0);
-    els.expectedNetAmount.textContent = formatMoney(summary.expectedNetAmount || 0);
-    els.unpaidNetAmount.textContent = formatMoney(summary.unpaidNetAmount || 0);
+
+    state.moneySummary = summary;
+    applyMoneyVisibility();
 
     // At-a-glance payment-progress bar under the status cards.
     const pct = (count) => (total > 0 ? `${(count / total) * 100}%` : "0%");
@@ -227,6 +235,29 @@ function renderSummary(summary) {
     els.progressPaidSegment.style.width = pct(paid);
     els.progressPartialSegment.style.width = pct(partial);
     els.progressUnpaidSegment.style.width = pct(unpaid);
+}
+
+const MONEY_MASK = "••••••";
+
+// Money is masked by default (see state.moneyVisible) — this both paints the
+// mask/real numbers and re-runs whenever new summary data arrives, so a
+// background refresh while masked can't accidentally flash real amounts.
+function applyMoneyVisibility() {
+    const summary = state.moneySummary || {};
+
+    if (state.moneyVisible) {
+        els.totalNetAmount.textContent = formatMoney(summary.totalNetAmount || 0);
+        els.expectedNetAmount.textContent = formatMoney(summary.expectedNetAmount || 0);
+        els.unpaidNetAmount.textContent = formatMoney(summary.unpaidNetAmount || 0);
+    } else {
+        els.totalNetAmount.textContent = MONEY_MASK;
+        els.expectedNetAmount.textContent = MONEY_MASK;
+        els.unpaidNetAmount.textContent = MONEY_MASK;
+    }
+
+    els.moneySummaryCards.classList.toggle("is-money-hidden", !state.moneyVisible);
+    els.moneyVisibilityToggle.textContent = state.moneyVisible ? "🙈 ซ่อนยอด" : "👁️ แสดงยอด";
+    els.moneyVisibilityToggle.setAttribute("aria-pressed", String(state.moneyVisible));
 }
 
 function syncQuickFilterButtons() {
@@ -328,8 +359,11 @@ function renderRows(rows) {
                             </span>
                         </td>
                         <td>
-                            <strong>#${escapeHtml(row.studentId)} ${escapeHtml(row.studentName)}</strong>
-                            ${row.nickname ? `<div class="subtle">น้อง${escapeHtml(row.nickname)}</div>` : ""}
+                            <div class="payment-student-name">
+                                <span class="payment-student-id">#${escapeHtml(row.studentId)}</span>
+                                <strong>${escapeHtml(row.studentName)}</strong>
+                            </div>
+                            ${row.nickname ? `<div class="payment-student-nickname">น้อง${escapeHtml(row.nickname)}</div>` : ""}
                         </td>
                         <td>${renderSubjectBadges(row.subjects)}</td>
                         <td>${row.receiptBook ? `${escapeHtml(row.receiptBook)}/${escapeHtml(row.receiptNo)}` : "-"}</td>
@@ -338,7 +372,6 @@ function renderRows(rows) {
                         <td>
                             <strong>${formatMoney(rowNetAmount(row))}</strong>
                             ${row.isPartial ? `<div class="subtle">ยอดค้าง ${formatMoney(row.unpaidNetAmount || 0)} • จ่ายแล้ว ${formatMoney(row.netAmount || 0)}</div>` : ""}
-                            ${!row.isPaid && !row.isPartial ? `<div class="subtle">ยอดที่ควรเก็บ</div>` : ""}
                             ${renderLatestBilling(row)}
                         </td>
                         <td>
@@ -965,6 +998,10 @@ function bindEvents() {
     els.printTestButton.addEventListener("click", printTestReceipt);
     els.printerStatusBadge.addEventListener("click", checkPrinterStatus);
     els.exportUnpaidButton.addEventListener("click", exportUnpaidCsv);
+    els.moneyVisibilityToggle.addEventListener("click", () => {
+        state.moneyVisible = !state.moneyVisible;
+        applyMoneyVisibility();
+    });
     document.querySelectorAll("[data-status-filter]").forEach((button) => {
         button.addEventListener("click", () => {
             state.statusFilter = button.dataset.statusFilter;

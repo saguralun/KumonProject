@@ -356,12 +356,24 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .summary-group-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 10px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.summary-group-hint {
+  color: #94a3b8;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .summary-cards {
@@ -374,11 +386,66 @@ html[data-role="staff"] [data-staff-up] {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.money-visibility-toggle {
+  flex: 0 0 auto;
+  min-height: 26px;
+  border: 1px solid #a7d8cd;
+  border-radius: 999px;
+  padding: 3px 10px;
+  background: #ffffff;
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.money-visibility-toggle:hover:not(:disabled) {
+  background: #ecfdf5;
+}
+
+/* Numbers stay masked by default — this is money tied to named students,
+   often visible to whoever's standing at the counter. Dimming the cards
+   too (not just the digits) makes "this is currently hidden" obvious at a
+   glance, not just on close reading. */
+.summary-cards.is-money-hidden .summary-card {
+  background: var(--surface-soft);
+}
+
+.summary-cards.is-money-hidden strong {
+  color: #94a3b8 !important;
+  letter-spacing: 0.12em;
+}
+
 .summary-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
   padding: 10px 12px;
+}
+
+/* The status cards double as the quick-filter buttons — same information,
+   one control instead of two rows that always had to be kept in sync. */
+button.summary-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+button.summary-card:hover:not(:disabled) {
+  border-color: #93c5fd;
+  transform: translateY(-1px);
+}
+
+button.summary-card:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+button.summary-card.is-active {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+  box-shadow: inset 0 0 0 1px var(--blue);
 }
 
 .summary-card span {
@@ -465,29 +532,11 @@ html[data-role="staff"] [data-staff-up] {
   font-weight: 700;
 }
 
-.quick-filter-row,
 .table-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
-}
-
-.quick-filter-button {
-  min-height: 30px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--surface-soft);
-  padding: 0 12px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.quick-filter-button.is-active {
-  border-color: #bfdbfe;
-  background: var(--blue-soft);
-  color: var(--blue);
 }
 
 .payment-table-panel {
@@ -582,6 +631,32 @@ html[data-role="staff"] [data-staff-up] {
 
 .payment-table tbody tr:hover {
   background: var(--blue-soft);
+}
+
+.payment-student-name {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.payment-student-name strong {
+  color: var(--text);
+  font-weight: 800;
+}
+
+.payment-student-id {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.payment-student-nickname {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .subject-badges {

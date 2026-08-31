@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/payment.css?v=20260828-cache-bust">
+  <link rel="stylesheet" href="/css/payment.css?v=20260831-money-privacy-redesign">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260831-worksheet-ipad-fix">
 </head>
 <body>
@@ -87,24 +87,24 @@
 
       <section class="summary-section" aria-label="Payment summary">
         <div class="summary-group summary-group-status">
-          <div class="summary-group-title">สถานะการจ่าย</div>
-          <div class="summary-cards">
-            <div class="summary-card is-total">
+          <div class="summary-group-title">สถานะการจ่าย <span class="summary-group-hint">กดการ์ดเพื่อกรอง</span></div>
+          <div class="summary-cards" aria-label="Quick payment filters">
+            <button type="button" class="summary-card is-total" data-status-filter="all">
               <span>ทั้งหมด</span>
               <strong id="totalStudents">0</strong>
-            </div>
-            <div class="summary-card is-paid">
+            </button>
+            <button type="button" class="summary-card is-paid" data-status-filter="paid">
               <span>จ่ายแล้ว</span>
               <strong id="paidStudents">0</strong>
-            </div>
-            <div class="summary-card is-partial">
+            </button>
+            <button type="button" class="summary-card is-partial" data-status-filter="partial">
               <span>จ่ายบางส่วน</span>
               <strong id="partialStudents">0</strong>
-            </div>
-            <div class="summary-card is-unpaid">
+            </button>
+            <button type="button" class="summary-card is-unpaid" data-status-filter="unpaid">
               <span>ยังไม่จ่าย</span>
               <strong id="unpaidStudents">0</strong>
-            </div>
+            </button>
           </div>
           <div class="summary-progress" role="img" aria-label="สัดส่วนสถานะการจ่ายเงิน">
             <div class="summary-progress-segment is-paid" id="progressPaidSegment"></div>
@@ -114,31 +114,28 @@
         </div>
 
         <div class="summary-group summary-group-money">
-          <div class="summary-group-title">ยอดเงิน</div>
-          <div class="summary-cards">
+          <div class="summary-group-title">
+            <span>ยอดเงิน</span>
+            <button type="button" class="money-visibility-toggle" id="moneyVisibilityToggle" aria-pressed="false">👁️ แสดงยอด</button>
+          </div>
+          <div class="summary-cards is-money-hidden" id="moneySummaryCards">
             <div class="summary-card is-expected">
               <span>ยอดที่ควรเก็บ</span>
-              <strong id="expectedNetAmount">0.00</strong>
+              <strong id="expectedNetAmount">••••••</strong>
             </div>
             <div class="summary-card is-net">
               <span>เก็บได้แล้ว</span>
-              <strong id="totalNetAmount">0.00</strong>
+              <strong id="totalNetAmount">••••••</strong>
             </div>
             <div class="summary-card is-unpaid-net">
               <span>ค้างเก็บ</span>
-              <strong id="unpaidNetAmount">0.00</strong>
+              <strong id="unpaidNetAmount">••••••</strong>
             </div>
           </div>
         </div>
       </section>
 
       <section class="search-panel" aria-label="Payment search">
-        <div class="quick-filter-row" aria-label="Quick payment filters">
-          <button type="button" class="quick-filter-button" data-status-filter="all">ทั้งหมด</button>
-          <button type="button" class="quick-filter-button" data-status-filter="paid">จ่ายแล้ว</button>
-          <button type="button" class="quick-filter-button" data-status-filter="partial">จ่ายบางส่วน</button>
-          <button type="button" class="quick-filter-button" data-status-filter="unpaid">ยังไม่จ่าย</button>
-        </div>
         <label>
           <span>ค้นหาเด็ก / ID / Enrollment</span>
           <input id="paymentSearch" type="text" autocomplete="off" placeholder="พิมพ์ชื่อเด็ก, student id หรือ enrollment id">
@@ -201,6 +198,6 @@
   </div>
 
   <script src="/js/authClient.js?v=20260831-auth-bar-update-button"></script>
-  <script type="module" src="/js/payment.js?v=20260831-receipt-keyboard-flow"></script>
+  <script type="module" src="/js/payment.js?v=20260831-money-privacy-redesign"></script>
 </body>
 </html>
