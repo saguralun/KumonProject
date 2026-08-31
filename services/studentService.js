@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { httpError } from "./httpError.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
@@ -19,12 +20,6 @@ async function hasOpeningScheduleActiveColumn() {
     `, [TABLE_SCHEMA]);
 
     return result.rows.length > 0;
-}
-
-function httpError(statusCode, message) {
-    const error = new Error(message);
-    error.statusCode = statusCode;
-    return error;
 }
 
 function normalizeDate(value) {

@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { httpError } from "./httpError.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
@@ -201,13 +202,6 @@ const DEFAULT_PATTERN_CODE = WORKSHEET_PATTERNS[1].code;
 const PATTERNS_BY_CODE = new Map(
     WORKSHEET_PATTERNS.map((pattern) => [pattern.code, pattern])
 );
-
-function httpError(statusCode, message) {
-    const error = new Error(message);
-    error.statusCode = statusCode;
-
-    return error;
-}
 
 function isCompleterLevel(subjectCode, levelCode) {
     return COMPLETER_LEVEL_BY_SUBJECT.get(subjectCode) === levelCode;
