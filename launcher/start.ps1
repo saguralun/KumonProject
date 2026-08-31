@@ -89,12 +89,18 @@ function Resolve-ChromePath {
 $chromePath = Resolve-ChromePath
 
 if ($chromePath) {
-    # --kiosk-printing skips Chrome's print preview dialog entirely and
-    # sends the job straight to whatever is set as the Windows default
-    # printer (the receipt layout is already sized for an 80mm thermal
-    # printer via @page in payment.css). Only affects this dedicated
-    # app-mode window, not the user's regular Chrome.
-    Start-Process -FilePath $chromePath -ArgumentList @("--app=$LoadingUrl", "--start-maximized", "--kiosk-printing")
+    # --kiosk-printing was meant to skip Chrome's print preview dialog
+    # entirely and send the job straight to whatever is set as the Windows
+    # default printer (the receipt layout is already sized for an 80mm
+    # thermal printer via @page in payment.css). Disabled for now — this
+    # flag has a known bug in recent Chrome versions and silently produces
+    # no print job at all (verified against the actual Xprinter here: no
+    # dialog, no job ever reaches the Windows spooler, even to
+    # "Microsoft Print to PDF"). Falling back to the normal print dialog so
+    # staff can manually pick the printer and confirm — re-enable once the
+    # silent-print bug is sorted out (or once SilentPrintingEnabled proves
+    # reliable across a real restart).
+    Start-Process -FilePath $chromePath -ArgumentList @("--app=$LoadingUrl", "--start-maximized")
 }
 else {
     # Chrome not found anywhere expected — no splash window in this path,

@@ -7,6 +7,7 @@ import {
     receiveReceiptPayment
 } from "../services/paymentService.js";
 import { getPrinterStatus } from "../services/printerService.js";
+import { printRawAsciiTest } from "../services/printerRawService.js";
 
 const router = express.Router();
 
@@ -64,6 +65,19 @@ router.post("/receipt/payment", async (req, res) => {
 router.post("/receipt/cancel", async (req, res) => {
     try {
         const result = await cancelReceiptPayment(req.body);
+
+        res.json(result);
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+// Sends raw ESC/POS bytes straight to the Windows printer queue's spooler,
+// bypassing window.print()/Chrome entirely — see services/printerRawService.js
+// for why (Chrome's print dialog was unreliable for this printer/setup).
+router.post("/print-raw-test", async (req, res) => {
+    try {
+        const result = await printRawAsciiTest();
 
         res.json(result);
     } catch (error) {

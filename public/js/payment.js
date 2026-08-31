@@ -823,57 +823,22 @@ function exportUnpaidCsv() {
     setStatus(`Export รายชื่อค้างจ่าย ${rows.length} รายการแล้ว`);
 }
 
-// A browser page has no way to actually query printer status (no web API
-// exposes that) — the closest real check is just printing something and
-// seeing whether it comes out. This gives staff a quick, low-stakes way to
-// do that without pulling up a real receipt, sized the same as one so it
-// also confirms the 80mm layout itself looks right.
-function printTestReceipt() {
-    const printWindow = window.open("", "_blank", "width=400,height=600");
+// Sends a raw ESC/POS test payload straight to the printer's Windows
+// queue, server-side — see services/printerRawService.js. This replaces
+// an earlier window.print()-based version: Chrome's print preview dialog
+// turned out to be unreliable on the till PC (would randomly close itself
+// in well under a second, before ever reaching the printer — confirmed via
+// zero jobs ever landing in the Windows print queue across many attempts),
+// so this bypasses the browser's print pipeline entirely instead.
+async function printTestReceipt() {
+    setStatus("กำลังส่งทดสอบพิมพ์...");
 
-    if (!printWindow) {
-        setStatus("Browser บล็อกหน้าต่าง print", "error");
-        return;
+    try {
+        await requestJson("/api/payment/print-raw-test", { method: "POST" });
+        setStatus("ส่งทดสอบพิมพ์แล้ว — เช็คที่เครื่องพิมพ์");
+    } catch (error) {
+        setStatus(error.message, "error");
     }
-
-    const now = new Date();
-    const dateText = now.toLocaleDateString("th-TH", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const timeText = now.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit", hour12: false });
-
-    printWindow.document.write(`
-        <!doctype html>
-        <html lang="th">
-        <head>
-            <meta charset="utf-8">
-            <title>ทดสอบพิมพ์</title>
-            <style>
-                @page { size: 80mm auto; margin: 0; }
-                body { font-family: "Sarabun", Arial, sans-serif; color: #111827; }
-                .paper { width: 80mm; padding: 4mm; box-sizing: border-box; font-size: 10.5px; }
-                h1 { font-size: 13px; text-align: center; margin: 0 0 6px; }
-                .line { border-top: 1px dashed #111827; margin: 6px 0; }
-                .row { display: flex; justify-content: space-between; }
-                .center { text-align: center; }
-            </style>
-        </head>
-        <body>
-            <div class="paper">
-                <h1>ทดสอบเครื่องพิมพ์</h1>
-                <div class="line"></div>
-                <div class="row"><span>วันที่</span><span>${escapeHtml(dateText)}</span></div>
-                <div class="row"><span>เวลา</span><span>${escapeHtml(timeText)}</span></div>
-                <div class="row"><span>ขนาดกระดาษ</span><span>80mm</span></div>
-                <div class="line"></div>
-                <div class="center">ถ้าพิมพ์ออกมาเต็มความกว้าง<br>และตัดกระดาษถูกจุด<br>แปลว่าพร้อมใช้งานแล้ว</div>
-                <div class="line"></div>
-            </div>
-        </body>
-        </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-    setStatus("ส่งทดสอบพิมพ์แล้ว");
 }
 
 // Reads real Windows printer status server-side (browsers have no API for
