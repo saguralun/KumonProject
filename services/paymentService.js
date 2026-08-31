@@ -1,7 +1,7 @@
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
+import { formatStudentName } from "./enrollmentHelpers.js";
 import {
-    formatStudentName,
     getEnrollmentRow,
     normalizeBillingPeriod,
     normalizeDate
@@ -463,11 +463,11 @@ export async function getPaymentStatus({
 // Moved here from worksheetService.js, which originally held every
 // worksheet-input AND payment concern in one file. This is the part that
 // actually handles money (getPaymentStatus above is read-only reporting);
-// getEnrollmentRow/formatStudentName/normalizeDate are core enrollment/
-// date helpers still owned by worksheetService.js and imported from
-// there rather than duplicated. normalizeBillingPeriod stayed there too
-// (rather than moving here with the rest) because worksheetService.js's
-// own getWorksheetMonthSummary needs it as well.
+// getEnrollmentRow/normalizeDate are core enrollment/date helpers still
+// owned by worksheetService.js and imported from there rather than
+// duplicated. normalizeBillingPeriod stayed there too (rather than moving
+// here with the rest) because worksheetService.js's own
+// getWorksheetMonthSummary needs it as well.
 
 function money(value) {
     return Number(Number(value || 0).toFixed(2));

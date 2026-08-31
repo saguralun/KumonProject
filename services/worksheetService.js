@@ -1,14 +1,10 @@
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
+import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
 const FREE_COMPLETION_LEVEL_CODES = ["6A", "5A"];
-const COMPLETER_LEVEL_BY_SUBJECT = new Map([
-    ["ME", "O"],
-    ["EFL", "O"],
-    ["TRP", "III"]
-]);
 const DEFAULT_HISTORY_LIMIT = 30;
 const MAX_HISTORY_LIMIT = 100;
 
@@ -203,10 +199,6 @@ const PATTERNS_BY_CODE = new Map(
     WORKSHEET_PATTERNS.map((pattern) => [pattern.code, pattern])
 );
 
-function isCompleterLevel(subjectCode, levelCode) {
-    return COMPLETER_LEVEL_BY_SUBJECT.get(subjectCode) === levelCode;
-}
-
 function normalizeHistoryLimit(value) {
     const limit = Number(value);
 
@@ -315,14 +307,6 @@ function monthsDaysBetween(startDateText, endDateText) {
         days,
         label: parts.join(" ")
     };
-}
-
-export function formatStudentName(row) {
-    const firstName = row.first_name || "";
-    const lastName = row.last_name || "";
-    const nickname = row.nickname ? ` (น้อง${row.nickname})` : "";
-
-    return `${firstName} ${lastName}${nickname}`.trim();
 }
 
 // Which Kumon billing month/year a date falls into — the day>20 rolls to

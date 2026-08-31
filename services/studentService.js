@@ -1,14 +1,10 @@
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
+import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
 const HISTORY_LIMIT = 80;
-const COMPLETER_LEVEL_BY_SUBJECT = new Map([
-    ["ME", "O"],
-    ["EFL", "O"],
-    ["TRP", "III"]
-]);
 
 async function hasOpeningScheduleActiveColumn() {
     const result = await pool.query(`
@@ -171,15 +167,6 @@ function nextPeriod(period) {
 
 function monthIndex(period) {
     return Number(period.year) * 12 + Number(period.month);
-}
-
-function formatStudentName(row) {
-    const nickname = row.nickname ? ` (น้อง${row.nickname})` : "";
-    return `${row.first_name || ""} ${row.last_name || ""}${nickname}`.trim();
-}
-
-function isCompleterLevel(subjectCode, levelCode) {
-    return COMPLETER_LEVEL_BY_SUBJECT.get(subjectCode) === levelCode;
 }
 
 function mapStudent(row) {
