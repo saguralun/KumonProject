@@ -493,3 +493,25 @@
     gap: 8px !important;
   }
 }
+
+/*
+ * The compact-density block above forces .worksheet-page .input-layout to a
+ * fixed 4-column grid at EVERY viewport width (it lives inside an
+ * unconditional `@media screen` block), which defeats worksheet.css's own
+ * `@media (max-width: 1120px)` collapse-to-1-column breakpoint — that rule
+ * has no !important, so it always loses. The 4-column minimums add up to
+ * ~991px, which overflows the content pane on every iPad size (portrait and
+ * most landscape orientations, since the 256px sidebar eats into the
+ * available width). This block re-collapses those specific pieces back to a
+ * single column below that threshold, restoring real responsiveness on
+ * tablets without touching the dense desktop layout above.
+ */
+@media (max-width: 1260px) {
+  .worksheet-page .input-layout {
+    grid-template-columns: 1fr !important;
+  }
+
+  .worksheet-page .student-strip {
+    grid-template-columns: 1fr !important;
+  }
+}

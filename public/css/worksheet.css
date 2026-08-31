@@ -1652,24 +1652,8 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 @media (max-width: 860px) {
-  .worksheet-page {
-    grid-template-columns: 1fr;
-  }
-
-  .subject-rail {
-    position: static;
-    height: auto;
-    padding: 12px;
-  }
-
   .subject-buttons {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .home-link,
-  .rail-nav,
-  .rail-title {
-    display: none;
   }
 
   .workspace {
@@ -1705,8 +1689,16 @@ html[data-role="staff"] [data-staff-up] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .mode-button {
+    min-height: 40px;
+  }
+
   .pattern-buttons {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pattern-button {
+    min-height: 38px;
   }
 
   .secondary-actions {
