@@ -97,7 +97,7 @@ els.updateBannerButton.addEventListener("click", async () => {
     }
   }
 
-  els.updateBannerButton.textContent = "สำเร็จ กำลังโหลด...";
+  els.updateBannerButton.textContent = "สำเร็จ";
   await waitForServerAndReload();
 });
 
