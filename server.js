@@ -12,6 +12,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import stockReceiveRoutes from "./routes/stockReceiveRoutes.js";
 import stockCutRoutes from "./routes/stockCutRoutes.js";
 import stockSummaryRoutes from "./routes/stockSummaryRoutes.js";
+import exportRoutes from "./routes/exportRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import forecastRoutes from "./routes/forecastRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
@@ -26,7 +27,9 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PgSession = connectPgSimple(session);
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 
-app.use(express.json());
+// Default 100kb is too small for a 5-sheet Forecast/Order/Expect Stock
+// export payload (every level x packet in the pivot, sent as JSON).
+app.use(express.json({ limit: "5mb" }));
 
 app.use(session({
   store: new PgSession({
@@ -134,6 +137,7 @@ app.use("/api/payment", requireStaff, paymentRoutes);
 app.use("/api/stock-receive", requireStaff, stockReceiveRoutes);
 app.use("/api/stock-cut", requireStaff, stockCutRoutes);
 app.use("/api/stock-summary", requireStaff, stockSummaryRoutes);
+app.use("/api/export", requireStaff, exportRoutes);
 app.use("/api/forecast", requireStaff, forecastRoutes);
 app.use("/api/report", requireStaff, reportRoutes);
 app.use("/api/users", requireAdmin, userRoutes);

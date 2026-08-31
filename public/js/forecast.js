@@ -23,7 +23,10 @@ const els = {
   orderCdSuggestionTableWrap: document.getElementById("orderCdSuggestionTableWrap"),
   expectedStockSubtitle: document.getElementById("expectedStockSubtitle"),
   expectedStockTableWrap: document.getElementById("expectedStockTableWrap"),
-  expectedStockCdTableWrap: document.getElementById("expectedStockCdTableWrap")
+  expectedStockCdTableWrap: document.getElementById("expectedStockCdTableWrap"),
+  exportForecastButton: document.getElementById("exportForecastButton"),
+  exportOrderButton: document.getElementById("exportOrderButton"),
+  exportExpectedStockButton: document.getElementById("exportExpectedStockButton")
 };
 
 let lastForecastData = null;
@@ -845,6 +848,132 @@ async function generateForecast({ force = false } = {}) {
   }
 }
 
+// Excel export — 5 sheets per view (WS x ME/EFL/TRP, CD x EFL/TRP; ME has
+// no CD). Reuses whatever pivot data is already computed for the screen —
+// the exported numbers are exactly what's displayed, no separate calc path.
+const WS_EXPORT_SUBJECTS = ["ME", "EFL", "TRP"];
+const CD_EXPORT_SUBJECTS = ["EFL", "TRP"];
+
+function pivotToSheetPayload(name, pivot) {
+  return {
+    name,
+    columns: pivot.columns,
+    rows: pivot.levels.map((level) => ({
+      label: level.levelCode,
+      values: level.values,
+      total: level.total
+    })),
+    columnTotals: pivot.columnTotals,
+    grandTotal: pivot.grandTotal
+  };
+}
+
+// CD forecast rows have no packet breakdown (one number per level) — reuse
+// buildOrderPivot with a synthetic single "packet" (1) so the CD sheet has
+// the same Level/column/รวม shape as everything else.
+function buildCdForecastPivot(cdRows, subjectCode) {
+  const mapped = cdRows
+    .filter((row) => row.subject === subjectCode)
+    .map((row) => ({
+      subjectId: row.subjectId,
+      levelMasterId: row.levelMasterId,
+      levelType: 1,
+      level: row.level,
+      packet: 1,
+      qty: row.prepareQty
+    }));
+
+  return buildOrderPivot(mapped, "qty");
+}
+
+async function downloadWorkbook(filename, sheets) {
+  const response = await fetch("/api/export/pivot-workbook", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ filename, sheets })
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+
+    throw new Error(data.error || "Export failed");
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = `${filename}.xlsx`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function runExport(button, filename, sheets) {
+  const originalText = button.textContent;
+
+  button.disabled = true;
+  button.textContent = "⏳ กำลัง export...";
+
+  try {
+    await downloadWorkbook(filename, sheets);
+  } catch (error) {
+    alert(`Export ไม่สำเร็จ: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = originalText;
+  }
+}
+
+function exportForecastExcel() {
+  const rows = (lastForecastData && lastForecastData.rows) || [];
+  const cdRows = (lastForecastData && lastForecastData.cdRows) || [];
+  const sheets = [
+    ...WS_EXPORT_SUBJECTS.map((code) =>
+      pivotToSheetPayload(`WS - ${code}`, buildWsPivot(rows.filter((row) => row.subject === code)))
+    ),
+    ...CD_EXPORT_SUBJECTS.map((code) =>
+      pivotToSheetPayload(`CD - ${code}`, buildCdForecastPivot(cdRows, code))
+    )
+  ];
+
+  runExport(els.exportForecastButton, "Forecast", sheets);
+}
+
+function exportOrderExcel() {
+  const sheets = [
+    ...WS_EXPORT_SUBJECTS.map((code) =>
+      pivotToSheetPayload(`WS - ${code}`, buildOrderPivot(lastOrderPlan.filter((row) => row.subject === code)))
+    ),
+    ...CD_EXPORT_SUBJECTS.map((code) =>
+      pivotToSheetPayload(`CD - ${code}`, buildOrderPivot(lastCdOrderPlan.filter((row) => row.subject === code)))
+    )
+  ];
+
+  runExport(els.exportOrderButton, "Order", sheets);
+}
+
+function exportExpectedStockExcel() {
+  const sheets = [
+    ...WS_EXPORT_SUBJECTS.map((code) =>
+      pivotToSheetPayload(
+        `WS - ${code}`,
+        buildOrderPivot(lastOrderPlan.filter((row) => row.subject === code), "expectedStock")
+      )
+    ),
+    ...CD_EXPORT_SUBJECTS.map((code) =>
+      pivotToSheetPayload(
+        `CD - ${code}`,
+        buildOrderPivot(lastCdOrderPlan.filter((row) => row.subject === code), "expectedStock")
+      )
+    )
+  ];
+
+  runExport(els.exportExpectedStockButton, "Expect Stock", sheets);
+}
+
 // One-way switch — once you commit to ordering, the forecast controls lock
 // so nothing here (button, days, subject tabs) can quietly recompute the
 // numbers you're about to order against. Refresh the page to forecast again.
@@ -882,6 +1011,9 @@ els.forecastButton.addEventListener("click", () => generateForecast());
 els.recalculateForecastButton.addEventListener("click", () => generateForecast({ force: true }));
 els.orderButton.addEventListener("click", showOrderView);
 els.expectedStockButton.addEventListener("click", showExpectedStockView);
+els.exportForecastButton.addEventListener("click", exportForecastExcel);
+els.exportOrderButton.addEventListener("click", exportOrderExcel);
+els.exportExpectedStockButton.addEventListener("click", exportExpectedStockExcel);
 els.forecastDetailClose.addEventListener("click", closeForecastDetail);
 els.forecastDetailModal.addEventListener("click", (event) => {
   if (event.target === els.forecastDetailModal) {

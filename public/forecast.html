@@ -83,8 +83,11 @@
       <div class="forecast-view" id="forecastResultsView">
         <section class="panel forecast-table-panel">
           <div class="panel-header">
-            <div class="panel-title">ผลลัพธ์ Forecast — WS</div>
-            <div class="subtle" id="resultSubtitle">เลือกจำนวนวัน แล้วกด Forecast</div>
+            <div>
+              <div class="panel-title">ผลลัพธ์ Forecast — WS</div>
+              <div class="subtle" id="resultSubtitle">เลือกจำนวนวัน แล้วกด Forecast</div>
+            </div>
+            <button type="button" class="secondary-button" id="exportForecastButton">📥 Export Excel</button>
           </div>
           <div class="forecast-summary" id="forecastSummary"></div>
           <div class="forecast-table-wrap" id="forecastTableWrap">
@@ -110,6 +113,7 @@
               <div class="panel-title">🛒 แนะนำสั่งซื้อ</div>
               <div class="subtle">ต้องมี = 5 (base) + เพดาน(รวม Forecast ของ zone ÷ 2.5) — order ปัดเป็นเลขลงท้าย 0/5 (หรือ 0/3/6/9 ถ้ารวม Forecast ของ zone &lt; 30) — สลับวิชาได้จากแท็บด้านซ้าย</div>
             </div>
+            <button type="button" class="secondary-button" id="exportOrderButton">📥 Export Excel</button>
           </div>
           <div class="forecast-table-wrap" id="orderSuggestionTableWrap">
             <div class="empty-state">ยังไม่มี Forecast</div>
@@ -134,6 +138,7 @@
               <div class="panel-title">📈 Expect Stock</div>
               <div class="subtle" id="expectedStockSubtitle">stock ที่มีอยู่ − Forecast ที่จะใช้ + จำนวนที่แนะนำสั่ง = stock ที่เหลือ ถ้าสั่งตามนี้จริง</div>
             </div>
+            <button type="button" class="secondary-button" id="exportExpectedStockButton">📥 Export Excel</button>
           </div>
           <div class="forecast-table-wrap" id="expectedStockTableWrap">
             <div class="empty-state">ยังไม่มี Forecast</div>
@@ -170,6 +175,6 @@
   </div>
 
   <script src="/js/authClient.js?v=20260828-cache-bust"></script>
-  <script src="/js/forecast.js?v=20260830-forecast-expected-stock"></script>
+  <script src="/js/forecast.js?v=20260830-forecast-excel-export"></script>
 </body>
 </html>
