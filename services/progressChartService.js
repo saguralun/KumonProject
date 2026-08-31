@@ -59,46 +59,62 @@ function buildReferenceLines(groups, levelIndexByCode) {
 }
 
 async function loadActiveStudentsForSubject(subjectCode) {
+    // active_enrollments narrows to this subject's ~150-200 active students
+    // FIRST. latest_ws then only has to scan worksheet_used (300k+ rows)
+    // joined against that small set — the original version joined
+    // worksheet_used against every enrollment in the whole system inside
+    // the CTE, which Postgres re-ran as a correlated nested loop once per
+    // outer row (166 loops) instead of once: ~15s instead of ~0.1s.
     const result = await pool.query(`
-        WITH latest_ws AS (
+        WITH active_enrollments AS (
+            SELECT
+                e.enrollment_id,
+                e.student_id,
+                e.current_level_master_id,
+                e.is_kumon_connect
+            FROM ${TABLE_SCHEMA}.enrollment e
+            JOIN ${TABLE_SCHEMA}.subject_master subject
+                ON subject.subject_id = e.subject_id
+            JOIN ${TABLE_SCHEMA}.level_master current_level
+                ON current_level.level_master_id = e.current_level_master_id
+            JOIN ${TABLE_SCHEMA}.status_master status
+                ON status.status_id = e.current_status_group1_id
+            WHERE subject.subject_code = $1
+              AND current_level.level_type = 1
+              AND status.status_code = ANY($2::text[])
+        ),
+        latest_ws AS (
             SELECT DISTINCT ON (wu.enrollment_id)
                 wu.enrollment_id,
                 wu.actual_worksheet_no
             FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN active_enrollments ae
+                ON ae.enrollment_id = wu.enrollment_id
             JOIN ${TABLE_SCHEMA}.worksheet_master wm
                 ON wm.worksheet_master_id = wu.worksheet_master_id
-            JOIN ${TABLE_SCHEMA}.enrollment e2
-                ON e2.enrollment_id = wu.enrollment_id
             WHERE wu.cpws = TRUE
-              AND wm.level_master_id = e2.current_level_master_id
+              AND wm.level_master_id = ae.current_level_master_id
             ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
         )
         SELECT
-            e.enrollment_id,
-            e.student_id,
+            ae.enrollment_id,
+            ae.student_id,
             student.first_name,
             student.last_name,
             student.nickname,
             grade.school_class AS school_grade_class,
             current_level.level_code AS current_level_code,
             COALESCE(lw.actual_worksheet_no, 0)::int AS actual_worksheet_no,
-            e.is_kumon_connect
-        FROM ${TABLE_SCHEMA}.enrollment e
+            ae.is_kumon_connect
+        FROM active_enrollments ae
         JOIN ${TABLE_SCHEMA}.student student
-            ON student.student_id = e.student_id
-        JOIN ${TABLE_SCHEMA}.subject_master subject
-            ON subject.subject_id = e.subject_id
+            ON student.student_id = ae.student_id
         JOIN ${TABLE_SCHEMA}.level_master current_level
-            ON current_level.level_master_id = e.current_level_master_id
+            ON current_level.level_master_id = ae.current_level_master_id
         LEFT JOIN ${TABLE_SCHEMA}.school_grade_master grade
             ON grade.school_grade_id = student.school_grade_id
-        JOIN ${TABLE_SCHEMA}.status_master status
-            ON status.status_id = e.current_status_group1_id
         LEFT JOIN latest_ws lw
-            ON lw.enrollment_id = e.enrollment_id
-        WHERE subject.subject_code = $1
-          AND current_level.level_type = 1
-          AND status.status_code = ANY($2::text[])
+            ON lw.enrollment_id = ae.enrollment_id
         ORDER BY current_level.level_master_id, student.first_name
     `, [subjectCode, ACTIVE_STATUS_CODES]);
 
