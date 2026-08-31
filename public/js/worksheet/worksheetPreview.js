@@ -245,19 +245,6 @@ export function focusWorksheetControl(input) {
     }
 }
 
-// Unused even in the original monolithic file (defined, never called) —
-// kept as-is rather than dropped, since the goal here was reorganizing,
-// not cleaning up dead code.
-function renderOptionsDatalist(id, options) {
-    return `
-        <datalist id="${escapeHtml(id)}">
-            ${options.map((option) => `
-                <option value="${escapeHtml(option.worksheetNo)}"></option>
-            `).join("")}
-        </datalist>
-    `;
-}
-
 function nextDefaultNo(value, options) {
     return moveWorksheetNo(value, options, 1);
 }
