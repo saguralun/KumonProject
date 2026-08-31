@@ -2474,40 +2474,43 @@ function planLevelCodesBetween(subjectCode, startLevelCode, endLevelCode) {
     return order.slice(from, to + 1);
 }
 
-function shiftPlanLevelCode(subjectCode, levelCode, yearOffset) {
-    const order = String(subjectCode || "").toUpperCase() === "TRP"
-        ? TRP_PLAN_LEVEL_ORDER
-        : STANDARD_PLAN_LEVEL_ORDER;
-    const index = order.indexOf(String(levelCode || "").toUpperCase());
-
-    if (index < 0) {
-        return null;
-    }
-
-    const shiftedIndex = index + yearOffset;
-
-    if (shiftedIndex < 0 || shiftedIndex >= order.length) {
-        return null;
-    }
-
-    return order[shiftedIndex];
-}
-
 function shiftPlanSegment(subjectCode, planRange, yearOffset) {
     if (String(subjectCode || "").toUpperCase() === "TRP" && planRange?.planGradeIndex) {
         return TRP_PLAN_GRADE_RANGES[planRange.planGradeIndex + yearOffset] || null;
     }
 
-    const startLevelCode = shiftPlanLevelCode(subjectCode, planRange.startLevelCode, yearOffset);
-    const endLevelCode = shiftPlanLevelCode(subjectCode, planRange.endLevelCode, yearOffset);
+    const order = STANDARD_PLAN_LEVEL_ORDER;
+    const startIndex = order.indexOf(String(planRange.startLevelCode || "").toUpperCase());
+    const endIndex = order.indexOf(String(planRange.endLevelCode || "").toUpperCase());
 
-    if (!startLevelCode || !endLevelCode) {
+    if (startIndex < 0 || endIndex < 0) {
+        return null;
+    }
+
+    // Chain every year onto the current bracket's own pace (its
+    // start->end span) rather than shifting both endpoints by 1 level
+    // index each. Shifting both by a flat 1 only stays continuous across
+    // the May 1st year boundary when the current bracket spans exactly 1
+    // level — true for most school years, but เตรียมอนุบาล spans 2
+    // (6A->4A) and similar brackets don't — so past/future segments would
+    // land a level away from where the adjacent segment ends, and the
+    // dashed plan line visibly jumps at each boundary instead of
+    // connecting. Scaling the shift by the span keeps every segment's end
+    // exactly equal to the next segment's start, by construction.
+    const span = endIndex - startIndex;
+    const shiftedStartIndex = startIndex + (yearOffset * span);
+    const shiftedEndIndex = shiftedStartIndex + span;
+
+    if (
+        shiftedStartIndex < 0 || shiftedStartIndex >= order.length
+        || shiftedEndIndex < 0 || shiftedEndIndex >= order.length
+    ) {
         return null;
     }
 
     return {
-        startLevelCode,
-        endLevelCode,
+        startLevelCode: order[shiftedStartIndex],
+        endLevelCode: order[shiftedEndIndex],
         endWorksheetNo: planRange.endWorksheetNo || 1
     };
 }
