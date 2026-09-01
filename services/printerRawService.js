@@ -1,14 +1,20 @@
+import { discoverPrinterHost } from "./printerDiscoveryService.js";
 import { renderLinesToBitmap } from "./receiptBitmapRenderer.js";
 import { sendViaLan } from "./printerTransportLan.js";
 import { sendViaUsb } from "./printerTransportUsb.js";
 
-// Switch to "lan" once the Xprinter is on Ethernet with a fixed IP (update
-// LAN_PRINTER_HOST below first) — everything else in this file stays the
-// same either way.
-const PRINTER_TRANSPORT = "usb";
+// "auto" (default) scans the LAN for the printer every time it's needed
+// (fast — uses a cached IP after the first successful print, see
+// printerDiscoveryService.js) and falls back to USB automatically if
+// nothing answers on the network at all. This means moving the printer or
+// the whole till PC to a different location/router never needs a code
+// change — plug in and go. Force "usb" here only to skip auto-detection
+// entirely, e.g. for troubleshooting the USB path specifically (there's no
+// forced "lan" mode since discovery already IS the LAN path — it just also
+// knows how to fail over).
+const PRINTER_TRANSPORT = "auto";
 
 const USB_PRINTER_NAME = "Xprinter XP-80"; // must match the Windows printer queue name exactly
-const LAN_PRINTER_HOST = "192.168.1.100"; // TODO: set to the printer's actual static IP once on LAN
 const LAN_PRINTER_PORT = 9100; // standard raw/JetDirect-style port for thermal/POS printers
 
 const ESC = 0x1b;
@@ -89,8 +95,18 @@ export function buildAsciiTestPayload() {
 }
 
 async function sendRawBytes(buffer) {
-    if (PRINTER_TRANSPORT === "lan") {
-        await sendViaLan(buffer, LAN_PRINTER_HOST, LAN_PRINTER_PORT);
+    if (PRINTER_TRANSPORT === "usb") {
+        await sendViaUsb(buffer, USB_PRINTER_NAME);
+        return;
+    }
+
+    // "auto": try to find the printer on the LAN, fall back to USB if
+    // nothing answers (unplugged from the network, moved, etc.) — USB
+    // still needs the Windows printer queue set up as before.
+    const host = await discoverPrinterHost();
+
+    if (host) {
+        await sendViaLan(buffer, host, LAN_PRINTER_PORT);
         return;
     }
 

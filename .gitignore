@@ -14,6 +14,9 @@ node_modules/
 migration/*.csv
 migration/*.txt
 
+# Runtime state — regenerated automatically, meaningless on another machine
+config/printer-lan-cache.json
+
 # OS / Editor
 .DS_Store
 Thumbs.db
