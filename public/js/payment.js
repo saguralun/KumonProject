@@ -158,6 +158,44 @@ function monthName(month) {
     ][Number(month)] || month;
 }
 
+// receipt.studentName arrives as one combined string from the shared
+// formatStudentName() backend helper (e.g. "กชพร สังขจันทร์ (น้องน้อยหน่า)")
+// — used as-is everywhere else in the app, but split here so the receipt
+// can put the nickname on its own line instead of running the whole thing
+// together.
+function splitNickname(fullName) {
+    const match = String(fullName || "").match(/^(.*?)(\s*\([^)]*\))\s*$/);
+
+    if (!match) {
+        return { name: fullName, nickname: "" };
+    }
+
+    return { name: match[1].trim(), nickname: match[2].trim() };
+}
+
+// English month name, used only on the printed/on-screen receipt itself —
+// everywhere else on this page (dropdowns, subtitles, unpaid lists) keeps
+// Thai via monthName() above. The receipt stays English apart from the
+// student's own name, so it prints cleanly without needing the Thai
+// bitmap-rendering path this printer needs for real Thai text.
+function monthNameEn(month) {
+    return [
+        "",
+        "January",
+        "February",
+        "March",
+        "April",
+        "May",
+        "June",
+        "July",
+        "August",
+        "September",
+        "October",
+        "November",
+        "December"
+    ][Number(month)] || month;
+}
+
 function formatDateDisplay(dateText) {
     const value = String(dateText || "").slice(0, 10);
     const [year, month, day] = value.split("-");
@@ -520,6 +558,8 @@ function renderReceipt(receipt) {
     els.receiptReceivePayment.disabled = hasBilling || state.isReceivingPayment || !receipt.receiptDetails?.length;
     els.receiptReceivePayment.textContent = receipt.billingId ? "✅ รับเงินแล้ว" : "💵 รับเงิน";
     renderReceiptSubjectPicker(receipt);
+    const { name: studentNamePart, nickname: studentNicknamePart } = splitNickname(receipt.studentName);
+
     els.receiptPaper.innerHTML = `
         <div class="receipt-center">
             <div class="receipt-title">KUMON</div>
@@ -535,16 +575,17 @@ function renderReceipt(receipt) {
             <span>Date</span>
             <strong>${escapeHtml(formatDateDisplay(receipt.billingDate))}${receipt.billingTime ? ` ${escapeHtml(formatTimeDisplay(receipt.billingTime))}` : ""}</strong>
         </div>
-        <div>Student: ${escapeHtml(receipt.studentName)}</div>
+        <div>Student: ${escapeHtml(studentNamePart)}</div>
+        ${studentNicknamePart ? `<div class="receipt-center">${escapeHtml(studentNicknamePart)}</div>` : ""}
         <div>Student ID: ${escapeHtml(receipt.studentId)}</div>
-        <div>Tuition: ${escapeHtml(monthName(receipt.billingMonth))} ${escapeHtml(receipt.billingYear)}</div>
+        <div>Tuition: ${escapeHtml(monthNameEn(receipt.billingMonth))} ${escapeHtml(receipt.billingYear)}</div>
         <div>Payment: ${escapeHtml(receipt.paymentMethodName)}</div>
         <div class="receipt-line"></div>
         ${(receipt.receiptDetails || []).map((detail) => `
             <div class="receipt-item">
                 <div class="receipt-item-name">
                     ${escapeHtml(detail.subjectCode)}
-                    (#${escapeHtml(detail.enrollmentId)} • ${escapeHtml(detail.subjectName)} level ${escapeHtml(detail.currentLevelCode)}${detail.currentZunLevelCode ? ` • Zun ${escapeHtml(detail.currentZunLevelCode)}` : ""})
+                    (#${escapeHtml(detail.enrollmentId)} • level ${escapeHtml(detail.currentLevelCode)}${detail.currentZunLevelCode ? ` • Zun ${escapeHtml(detail.currentZunLevelCode)}` : ""})
                 </div>
                 <div class="receipt-row">
                     <span>Tuition</span>

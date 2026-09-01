@@ -780,6 +780,15 @@ button.summary-card.is-active {
 
 .receipt-paper-panel {
   display: grid;
+  /* Without an explicit track, a grid's implicit column sizes to fit its
+     item's own preferred width — which for .receipt-paper (width: 80mm)
+     means the track just grows to fit 80mm regardless of how much space
+     is actually available, pushing this panel wider than its own
+     container and causing exactly the horizontal-scrollbar overflow this
+     was chasing. minmax(0, 1fr) makes the track respect the container's
+     real width instead, so .receipt-paper's own `max-width: 100%` can
+     actually shrink it down to fit. */
+  grid-template-columns: minmax(0, 1fr);
   justify-items: center;
   border: 1px solid var(--line);
   border-radius: 9px;
@@ -860,13 +869,19 @@ button.summary-card.is-active {
   max-width: 100%;
   justify-self: center;
   overflow: visible;
+  overflow-wrap: break-word;
   border: 1px dashed #aab6c3;
   background: #ffffff;
   padding: 8mm 5mm;
   color: #111827;
   font-family: "Courier New", monospace;
-  font-size: 11px;
+  /* Checked against the longest realistic rows (Date/amount lines,
+     "Book/No") at 80mm width: fits up to 20px before wrapping, so 15px
+     leaves real margin while still being a solid size bump from the
+     original 11px. */
+  font-size: 15px;
   line-height: 1.35;
+  box-sizing: border-box;
 }
 
 .receipt-center {
@@ -874,7 +889,7 @@ button.summary-card.is-active {
 }
 
 .receipt-title {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 700;
 }
 
@@ -885,8 +900,14 @@ button.summary-card.is-active {
 
 .receipt-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0 8px;
+}
+
+.receipt-row > * {
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .receipt-item {
@@ -897,6 +918,15 @@ button.summary-card.is-active {
 .receipt-paid-stamp,
 .receipt-total {
   font-weight: 700;
+}
+
+.receipt-item-name {
+  /* A bit bigger than the 11px body text for emphasis — checked against
+     the longest realistic line ("XX (#1234 • level XX • Zun XXX)") at
+     80mm width: fits up to 15px before wrapping (16px is the first size
+     that breaks). Right at that ceiling, so if a slightly different font
+     render pushes it over on some machine, drop back a size or two. */
+  font-size: 15px;
 }
 
 .receipt-paid-stamp {
@@ -986,6 +1016,14 @@ button.summary-card.is-active {
     overflow: visible;
     border: 0;
     padding: 4mm;
-    font-size: 10.5px;
+    font-size: 14px;
+  }
+
+  /* Both panels carry `overflow: auto` on screen (for when content runs
+     tall) — printing with that still in effect reserves scrollbar-gutter
+     space that shows up in the printed output, so drop it here. */
+  .receipt-paper-panel,
+  .receipt-control-panel {
+    overflow: visible;
   }
 }

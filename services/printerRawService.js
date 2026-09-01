@@ -67,12 +67,15 @@ export function buildAsciiTestPayload() {
 
     return Buffer.concat([
         escposInit(),
+        // Normal (non-bold) weight printed too faint to read reliably on
+        // this printer/paper — barely visible next to the bold heading.
+        // Bold is the one weight confirmed to come out dark and clear, so
+        // it stays on for the whole body instead of just the heading.
+        escposBold(true),
         escposAlignCenter(),
         escposCharSize(2, 2),
-        escposBold(true),
         escposAscii("RAW PRINT TEST"),
         escposCharSize(1, 1),
-        escposBold(false),
         escposAscii("------------------------"),
         escposAlignLeft(),
         escposAscii(`Time: ${now.toISOString()}`),
