@@ -1,14 +1,16 @@
 import { execFile } from "child_process";
 import { promisify } from "util";
+import { discoverPrinterHost } from "./printerDiscoveryService.js";
+import { USB_PRINTER_NAME } from "./printerRawService.js";
 
 const execFileAsync = promisify(execFile);
 
-// Browsers have no API to ask "is a printer connected" — that check has to
-// happen server-side, on the machine the printer is actually plugged into
-// (which is also the machine running this server, per the LAN setup).
-// Windows' own printer status isn't perfect for every USB thermal printer
-// model/driver (a disconnected-but-not-detected printer can still report
-// "not offline"), but WorkOffline is the closest real signal available.
+// Mirrors printerRawService.js's own auto-detection (LAN first, USB
+// fallback) — this used to just ask Windows "what's the default printer
+// and is it offline", but that check went stale the moment actual
+// printing moved to raw ESC/POS over LAN/USB, bypassing the Windows print
+// queue entirely for the LAN path. Checking the same way printing
+// actually happens is what keeps this badge honest.
 export async function getPrinterStatus() {
     if (process.platform !== "win32") {
         return {
@@ -19,13 +21,28 @@ export async function getPrinterStatus() {
         };
     }
 
+    const lanHost = await discoverPrinterHost();
+
+    if (lanHost) {
+        return {
+            supported: true,
+            connected: true,
+            printerName: `Xprinter XP-80 (LAN ${lanHost})`,
+            detail: `พร้อมใช้งานผ่านเครือข่าย: ${lanHost}`
+        };
+    }
+
+    return checkUsbPrinterStatus();
+}
+
+async function checkUsbPrinterStatus() {
     try {
         const { stdout } = await execFileAsync("powershell.exe", [
             "-NoProfile",
             "-NonInteractive",
             "-ExecutionPolicy", "Bypass",
             "-Command",
-            "Get-CimInstance -ClassName Win32_Printer | Select-Object Name, Default, WorkOffline, PrinterStatus | ConvertTo-Json -Compress"
+            `Get-CimInstance -ClassName Win32_Printer -Filter "Name='${USB_PRINTER_NAME.replace(/'/g, "''")}'" | Select-Object Name, WorkOffline, PrinterStatus | ConvertTo-Json -Compress`
         ], { timeout: 8000 });
 
         const trimmed = stdout.trim();
@@ -35,33 +52,20 @@ export async function getPrinterStatus() {
                 supported: true,
                 connected: false,
                 printerName: null,
-                detail: "ไม่พบเครื่องพิมพ์ในเครื่องนี้เลย ยังไม่ได้ติดตั้ง driver หรือเปล่า?"
+                detail: `ไม่พบเครื่องพิมพ์ทั้งทาง LAN และ USB — เช็คว่าเสียบสาย USB "${USB_PRINTER_NAME}" อยู่ไหม หรือต่อ LAN ไว้หรือเปล่า`
             };
         }
 
-        const parsed = JSON.parse(trimmed);
-        const printers = Array.isArray(parsed) ? parsed : [parsed];
-
-        if (!printers.length) {
-            return {
-                supported: true,
-                connected: false,
-                printerName: null,
-                detail: "ไม่พบเครื่องพิมพ์ในเครื่องนี้เลย ยังไม่ได้ติดตั้ง driver หรือเปล่า?"
-            };
-        }
-
-        const defaultPrinter = printers.find((printer) => printer.Default) || printers[0];
-        const isOffline = defaultPrinter.WorkOffline === true;
+        const printer = JSON.parse(trimmed);
+        const isOffline = printer.WorkOffline === true;
 
         return {
             supported: true,
             connected: !isOffline,
-            printerName: defaultPrinter.Name || null,
-            isDefaultPrinterSet: printers.some((printer) => printer.Default),
+            printerName: printer.Name || null,
             detail: isOffline
-                ? `เครื่องพิมพ์ "${defaultPrinter.Name}" ออฟไลน์อยู่ ลองเช็คสาย/เปิดเครื่อง`
-                : `พร้อมใช้งาน: ${defaultPrinter.Name}`
+                ? `เครื่องพิมพ์ "${printer.Name}" ออฟไลน์อยู่ (USB) ลองเช็คสาย/เปิดเครื่อง`
+                : `พร้อมใช้งานผ่าน USB: ${printer.Name}`
         };
     } catch (error) {
         return {

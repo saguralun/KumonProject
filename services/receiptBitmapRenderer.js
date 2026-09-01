@@ -31,26 +31,68 @@ function ensureThaiFontRegistered() {
     thaiFontRegistered = true;
 }
 
-// lines: array of { text, fontSize = 24, bold = false, align = "left" }
+const MARGIN_X = 8;
+const AVAILABLE_WIDTH_PX = BITMAP_WIDTH_PX - MARGIN_X * 2;
+
+// Breaks `text` into as many lines as needed to each fit maxWidth, breaking
+// only at spaces (fine for this receipt's actual content — Thai names
+// here are written with spaces between first/last/nickname components,
+// not run together the way general Thai prose can be). A single word
+// longer than maxWidth on its own is left as-is rather than mid-word
+// hyphenated.
+function wrapToWidth(ctx, text, font, maxWidth) {
+    ctx.font = font;
+
+    if (ctx.measureText(text).width <= maxWidth) {
+        return [text];
+    }
+
+    const words = text.split(" ");
+    const wrapped = [];
+    let current = "";
+
+    for (const word of words) {
+        const candidate = current ? `${current} ${word}` : word;
+
+        if (current && ctx.measureText(candidate).width > maxWidth) {
+            wrapped.push(current);
+            current = word;
+        } else {
+            current = candidate;
+        }
+    }
+
+    if (current) {
+        wrapped.push(current);
+    }
+
+    return wrapped;
+}
+
+// lines: array of { text, fontSize = 24, bold = false, align = "left" }.
+// Any line wider than the printable area wraps onto as many additional
+// lines as needed (see wrapToWidth) rather than being cut off or forcing
+// every line down to a tiny font size to make one long line fit.
 export function renderLinesToBitmap(lines) {
     ensureThaiFontRegistered();
 
     const lineHeightPadding = 6;
-    const marginX = 8;
 
-    // First pass on a throwaway canvas just to measure total height, since
+    // First pass on a throwaway canvas just to measure/wrap text, since
     // canvas needs a fixed size up front.
     const measureCanvas = createCanvas(BITMAP_WIDTH_PX, 10);
     const measureCtx = measureCanvas.getContext("2d");
     let totalHeight = 12;
-    const lineMetrics = lines.map((line) => {
+    const lineMetrics = lines.flatMap((line) => {
         const fontSize = line.fontSize || 24;
-
-        measureCtx.font = `${line.bold ? "bold " : ""}${fontSize}px "${THAI_FONT_FAMILY}"`;
+        const font = `${line.bold ? "bold " : ""}${fontSize}px "${THAI_FONT_FAMILY}"`;
         const height = Math.ceil(fontSize * 1.35) + lineHeightPadding;
+        const wrappedTexts = wrapToWidth(measureCtx, line.text, font, AVAILABLE_WIDTH_PX);
 
-        totalHeight += height;
-        return { ...line, fontSize, height };
+        return wrappedTexts.map((text) => {
+            totalHeight += height;
+            return { ...line, text, fontSize, height };
+        });
     });
 
     const canvas = createCanvas(BITMAP_WIDTH_PX, totalHeight);
@@ -66,12 +108,12 @@ export function renderLinesToBitmap(lines) {
     for (const line of lineMetrics) {
         ctx.font = `${line.bold ? "bold " : ""}${line.fontSize}px "${THAI_FONT_FAMILY}"`;
         const textWidth = ctx.measureText(line.text).width;
-        let x = marginX;
+        let x = MARGIN_X;
 
         if (line.align === "center") {
-            x = Math.max(marginX, (BITMAP_WIDTH_PX - textWidth) / 2);
+            x = Math.max(MARGIN_X, (BITMAP_WIDTH_PX - textWidth) / 2);
         } else if (line.align === "right") {
-            x = Math.max(marginX, BITMAP_WIDTH_PX - textWidth - marginX);
+            x = Math.max(MARGIN_X, BITMAP_WIDTH_PX - textWidth - MARGIN_X);
         }
 
         ctx.fillText(line.text, x, y);

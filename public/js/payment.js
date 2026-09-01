@@ -882,6 +882,28 @@ async function printTestReceipt() {
     }
 }
 
+// Same raw ESC/POS path as printTestReceipt — server formats and prints
+// state.receipt directly (see services/printerRawService.js's
+// buildReceiptPayload, which mirrors renderReceipt()'s markup) instead of
+// window.print()-ing the on-screen #receiptModal.
+async function printReceiptViaBackend() {
+    if (!state.receipt) {
+        return;
+    }
+
+    setStatus("กำลังพิมพ์ใบเสร็จ...");
+
+    try {
+        await requestJson("/api/payment/print-receipt", {
+            method: "POST",
+            body: JSON.stringify(state.receipt)
+        });
+        setStatus("พิมพ์ใบเสร็จแล้ว");
+    } catch (error) {
+        setStatus(error.message, "error");
+    }
+}
+
 // Reads real Windows printer status server-side (browsers have no API for
 // this — see services/printerService.js). Not a print test: this just
 // checks what Windows itself already believes about the default printer.
@@ -1038,7 +1060,7 @@ function bindEvents() {
             closeReceipt();
         }
     });
-    els.receiptPrint.addEventListener("click", () => window.print());
+    els.receiptPrint.addEventListener("click", printReceiptViaBackend);
     els.receiptCancelPayment.addEventListener("click", cancelPayment);
     els.receiptReceivePayment.addEventListener("click", receivePayment);
     els.receiptSubjectPicker.addEventListener("change", (event) => {

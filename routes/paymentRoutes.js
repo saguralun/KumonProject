@@ -7,7 +7,7 @@ import {
     receiveReceiptPayment
 } from "../services/paymentService.js";
 import { getPrinterStatus } from "../services/printerService.js";
-import { printRawAsciiTest } from "../services/printerRawService.js";
+import { printRawAsciiTest, printReceipt } from "../services/printerRawService.js";
 
 const router = express.Router();
 
@@ -78,6 +78,20 @@ router.post("/receipt/cancel", async (req, res) => {
 router.post("/print-raw-test", async (req, res) => {
     try {
         const result = await printRawAsciiTest();
+
+        res.json(result);
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+// Same raw ESC/POS path as print-raw-test above, but for a real receipt —
+// the client already has the fully-computed receipt object (from
+// /receipt/preview or /receipt/payment) and just hands it back here to be
+// formatted and printed, rather than this route re-deriving it.
+router.post("/print-receipt", async (req, res) => {
+    try {
+        const result = await printReceipt(req.body);
 
         res.json(result);
     } catch (error) {
