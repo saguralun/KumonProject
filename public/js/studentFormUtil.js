@@ -11,7 +11,25 @@ import { els } from "./student-manager.js";
 // module graph (see student-manager.html), read here as ambient globals
 // and re-exported so every file that already imports them from this
 // module keeps working unchanged.
-export const setStatus = createStatusSetter(els.statusLine);
+//
+// setStatus can't just be `createStatusSetter(els.statusLine)` at module
+// top level like every other page does it: this file imports `els` from
+// student-manager.js, which itself imports setStatus from HERE first —
+// a genuine circular import. At the point this module's top-level code
+// runs, student-manager.js hasn't reached its own `export const els =
+// {...}` yet, so `els` is still in its temporal dead zone and touching
+// `els.statusLine` throws "Cannot access 'els' before initialization".
+// Deferring the lookup into the returned function — only ever called
+// later, after every module has finished loading — sidesteps that.
+let cachedSetStatus = null;
+
+export function setStatus(message, type = "neutral") {
+    if (!cachedSetStatus) {
+        cachedSetStatus = createStatusSetter(els.statusLine);
+    }
+
+    cachedSetStatus(message, type);
+}
 
 export function setAddEnrollmentMessage(message = "", type = "neutral", { html = false } = {}) {
     if (html) {
