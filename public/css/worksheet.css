@@ -514,6 +514,18 @@ html[data-role="staff"] [data-staff-up] {
   color: var(--muted);
 }
 
+/* .strip-card is a purely-structural wrapper, invisible at this
+   (desktop/full-screen) width: `display: contents` takes the wrapper
+   itself out of layout entirely, so .pattern-control/.student-primary/
+   .subject-select-wrap become .student-strip's direct grid items again
+   — exactly the desktop layout from before this wrapper existed, byte
+   for byte. Splitting them into two visible cards is a tablet-only
+   need (see the @media block further down) — a single row has plenty
+   of room for all three on a real desktop width already. */
+.strip-card {
+  display: contents;
+}
+
 .student-name {
   display: flex;
   gap: 8px;
