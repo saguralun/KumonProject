@@ -1666,13 +1666,33 @@ html[data-role="staff"] [data-staff-up] {
   font-weight: 700;
 }
 
+/* Tablet tier: a scaled-down Windows tablet reports a much smaller CSS
+   viewport than its physical pixel count (DPI scaling), so this range
+   covers real tablets in landscape, not just small desktop windows.
+   Keep everything in its normal WIDE row layout (topbar/status-line,
+   student-strip, search-band all stay as one row each) — full stacking
+   is reserved for genuinely phone-narrow widths below. .input-layout
+   can't fit its full 4-column desktop layout here, so it pairs up
+   instead: progress+date share one row, input+preview share the next —
+   still keeping progress/date together and input/preview both visible
+   without the full-height 4-way stack that used to push input fields
+   and the Save button out of view entirely. */
 @media (max-width: 1120px) {
   .input-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(200px, 1.05fr) minmax(200px, 1fr);
+    grid-auto-rows: auto;
+    max-height: none;
+    overflow-y: auto;
   }
 }
 
-@media (max-width: 860px) {
+/* The drawer handle (.rail-collapse-toggle) and the .worksheet-page.rail-
+   collapsed rules that make it actually hide the sidebar now live in
+   app-scale.css — it's a shared, page-agnostic feature (see
+   /js/sidebarDrawer.js) available on every page and at every screen
+   width, not a worksheet-only/tablet-only thing anymore. */
+
+@media (max-width: 560px) {
   .subject-buttons {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
@@ -1702,7 +1722,8 @@ html[data-role="staff"] [data-staff-up] {
   .search-band,
   .student-strip,
   .worksheet-grid,
-  .worksheet-pair-row {
+  .worksheet-pair-row,
+  .input-layout {
     grid-template-columns: 1fr;
   }
 

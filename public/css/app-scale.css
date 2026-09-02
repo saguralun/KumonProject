@@ -54,6 +54,117 @@
     overflow: hidden;
   }
 
+  /* The sidebar drawer (see /js/sidebarDrawer.js, which is what adds
+     .rail-collapsed): collapses the sidebar to give the workspace the
+     full width. One paired rule per page — each page only ever has ONE
+     of these page classes and ONE matching sidebar class in its DOM, so
+     listing every pair here is exactly the same shape as the page-class
+     list and the sidebar-class list already above/below, just zipped
+     together; a compound selector like `.worksheet-page.rail-collapsed`
+     is higher specificity than the plain `.worksheet-page` rule above,
+     so it always wins once the class is present. Available on every
+     page (including desktop widths — this isn't width-gated at all). */
+  .worksheet-page.rail-collapsed,
+  .payment-page.rail-collapsed,
+  .student-page.rail-collapsed,
+  .table-page.rail-collapsed,
+  .stock-page.rail-collapsed,
+  .stock-summary-page.rail-collapsed,
+  .progress-page.rail-collapsed,
+  .users-page.rail-collapsed,
+  .report-page.rail-collapsed,
+  .forecast-page.rail-collapsed,
+  .schedule-page.rail-collapsed {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .worksheet-page.rail-collapsed .subject-rail,
+  .payment-page.rail-collapsed .payment-sidebar,
+  .student-page.rail-collapsed .student-sidebar,
+  .table-page.rail-collapsed .table-sidebar,
+  .stock-page.rail-collapsed .stock-sidebar,
+  .stock-summary-page.rail-collapsed .stock-summary-sidebar,
+  .progress-page.rail-collapsed .progress-sidebar,
+  .users-page.rail-collapsed .users-sidebar,
+  .report-page.rail-collapsed .report-sidebar,
+  .forecast-page.rail-collapsed .forecast-sidebar,
+  .schedule-page.rail-collapsed .schedule-sidebar {
+    display: none !important;
+  }
+
+  /* The drawer handle itself — a thin dark rounded tab fixed to the
+     left edge, always reachable (position: fixed, outside the
+     grid/sidebar flow entirely) whether the sidebar is open or
+     collapsed, on every page and at every screen width. Sits at the
+     sidebar's own right edge when open (chevron pointing left, "tap to
+     close"); once collapsed, .rail-collapsed moves it flush to the
+     screen edge and flips the chevron (pointing right, "tap to open").
+     No `transition` here: a transitioned position change on this
+     element (tried both as `left` going var(--app-sidebar-width)->0 and
+     as `transform` going translate(254px,...)->translate(0,...)) gets
+     permanently stuck at its pre-transition value in this environment
+     and never settles — confirmed via getComputedStyle AND a real
+     screenshot (the handle visibly stayed stranded mid-content instead
+     of moving to the edge). Snapping instantly avoids the bug entirely.
+     254px = --app-sidebar-width's 256px value above minus this button's
+     own 2px inset — keep the two in sync if the sidebar width changes. */
+  .rail-collapse-toggle {
+    display: flex;
+    position: fixed;
+    z-index: 40;
+    top: 50%;
+    left: 0;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 64px;
+    transform: translate(254px, -50%);
+    border: 0;
+    border-radius: 0 12px 12px 0;
+    background: rgba(19, 32, 51, 0.92);
+    color: #dbeafe;
+    font-size: 16px;
+    line-height: 1;
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.28);
+    transition: none;
+  }
+
+  .rail-collapse-toggle::before {
+    content: "‹";
+  }
+
+  .rail-collapse-toggle:hover {
+    background: rgba(19, 32, 51, 1);
+  }
+
+  .worksheet-page.rail-collapsed .rail-collapse-toggle,
+  .payment-page.rail-collapsed .rail-collapse-toggle,
+  .student-page.rail-collapsed .rail-collapse-toggle,
+  .table-page.rail-collapsed .rail-collapse-toggle,
+  .stock-page.rail-collapsed .rail-collapse-toggle,
+  .stock-summary-page.rail-collapsed .rail-collapse-toggle,
+  .progress-page.rail-collapsed .rail-collapse-toggle,
+  .users-page.rail-collapsed .rail-collapse-toggle,
+  .report-page.rail-collapsed .rail-collapse-toggle,
+  .forecast-page.rail-collapsed .rail-collapse-toggle,
+  .schedule-page.rail-collapsed .rail-collapse-toggle {
+    transform: translate(0, -50%);
+  }
+
+  .worksheet-page.rail-collapsed .rail-collapse-toggle::before,
+  .payment-page.rail-collapsed .rail-collapse-toggle::before,
+  .student-page.rail-collapsed .rail-collapse-toggle::before,
+  .table-page.rail-collapsed .rail-collapse-toggle::before,
+  .stock-page.rail-collapsed .rail-collapse-toggle::before,
+  .stock-summary-page.rail-collapsed .rail-collapse-toggle::before,
+  .progress-page.rail-collapsed .rail-collapse-toggle::before,
+  .users-page.rail-collapsed .rail-collapse-toggle::before,
+  .report-page.rail-collapsed .rail-collapse-toggle::before,
+  .forecast-page.rail-collapsed .rail-collapse-toggle::before,
+  .schedule-page.rail-collapsed .rail-collapse-toggle::before {
+    content: "›";
+  }
+
   .subject-rail,
   .payment-sidebar,
   .student-sidebar,
@@ -533,5 +644,30 @@
 
   .worksheet-page .student-strip {
     grid-template-columns: 1fr !important;
+  }
+}
+
+/* WS Input tablet tier (iPad-ish widths, ≤1120px — the same cutoff
+   worksheet.css's own tablet block uses for the drawer toggle). The
+   1260px block above collapses .input-layout/.student-strip to a single
+   column, which is fine for a genuinely narrow window but wastes an
+   iPad's width; pair them back into columns instead — subject dropdown
+   next to the student name, progress card next to the date control (WS
+   input + Save button land together in the second .input-layout row via
+   grid auto-placement, so both stay reachable instead of scrolling off).
+   Same selectors + !important as the 1260px block, placed after it, so
+   this wins for ≤1120px specifically while 1121-1260px (and everything
+   above, i.e. desktop) is untouched. */
+@media (max-width: 1120px) {
+  .worksheet-page .student-strip {
+    grid-template-columns: minmax(150px, 0.85fr) minmax(0, 1.3fr) minmax(130px, 0.85fr) !important;
+    gap: 8px !important;
+  }
+
+  .worksheet-page .input-layout {
+    grid-template-columns: minmax(200px, 1.05fr) minmax(200px, 1fr) !important;
+    grid-auto-rows: auto !important;
+    max-height: none !important;
+    overflow-y: auto !important;
   }
 }
