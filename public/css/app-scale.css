@@ -145,8 +145,36 @@
     content: "‹";
   }
 
+  /* Root cause of the handle going invisible / unclickable on hover
+     (confirmed via a video of the real bug — the handle visibly
+     snapped back to the screen edge, blending into the sidebar's own
+     background, the moment the cursor touched it): every page's own
+     CSS has a generic `button:hover:not(:disabled) { transform:
+     translateY(-1px); ... }` "lift" effect for ordinary buttons, and
+     because .rail-collapse-toggle is a <button>, that rule's higher
+     specificity — (0,2,1): a tag + 2 pseudo-classes — beats this
+     element's own base rule above — (0,1,0): one class — so hovering
+     silently replaced the positioning `transform` (which is load-
+     bearing here, not just cosmetic) with `translateY(-1px)`, snapping
+     the handle back to left:0 and moving its hit target with it. Only
+     matters in the expanded state: the .rail-collapsed variant further
+     down is a 3-class selector, (0,3,0), already specific enough to
+     win on its own. !important guarantees this wins regardless of
+     which page's copy of that generic rule is in play. */
   .rail-collapse-toggle:hover {
     background: rgba(19, 32, 51, 1);
+    border-color: transparent !important;
+    box-shadow: 0 10px 24px rgba(2, 6, 23, 0.28) !important;
+    transform: translate(244px, -50%) !important;
+  }
+
+  /* Same specificity problem, same fix, for :active (mousedown) — every
+     page's CSS also has a generic `button:active:not(:disabled) {
+     transform: translateY(0); ... }`, which would just as happily hijack
+     this element's positioning transform for the brief moment the mouse
+     button is down. */
+  .rail-collapse-toggle:active {
+    transform: translate(244px, -50%) !important;
   }
 
   /* Some pages (student-manager.css at <=820px, possibly others) fall
@@ -175,6 +203,42 @@
   .forecast-page.rail-collapsed .rail-collapse-toggle,
   .schedule-page.rail-collapsed .rail-collapse-toggle {
     transform: translate(0, -50%);
+  }
+
+  /* The generic button:hover/:active "lift" rules (0,2,1) can't beat
+     this 3-class selector's (0,3,0) specificity, so the collapsed
+     position above was already safe from the hover bug on its own —
+     UNTIL the plain .rail-collapse-toggle:hover/:active fix further up
+     added !important to win against that generic rule in the expanded
+     case. !important always beats a non-!important rule regardless of
+     specificity, so without this, THIS selector (still no !important)
+     would lose to that one while collapsed and hovered. Re-assert the
+     collapsed position here too, at higher specificity than the plain
+     hover/active rules (both !important), so collapsed wins collapsed
+     and expanded wins expanded regardless of hover/active state. */
+  .worksheet-page.rail-collapsed .rail-collapse-toggle:hover,
+  .payment-page.rail-collapsed .rail-collapse-toggle:hover,
+  .student-page.rail-collapsed .rail-collapse-toggle:hover,
+  .table-page.rail-collapsed .rail-collapse-toggle:hover,
+  .stock-page.rail-collapsed .rail-collapse-toggle:hover,
+  .stock-summary-page.rail-collapsed .rail-collapse-toggle:hover,
+  .progress-page.rail-collapsed .rail-collapse-toggle:hover,
+  .users-page.rail-collapsed .rail-collapse-toggle:hover,
+  .report-page.rail-collapsed .rail-collapse-toggle:hover,
+  .forecast-page.rail-collapsed .rail-collapse-toggle:hover,
+  .schedule-page.rail-collapsed .rail-collapse-toggle:hover,
+  .worksheet-page.rail-collapsed .rail-collapse-toggle:active,
+  .payment-page.rail-collapsed .rail-collapse-toggle:active,
+  .student-page.rail-collapsed .rail-collapse-toggle:active,
+  .table-page.rail-collapsed .rail-collapse-toggle:active,
+  .stock-page.rail-collapsed .rail-collapse-toggle:active,
+  .stock-summary-page.rail-collapsed .rail-collapse-toggle:active,
+  .progress-page.rail-collapsed .rail-collapse-toggle:active,
+  .users-page.rail-collapsed .rail-collapse-toggle:active,
+  .report-page.rail-collapsed .rail-collapse-toggle:active,
+  .forecast-page.rail-collapsed .rail-collapse-toggle:active,
+  .schedule-page.rail-collapsed .rail-collapse-toggle:active {
+    transform: translate(0, -50%) !important;
   }
 
   .worksheet-page.rail-collapsed .rail-collapse-toggle::before,
