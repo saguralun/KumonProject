@@ -21,6 +21,7 @@ import userRoutes from "./routes/userRoutes.js";
 import roleRoutes from "./routes/roleRoutes.js";
 import migrationRoutes from "./migration/migrationRoutes.js";
 import systemRoutes from "./routes/systemRoutes.js";
+import { checkAndApplySchoolYearUpgrade } from "./services/schoolYearUpgradeService.js";
 import {
   requireAuth,
   requireAdmin,
@@ -169,3 +170,28 @@ app.listen(PORT, HOST, () => {
   console.log(`KumonDB running at http://localhost:${PORT}`);
   console.log(`LAN access enabled on http://${HOST}:${PORT}`);
 });
+
+// School-year rollover: a no-op every single time except the one moment
+// per year the billing-period rule (day > 20 counts as next month) first
+// reports May of (school_year + 1) — see schoolYearUpgradeService.js.
+// Checked at startup (covers the common case: the app gets restarted
+// regularly) and again every hour after that, so it still fires on time
+// even if the server process happens to stay up across the actual date
+// the year turns over.
+function runSchoolYearUpgradeCheck() {
+  checkAndApplySchoolYearUpgrade()
+    .then((result) => {
+      if (result.applied) {
+        console.log(
+          `[school-year] Upgraded ${result.studentsUpgraded} students: ` +
+          `school_year ${result.previousSchoolYear} -> ${result.newSchoolYear}`
+        );
+      }
+    })
+    .catch((error) => {
+      console.error("[school-year] Upgrade check failed:", error);
+    });
+}
+
+runSchoolYearUpgradeCheck();
+setInterval(runSchoolYearUpgradeCheck, 60 * 60 * 1000);
