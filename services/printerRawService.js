@@ -78,7 +78,7 @@ function escposDashLine(width = RECEIPT_LINE_WIDTH) {
 // Server-side twin of formatMoney() in payment.js — same rounding/format,
 // but "THB" instead of "บาท" since this whole receipt stays ASCII except
 // the student's name (see hasThai/renderLinesToBitmap below).
-function formatMoneyAscii(value) {
+export function formatMoneyAscii(value) {
     const formatted = Number(value || 0).toLocaleString("en-US", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
@@ -87,14 +87,14 @@ function formatMoneyAscii(value) {
     return `${formatted} THB`;
 }
 
-function hasThai(text) {
+export function hasThai(text) {
     return /[฀-๿]/.test(String(text || ""));
 }
 
 // Server-side twin of splitNickname() in payment.js — pulls the trailing
 // " (nickname)" off receipt.studentName, which arrives as one combined
 // string from the shared formatStudentName() backend helper.
-function splitNickname(fullName) {
+export function splitNickname(fullName) {
     const match = String(fullName || "").match(/^(.*?)(\s*\([^)]*\))\s*$/);
 
     if (!match) {
@@ -109,14 +109,14 @@ const MONTH_NAMES_EN = [
     "July", "August", "September", "October", "November", "December"
 ];
 
-function monthNameEn(month) {
+export function monthNameEn(month) {
     return MONTH_NAMES_EN[Number(month)] || month;
 }
 
 // Server-side twins of formatDateDisplay()/formatTimeDisplay() in
 // payment.js — Buddhist-era year, but still plain ASCII digits, so no
 // bitmap needed for these despite the calendar being Thai-specific.
-function formatDateDisplay(dateText) {
+export function formatDateDisplay(dateText) {
     const value = String(dateText || "").slice(0, 10);
     const [year, month, day] = value.split("-");
 
@@ -127,7 +127,7 @@ function formatDateDisplay(dateText) {
     return `${day}/${month}/${Number(year) + 543}`;
 }
 
-function formatTimeDisplay(dateTimeText) {
+export function formatTimeDisplay(dateTimeText) {
     const date = new Date(dateTimeText);
 
     if (Number.isNaN(date.getTime())) {
