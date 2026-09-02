@@ -251,6 +251,13 @@ button:disabled {
   padding: 2px 0;
 }
 
+.legend-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
 .legend-line {
   display: inline-block;
   width: 16px;

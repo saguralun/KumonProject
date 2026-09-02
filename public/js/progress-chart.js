@@ -4,8 +4,7 @@ const els = {
   gradeFilterAll: document.getElementById("gradeFilterAll"),
   gradeFilterNone: document.getElementById("gradeFilterNone"),
   refreshButton: document.getElementById("refreshButton"),
-  lineLegend: document.getElementById("lineLegend"),
-  dotLegend: document.getElementById("dotLegend"),
+  combinedLegend: document.getElementById("combinedLegend"),
   statusLine: document.getElementById("statusLine"),
   summaryCards: document.getElementById("summaryCards"),
   chartScroll: document.getElementById("chartScroll"),
@@ -26,7 +25,7 @@ let selectedGrades = null;
 const STATUS_COLORS = {
   none: "#94a3b8",
   "0": "#7dd3fc",
-  KSIS: "#0ea5e9",
+  KSIS: "#7dd3fc",
   "6M": "#059669",
   "2Y": "#2563eb",
   "3Y": "#7c3aed",
@@ -151,21 +150,28 @@ function filterDataByGrades(data) {
   };
 }
 
+// A code's reference line and its student-dot tier are the exact same
+// color on purpose — one row with both a line dash and a dot swatch
+// instead of two identically-colored rows. The "0" row stands in for
+// both the on-pace line AND the KSIS dot tier (0-6 months ahead), since
+// they share one color; "none" (behind pace) has no line at all.
+const LEGEND_ROWS = [
+  { code: "none", hasDot: true },
+  { code: "0", hasLine: true, hasDot: true },
+  { code: "6M", hasLine: true, hasDot: true },
+  { code: "2Y", hasLine: true, hasDot: true },
+  { code: "3Y", hasLine: true, hasDot: true },
+  { code: "5Y", hasLine: true, hasDot: true },
+  { code: "7Y", hasLine: true, hasDot: true }
+];
+
 function renderLegends() {
-  const lineOrder = ["0", "6M", "2Y", "3Y", "5Y", "7Y"];
-
-  els.lineLegend.innerHTML = lineOrder.map((code) => `
+  els.combinedLegend.innerHTML = LEGEND_ROWS.map(({ code, hasLine, hasDot }) => `
     <div class="legend-row">
-      <span class="legend-line" style="background:${STATUS_COLORS[code]}"></span>
-      ${escapeHtml(STATUS_LABELS[code])}
-    </div>
-  `).join("");
-
-  const dotOrder = ["none", "KSIS", "6M", "2Y", "3Y", "5Y", "7Y"];
-
-  els.dotLegend.innerHTML = dotOrder.map((code) => `
-    <div class="legend-row">
-      <span class="legend-dot" style="background:${STATUS_COLORS[code]}"></span>
+      <span class="legend-swatch">
+        ${hasLine ? `<span class="legend-line" style="background:${STATUS_COLORS[code]}"></span>` : ""}
+        ${hasDot ? `<span class="legend-dot" style="background:${STATUS_COLORS[code]}"></span>` : ""}
+      </span>
       ${escapeHtml(STATUS_LABELS[code])}
     </div>
   `).join("");
