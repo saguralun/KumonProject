@@ -6,10 +6,12 @@
 // student-manager.js itself) imports from here.
 import { els } from "./student-manager.js";
 
-export function setStatus(message, type = "neutral") {
-    els.statusLine.textContent = message;
-    els.statusLine.classList.toggle("is-error", type === "error");
-}
+// requestJson/escapeHtml/createStatusSetter come from httpUtil.js/
+// htmlUtil.js/statusUtil.js — plain classic scripts loaded before this
+// module graph (see student-manager.html), read here as ambient globals
+// and re-exported so every file that already imports them from this
+// module keeps working unchanged.
+export const setStatus = createStatusSetter(els.statusLine);
 
 export function setAddEnrollmentMessage(message = "", type = "neutral", { html = false } = {}) {
     if (html) {
@@ -31,14 +33,7 @@ export function setAddStudentMessage(message = "", type = "neutral", { html = fa
     els.addStudentMessage.classList.toggle("is-error", type === "error");
 }
 
-export function escapeHtml(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+export const escapeHtml = window.escapeHtml;
 
 export function formatBoolean(value) {
     if (value === true) {
@@ -104,22 +99,7 @@ export function formatZipcodeField(field) {
     field.value = zipcodeDigits(field.value);
 }
 
-export async function requestJson(url, options = {}) {
-    const response = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...(options.headers || {})
-        },
-        ...options
-    });
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok || data.success === false) {
-        throw new Error(data.error || "Request failed");
-    }
-
-    return data;
-}
+export const requestJson = window.requestJson;
 
 export function optionHtml(rows, {
     value,

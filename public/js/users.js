@@ -77,14 +77,6 @@ function formatDate(value) {
   return date.toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 // Roles a real account can be assigned — everything except guest (guest
 // isn't a DB account, see services/authService.js).
 function assignableRoles() {

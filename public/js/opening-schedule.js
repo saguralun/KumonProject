@@ -29,14 +29,6 @@ async function requestJson(url, options = {}) {
   return data;
 }
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
 function setStatus(text, isError = false) {
   els.statusLine.textContent = text;
   els.statusLine.classList.toggle("is-error", isError);

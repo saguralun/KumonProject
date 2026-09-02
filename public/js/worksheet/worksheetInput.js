@@ -211,11 +211,8 @@ export function requiredMainReady(pattern, mainWorksheetNos) {
     )).length === count;
 }
 
-export function escapeHtml(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+// From htmlUtil.js — a plain classic script loaded before this module
+// graph (see worksheet.html), read here as an ambient global and
+// re-exported so every file that already imports it from here keeps
+// working unchanged.
+export const escapeHtml = window.escapeHtml;

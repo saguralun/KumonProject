@@ -35,33 +35,7 @@ let lastOrderPlan = [];
 let lastCdOrderPlan = [];
 let currentView = "forecast";
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || data.success === false) {
-    throw new Error(data.error || "Request failed");
-  }
-
-  return data;
-}
-
-function setStatus(message, type = "neutral") {
-  els.statusLine.textContent = message;
-  els.statusLine.classList.toggle("is-error", type === "error");
-}
+const setStatus = createStatusSetter(els.statusLine);
 
 function formatNumber(value, fractionDigits = 0) {
   return Number(value || 0).toLocaleString("th-TH", {

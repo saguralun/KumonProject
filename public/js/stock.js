@@ -13,15 +13,6 @@ const els = {
 let stockData = null;
 let activeSubjectCode = null;
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
 function formatNumber(value) {
   return Number(value || 0).toLocaleString("th-TH");
 }
@@ -37,24 +28,7 @@ function formatDateTime(value) {
   });
 }
 
-function setStatus(message, type = "neutral") {
-  els.statusLine.textContent = message;
-  els.statusLine.classList.toggle("is-error", type === "error");
-}
-
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-    ...options
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || data.success === false) {
-    throw new Error(data.error || "Request failed");
-  }
-
-  return data;
-}
+const setStatus = createStatusSetter(els.statusLine);
 
 // Quantity buckets driving cell shading — a plain visual aid, not a stocking
 // rule: < 5 = critical (red), < 10 = getting low (orange), otherwise fine (no tint).
