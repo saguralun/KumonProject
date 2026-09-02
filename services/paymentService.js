@@ -959,7 +959,11 @@ async function buildReceiptPreview({
         receiptNo: receiptNo.receiptNo,
         studentId: currentEnrollment.student_id,
         sourceEnrollmentId: normalizedEnrollmentId,
-        studentName: formatStudentName(currentEnrollment),
+        // Receipt-only: prefix (ด.ช./ด.ญ./นาย/...) goes in front of the
+        // formal name here, not in formatStudentName() itself — that
+        // helper is shared with WS Input, reports, and everywhere else
+        // that only ever wanted the plain name.
+        studentName: `${currentEnrollment.prefix_name || ""}${formatStudentName(currentEnrollment)}`,
         billingDate: useExistingBilling
             ? normalizeDate(existingBilling.billing_date)
             : period.billingDate,

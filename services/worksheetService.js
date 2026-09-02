@@ -473,6 +473,7 @@ export async function getEnrollmentRow(enrollmentId, { activeOnly = true } = {})
             student.last_name,
             student.nickname,
             student.school_grade_id,
+            prefix.prefix_name,
             grade.school_class AS school_grade_class,
             subject.subject_code,
             subject.subject_name,
@@ -485,6 +486,8 @@ export async function getEnrollmentRow(enrollmentId, { activeOnly = true } = {})
         FROM ${TABLE_SCHEMA}.enrollment e
         JOIN ${TABLE_SCHEMA}.student student
             ON student.student_id = e.student_id
+        LEFT JOIN ${TABLE_SCHEMA}.prefix_master prefix
+            ON prefix.prefix_id = student.prefix_id
         LEFT JOIN ${TABLE_SCHEMA}.school_grade_master grade
             ON grade.school_grade_id = student.school_grade_id
         JOIN ${TABLE_SCHEMA}.subject_master subject
