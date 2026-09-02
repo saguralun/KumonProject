@@ -131,6 +131,14 @@ button:disabled {
   color: #a9b8cc;
 }
 
+/* Generic hidden utility — missing entirely from this stylesheet, unlike
+   every other page's own CSS. Anything toggling .hidden via JS on this
+   page (notably the auth-bar's update button) was silently never
+   actually hiding. */
+.hidden {
+  display: none !important;
+}
+
 .filter-panel {
   display: grid;
   gap: 11px;

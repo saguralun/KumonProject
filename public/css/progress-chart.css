@@ -70,11 +70,24 @@ button:disabled {
   height: 100vh;
   height: 100dvh;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   border-right: 1px solid var(--line);
   background: #132033;
   color: #e5edf7;
   padding: 10px;
+}
+
+/* Everything between the nav/header and the auth bar scrolls on its own
+   — the grade filter list can grow to a full row per grade, and without
+   this the whole sidebar (nav included) would scroll as one unit,
+   pushing the logout button below the fold on shorter screens instead
+   of leaving it always reachable at the bottom. */
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 18px;
 }
 
 .side-nav {
@@ -225,7 +238,6 @@ button:disabled {
 }
 
 .progress-legend {
-  margin-top: 18px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 8px;
   padding: 9px 10px;
@@ -544,6 +556,16 @@ html[data-role="staff"] [data-staff-up] {
 
 .chart-tooltip.hidden {
   display: none;
+}
+
+/* Generic hidden utility — every other page's own stylesheet has this
+   (student-manager.css, payment.css, forecast.css, ...), but this one
+   never did. Everything toggling .hidden via JS on this page (the
+   auth-bar's update button, the grade-filter loading states, etc.) was
+   silently never actually hiding — the class was being added/removed
+   correctly, it just had nothing to do. */
+.hidden {
+  display: none !important;
 }
 
 .chart-tooltip .tooltip-title {

@@ -13,6 +13,16 @@
   display: none !important;
 }
 
+/* Generic hidden utility, shared by every page (loaded on all of them —
+   see below). Most pages' own stylesheet also defines this locally, but
+   a few didn't (progress-chart.css, report.css, stock.css) — anything
+   toggling .hidden via JS there, notably the auth-bar's update button
+   (authClient.js), was silently never actually hiding. Defining it here
+   too means no future page can hit that same gap by omission. */
+.hidden {
+  display: none !important;
+}
+
 @media screen {
   html,
   body {

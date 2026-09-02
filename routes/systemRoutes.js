@@ -14,6 +14,13 @@ const router = express.Router();
 const sendError = createSendError("Unexpected system error");
 
 router.get("/update-check", async (req, res) => {
+    // Express adds an ETag by default, which lets a browser reuse a
+    // stale cached response instead of hitting this route again — the
+    // one check that must never be stale, since a page left open across
+    // an update relies on it to eventually notice. No-store forces a
+    // real network hit every time.
+    res.set("Cache-Control", "no-store");
+
     try {
         res.json({
             success: true,
