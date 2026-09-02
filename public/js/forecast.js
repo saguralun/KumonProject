@@ -85,6 +85,18 @@ function getAvailableSubjects(data) {
   });
 }
 
+// ME has no CD material at all — the CD panel (WS/Order/Expect Stock,
+// all 3 views share the same .forecast-table-panel-cd class) is only
+// ever meaningful for EFL/TRP, so hide it outright for ME instead of
+// showing an empty table.
+function updateCdPanelsVisibility() {
+  const hideCd = activeSubjectCode === "ME";
+
+  document.querySelectorAll(".forecast-table-panel-cd").forEach((panel) => {
+    panel.classList.toggle("hidden", hideCd);
+  });
+}
+
 function renderSubjectTabs() {
   const subjects = getAvailableSubjects(lastForecastData || {});
 
@@ -95,6 +107,8 @@ function renderSubjectTabs() {
       data-subject="${escapeHtml(code)}"
     >${escapeHtml(code)}</button>
   `).join("");
+
+  updateCdPanelsVisibility();
 
   [...els.subjectTabs.querySelectorAll(".subject-tab")].forEach((button) => {
     button.addEventListener("click", () => {
