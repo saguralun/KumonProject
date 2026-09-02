@@ -95,9 +95,9 @@
   /* The drawer handle itself — a thin dark rounded tab fixed to the
      left edge, always reachable (position: fixed, outside the
      grid/sidebar flow entirely) whether the sidebar is open or
-     collapsed, on every page and at every screen width. Sits at the
-     sidebar's own right edge when open (chevron pointing left, "tap to
-     close"); once collapsed, .rail-collapsed moves it flush to the
+     collapsed, on every page and at every screen width. Sits inside the
+     sidebar near its right edge when open (chevron pointing left, "tap
+     to close"); once collapsed, .rail-collapsed moves it flush to the
      screen edge and flips the chevron (pointing right, "tap to open").
      No `transition` here: a transitioned position change on this
      element (tried both as `left` going var(--app-sidebar-width)->0 and
@@ -106,8 +106,17 @@
      and never settles — confirmed via getComputedStyle AND a real
      screenshot (the handle visibly stayed stranded mid-content instead
      of moving to the edge). Snapping instantly avoids the bug entirely.
-     254px = --app-sidebar-width's 256px value above minus this button's
-     own 2px inset — keep the two in sync if the sidebar width changes. */
+     28px wide (up from an original 20px) because the narrower size
+     turned out to be genuinely hard to hit precisely, on top of the
+     overlap bug below — a bit of extra width makes it far more
+     forgiving to click/tap. 220px keeps the button's right edge at
+     248px, a clear 8px inside --app-sidebar-width's 256px (above) — NOT
+     flush with it: an earlier 254px offset let the button's right few
+     pixels spill into the workspace's own box, which turned out to be
+     exactly what broke clicking it (see the .rail-collapsed workspace
+     padding-left rule below for the matching collapsed-state fix and
+     fuller explanation). Keep both numbers in sync if the sidebar width
+     or button width ever change. */
   .rail-collapse-toggle {
     display: flex;
     position: fixed;
@@ -116,9 +125,9 @@
     left: 0;
     align-items: center;
     justify-content: center;
-    width: 20px;
+    width: 28px;
     height: 64px;
-    transform: translate(254px, -50%);
+    transform: translate(220px, -50%);
     border: 0;
     border-radius: 0 12px 12px 0;
     background: rgba(19, 32, 51, 0.92);
@@ -165,6 +174,31 @@
     content: "›";
   }
 
+  /* This is what was actually behind "can't click the drawer": once
+     collapsed, the workspace fills the full page width and its own
+     left padding (10px, from the .workspace/.payment-workspace/...
+     rule above) starts well inside the handle's 28px-wide hit target
+     (0-28px) — a real, confirmed geometric overlap (.input-panel's
+     rendered left edge landed at x=10, well inside the handle at the
+     time), not just a z-index question, and which element actually
+     receives a click in that shared strip was inconsistent. Giving the
+     workspace extra left padding when collapsed (handle width + a
+     clear gap) removes the overlap outright instead of relying on
+     stacking to arbitrate it. */
+  .worksheet-page.rail-collapsed .workspace,
+  .payment-page.rail-collapsed .payment-workspace,
+  .student-page.rail-collapsed .student-workspace,
+  .table-page.rail-collapsed .table-workspace,
+  .stock-page.rail-collapsed .stock-workspace,
+  .stock-summary-page.rail-collapsed .stock-summary-workspace,
+  .progress-page.rail-collapsed .progress-workspace,
+  .users-page.rail-collapsed .users-workspace,
+  .report-page.rail-collapsed .report-workspace,
+  .forecast-page.rail-collapsed .forecast-workspace,
+  .schedule-page.rail-collapsed .schedule-workspace {
+    padding-left: 40px !important;
+  }
+
   .subject-rail,
   .payment-sidebar,
   .student-sidebar,
@@ -184,6 +218,15 @@
     min-height: 0 !important;
     overflow: visible !important;
     padding: 8px !important;
+    /* Extra clearance on the right specifically, for the drawer handle
+       (position: fixed, translate(220px,...) above — sits at 220-248px,
+       inside this 256px-wide sidebar). Same reasoning as the collapsed-
+       state workspace padding-left a bit above: the handle overlapping
+       actual sidebar content (nav links, subject buttons, ...) is what
+       made it unreliable to click, not a z-index question — so reserve
+       real, empty space for it instead of stacking two clickable things
+       on top of each other. */
+    padding-right: 40px !important;
     position: relative;
     z-index: 30;
   }
