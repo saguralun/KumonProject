@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/progress-chart.css?v=20260831-role-permission-system">
+  <link rel="stylesheet" href="/css/progress-chart.css?v=20260901-grade-filter-grid-layout">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260831-role-permission-system">
 </head>
 <body>
@@ -57,6 +57,14 @@
 
       <section class="filter-panel">
         <div class="subject-tabs" id="subjectTabs"></div>
+        <div class="grade-filter-header">
+          <span>ชั้นเรียน</span>
+          <div class="grade-filter-actions">
+            <button type="button" class="grade-filter-action" id="gradeFilterAll">ทั้งหมด</button>
+            <button type="button" class="grade-filter-action" id="gradeFilterNone">ไม่เลือก</button>
+          </div>
+        </div>
+        <div class="grade-filter" id="gradeFilter"></div>
         <button type="button" class="secondary-button" id="refreshButton">🔄 Refresh</button>
       </section>
 
@@ -98,6 +106,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/progress-chart.js?v=20260901-shared-utils"></script>
+  <script src="/js/progress-chart.js?v=20260901-staircase-ref-lines"></script>
 </body>
 </html>

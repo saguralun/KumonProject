@@ -2,7 +2,8 @@ import pool from "../config/db.js";
 import {
     computeGradeSyncStatus,
     GRADE_LEVEL_GROUPS_BY_SUBJECT,
-    GRADE_SYNC_THRESHOLDS
+    GRADE_SYNC_THRESHOLDS,
+    schoolYearFraction
 } from "./worksheetService.js";
 
 const TABLE_SCHEMA = "kumon";
@@ -36,13 +37,23 @@ function monthsToLevelPosition(months, groups, levelIndexByCode) {
     return levelIndexByCode.get(levelCode) + fractionWithinLevel;
 }
 
-function buildReferenceLines(groups, levelIndexByCode) {
+// The reference lines move in real time — they use the exact same
+// "expectedMonths = grade*12 + schoolYearFraction(today)*12" baseline as
+// computeGradeSyncStatus() (see worksheetService.js), so a student's own
+// gradeSyncStatus (their dot's color, computed with that same formula)
+// and these lines are mathematically guaranteed to agree: whichever side
+// of the "6M" line a student's real curriculum position falls on is
+// exactly the side computeGradeSyncStatus already put them on. Neither
+// side can drift out of sync with the other because both derive from the
+// identical calculation, just evaluated at the same `today`.
+function buildReferenceLines(groups, levelIndexByCode, today) {
     // 0 months = "exactly on pace" baseline, not itself a badge tier but
     // useful as the floor every other threshold line sits above.
     const thresholds = [
         { code: "0", label: "ทันชั้นเรียนพอดี", minMonths: 0 },
         ...GRADE_SYNC_THRESHOLDS.filter((entry) => entry.minMonths > 0)
     ];
+    const todayOffsetMonths = schoolYearFraction(today) * 12;
 
     return thresholds.map((threshold) => ({
         code: threshold.code,
@@ -50,7 +61,7 @@ function buildReferenceLines(groups, levelIndexByCode) {
         points: groups.map((group, gradeIndex) => ({
             grade: group.schoolClass,
             levelPosition: monthsToLevelPosition(
-                (gradeIndex * 12) + threshold.minMonths,
+                (gradeIndex * 12) + todayOffsetMonths + threshold.minMonths,
                 groups,
                 levelIndexByCode
             )
@@ -129,10 +140,17 @@ export async function getProgressChartData({ subjectCode }) {
         return { subjectCode: normalizedSubject, grades: [], levels: [], referenceLines: [], students: [] };
     }
 
+    // Shared instant for both the reference lines and every student's
+    // status below — computeGradeSyncStatus() defaults `today` on its
+    // own, but passing the same Date in here guarantees the lines and
+    // the dots they're compared against never drift apart within one
+    // request.
+    const today = new Date();
+
     const flatLevels = flattenLevels(groups);
     const levelIndexByCode = new Map(flatLevels.map((code, index) => [code, index]));
     const grades = groups.map((group) => group.schoolClass);
-    const referenceLines = buildReferenceLines(groups, levelIndexByCode);
+    const referenceLines = buildReferenceLines(groups, levelIndexByCode, today);
 
     const rows = await loadActiveStudentsForSubject(normalizedSubject);
     const missingLevel = [];
@@ -151,12 +169,24 @@ export async function getProgressChartData({ subjectCode }) {
                 ? Math.min(MAIN_MAX_WORKSHEET_NO, row.actual_worksheet_no + PACKET_DISPLAY_OFFSET)
                 : 0;
             const percent = Math.max(0, Math.min(100, Math.round((displayWorksheetNo / MAIN_MAX_WORKSHEET_NO) * 100)));
-
+            // Cap the fractional part just under a whole level, even at
+            // percent 100 — a student who's finished every worksheet in
+            // their CURRENT level but hasn't actually been promoted yet
+            // (current_level_code in the DB hasn't changed) is still in
+            // that level, not the next one. Without this cap,
+            // levelIndex + 100/100 lands on an exact whole number, and
+            // flooring it on the frontend buckets the dot into the NEXT
+            // level's row — showing them as already past a boundary they
+            // haven't actually crossed.
+            const levelPosition = levelIndex + Math.min(percent, 99) / 100;
+            // Same calculation the WS Input page uses — real, day-accurate
+            // pace, not tied to the fixed reference lines above.
             const gradeSyncStatus = computeGradeSyncStatus({
                 subjectCode: normalizedSubject,
                 schoolGradeClass: row.school_grade_class,
                 currentLevelCode: row.current_level_code,
-                progressPercent: percent
+                progressPercent: percent,
+                today
             });
 
             return {
@@ -166,7 +196,7 @@ export async function getProgressChartData({ subjectCode }) {
                 nickname: row.nickname || "",
                 gradeClass: row.school_grade_class || null,
                 levelCode: row.current_level_code,
-                levelPosition: levelIndex + (percent / 100),
+                levelPosition,
                 percent,
                 isKc: row.is_kumon_connect === true,
                 gradeSyncStatus

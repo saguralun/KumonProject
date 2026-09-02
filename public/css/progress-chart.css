@@ -150,6 +150,64 @@ button:disabled {
   color: var(--blue);
 }
 
+.grade-filter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.grade-filter-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.grade-filter-action {
+  border: none;
+  background: none;
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+  padding: 0;
+}
+
+.grade-filter-action:hover {
+  text-decoration: underline;
+}
+
+.grade-filter {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.grade-filter-tab {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #dbe4f3;
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.grade-filter-tab:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.grade-filter-tab.active {
+  border-color: #93c5fd;
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
 .secondary-button {
   min-height: 36px;
   border: 1px solid var(--line);

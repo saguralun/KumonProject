@@ -83,7 +83,7 @@ export const GRADE_SYNC_THRESHOLDS = [
     { minMonths: -Infinity, code: "KSIS" }
 ];
 
-function schoolYearFraction(today) {
+export function schoolYearFraction(today) {
     const year = today.getFullYear();
     const may1ThisCycle = today.getMonth() >= 4 // getMonth() 0-based, 4 = May
         ? new Date(year, 4, 1)
