@@ -379,6 +379,14 @@
     position: relative;
   }
 
+  /* Added by authClient.js's hideEmptyFlyouts() once every item inside a
+     flyout ends up hidden for the signed-in role (e.g. a custom role with
+     none of "ระบบ"'s permissions granted) — hides the trigger itself
+     instead of leaving a button that opens a visibly empty dropdown. */
+  .nav-flyout.nav-flyout-empty {
+    display: none !important;
+  }
+
   .nav-flyout::after {
     position: absolute;
     top: 0;

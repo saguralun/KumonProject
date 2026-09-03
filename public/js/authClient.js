@@ -42,6 +42,25 @@ function applyPermissionVisibility(permissions) {
   });
 }
 
+// Runs after the two functions above so every link's final CSS-driven
+// display is already settled. A role with none of a flyout's items granted
+// (e.g. a custom role with no page:tables/page:opening-schedule, so every
+// item under "ระบบ" is hidden) still had that flyout's trigger button show
+// — hovering it opened a visibly empty dropdown with nothing inside. Rather
+// than re-deriving which of data-admin-only/data-staff-up/data-requires-
+// permission hid a given link, just check the one thing that actually
+// matters: did it end up rendered at all. Checks computed style, not a
+// specific class, so it stays correct regardless of which mechanism (or a
+// future one) hid the items.
+function hideEmptyFlyouts() {
+  document.querySelectorAll(".nav-flyout").forEach((flyout) => {
+    const links = flyout.querySelectorAll(".nav-flyout-menu .home-link");
+    const hasVisibleLink = [...links].some((link) => getComputedStyle(link).display !== "none");
+
+    flyout.classList.toggle("nav-flyout-empty", !hasVisibleLink);
+  });
+}
+
 function renderAuthBar(user) {
   const bar = document.getElementById("authBar");
 
@@ -165,5 +184,6 @@ async function checkForUpdateAndShowButton(button) {
 
   applyRoleVisibility(user.role);
   applyPermissionVisibility(permissions);
+  hideEmptyFlyouts();
   renderAuthBar(user);
 })();

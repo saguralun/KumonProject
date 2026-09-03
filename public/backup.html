@@ -8,12 +8,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/backup.css?v=20260905-backup-page">
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260905-hover-intent-flyout">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260906-hide-empty-flyouts">
 </head>
 <body>
   <main class="backup-page">
     <aside class="backup-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link active current-page" href="/backup.html" data-admin-only>💾 Backup</a>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
           <div class="nav-flyout-menu">
@@ -45,7 +46,7 @@
             <a class="home-link" href="/opening-schedule.html" data-requires-permission="page:opening-schedule">🕒 Opening Schedule</a>
             <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
             <a class="home-link" href="/migration.html" data-admin-only>📥 Migration</a>
-            <a class="home-link active current-page" href="/backup.html" data-admin-only>💾 Backup</a>
+            <a class="home-link" href="/backup.html" data-admin-only>💾 Backup</a>
           </div>
         </div>
       </nav>
@@ -114,7 +115,7 @@
     </section>
   </main>
 
-  <script src="/js/authClient.js?v=20260831-role-permission-system"></script>
+  <script src="/js/authClient.js?v=20260906-hide-empty-flyouts"></script>
   <script src="/js/sidebarDrawer.js?v=20260902-drawer-resizeobserver"></script>
   <script src="/js/navFlyout.js?v=20260905-hover-intent-flyout"></script>
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
