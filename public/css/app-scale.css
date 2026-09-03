@@ -123,7 +123,18 @@
   .rail-collapse-toggle {
     display: flex;
     position: fixed;
-    z-index: 40;
+    /* Below the sidebar (z-index: 30) and its nav (z-index: 40) on
+       purpose — the handle's own left 12px overlaps the sidebar's right
+       edge (see the 244px note above), and at an equal-or-higher
+       z-index that sliver painted OVER the sidebar's nav content,
+       visibly clashing with its color right at the seam. Sitting under
+       the sidebar instead lets the sidebar's own background legitimately
+       cover that overlapped sliver, leaving only the genuinely
+       protruding 16px (256-272px, past the sidebar's right edge, with
+       nothing else painted there) visible — still above ordinary
+       workspace content (no z-index of its own), just not above the
+       sidebar it's tucked into. */
+    z-index: 20;
     top: 50%;
     left: 0;
     align-items: center;
