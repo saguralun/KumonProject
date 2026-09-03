@@ -292,6 +292,18 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/worksheet/worksheetTabletReflow.js?v=20260903-tablet-reflow"></script>
-  <script type="module" src="/js/worksheet/worksheet.js?v=20260903-zun-toggle"></script>
+  <!-- No ?v= cache-bust query string here, deliberately: worksheetAt.js/
+       worksheetSearch.js/worksheetIncomplete.js import back from this
+       exact file ("./worksheet.js", circular, no query string of their
+       own — internal ES module imports never carry one). A query string
+       here that those internal imports don't share makes the browser
+       resolve them as two different module URLs and load + execute this
+       whole file twice — silently double-binding every listener
+       bindEvents() sets up (confirmed live: a single click on the date-
+       next button advanced the date by 2 days, traced to bindEvents()
+       running via two separate stack traces, one for each resolved
+       URL). Relies on the server's normal ETag revalidation (see
+       server.js's express.static) to pick up changes on reload instead. -->
+  <script type="module" src="/js/worksheet/worksheet.js"></script>
 </body>
 </html>
