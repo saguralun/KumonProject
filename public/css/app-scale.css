@@ -869,4 +869,21 @@
   .worksheet-page .preview-panel {
     display: none !important;
   }
+
+  /* Per feedback: on the Payment table, drop the "ล่าสุด: ..." (latest
+     billing) line from the Net column at this width, and lift
+     payment.css's own `min-width: 1120px` floor on the table — that
+     hard floor (confirmed the actual culprit: table scrollWidth matched
+     it exactly, 1120px, regardless of real content) is what forced a
+     horizontal scrollbar even after every column got narrower. Letting
+     the table size to its real content instead means it fits at this
+     width with no horizontal scroll — the vertical scrollbar on
+     .payment-table-wrap for a long row list is untouched. */
+  .payment-page .payment-latest-billing {
+    display: none !important;
+  }
+
+  .payment-page .payment-table {
+    min-width: 0 !important;
+  }
 }

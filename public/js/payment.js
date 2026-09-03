@@ -330,8 +330,12 @@ function renderLatestBilling(row) {
         return "";
     }
 
+    // payment-latest-billing (alongside the generic .subtle look) exists
+    // so this specific line can be hidden at tablet width without
+    // touching every other .subtle usage on the page — see the tablet
+    // media query in app-scale.css.
     return `
-        <div class="subtle">
+        <div class="subtle payment-latest-billing">
             ล่าสุด: ${escapeHtml(monthName(row.latestBillingMonth))} ${escapeHtml(row.latestBillingYear)}
             • ${escapeHtml(row.latestReceiptBook)}/${escapeHtml(row.latestReceiptNo)}
             • ${formatMoney(row.latestNetAmount)}
