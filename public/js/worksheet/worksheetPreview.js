@@ -239,8 +239,29 @@ function renderGradeSyncBadge(status) {
     els.gradeSyncBadge.classList.remove("hidden");
 }
 
+// On a touch-primary device, focusing a <select> makes the OS pop its
+// native picker open immediately — every one of the worksheet-number
+// fields below is a <select>, and that's platform behavior (iOS and
+// others), not something CSS/JS can suppress once .focus() is called.
+// (hover: none) and (pointer: coarse) is the standard way to detect
+// "touch is the primary input here" regardless of which platform it is,
+// rather than sniffing the user agent for iPad specifically.
+const isTouchPrimary = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+
 export function focusWorksheetControl(input) {
     if (!input) {
+        return;
+    }
+
+    // Auto-advancing focus onto the next field right after finishing this
+    // one (this function's usual caller, advanceWorksheet) is a nice
+    // keyboard convenience on desktop, but on a touch device it just pops
+    // an unwanted picker open before the user asked for one. Skip it for
+    // <select> fields there — the user taps the next one themselves when
+    // ready, same as any other touch UI; text inputs (e.g. the AT dialog's
+    // score field) still get auto-focused everywhere, since those don't
+    // have this side effect.
+    if (isTouchPrimary && input.tagName === "SELECT") {
         return;
     }
 
