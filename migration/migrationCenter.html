@@ -763,47 +763,6 @@
 
 
     <!-- =====================================
-         CLEAN NICKNAMES (TEMPORARY — remove
-         once every center has run this once)
-    ====================================== -->
-
-    <section class="overall" style="border:1px solid #fecaca;background:#fff5f5;">
-
-        <div class="overall-top">
-
-            <div>
-
-                <div class="overall-title">
-                    🧹 ล้างชื่อเล่นซ้ำ (ชั่วคราว)
-                </div>
-
-                <div class="overall-detail">
-                    ตัดข้อความหลังช่องว่างแรกออกจากชื่อเล่นทุกคน — เช่น "ซัน อัครวิทย์ A" → "ซัน"
-                    (ของเก่าที่ต่อชื่อจริง+ตัวอักษรไว้กันชื่อเล่นซ้ำ ตอนนี้ไม่ต้องใช้วิธีนี้แล้ว)
-                    <strong>แก้ถาวร แก้กลับไม่ได้</strong> — รันครั้งเดียวพอ แล้วเอาปุ่มนี้ออกทีหลัง
-                </div>
-
-            </div>
-
-            <button
-                id="cleanNicknamesButton"
-                class="danger"
-                onclick="runCleanNicknames()"
-            >
-                🧹 ล้างชื่อเล่นซ้ำทั้งหมด
-            </button>
-
-        </div>
-
-        <div
-            id="cleanNicknamesResult"
-            class="result"
-        ></div>
-
-    </section>
-
-
-    <!-- =====================================
          OVERALL STATUS
     ====================================== -->
 
@@ -2108,67 +2067,6 @@ async function runDatabaseSetup() {
 
         button.disabled = false;
         button.textContent = "🗄️ Reinstall Database (001 → 002 → 003)";
-
-    }
-
-}
-
-
-/* =========================================================
-   CLEAN NICKNAMES BUTTON (strip everything after the first
-   space — temporary, remove once every center has run it)
-========================================================= */
-
-async function runCleanNicknames() {
-
-    const confirmed = confirm(
-        "จะตัดข้อความหลังช่องว่างแรกออกจากชื่อเล่นของนักเรียนทุกคน — แก้ถาวร แก้กลับไม่ได้\n\nยืนยันว่าจะดำเนินการต่อ?"
-    );
-
-    if (!confirmed) {
-        return;
-    }
-
-    const button = document.getElementById("cleanNicknamesButton");
-    const result = document.getElementById("cleanNicknamesResult");
-
-    button.disabled = true;
-    button.textContent = "⏳ กำลังล้าง...";
-
-    result.className = "result show";
-    result.textContent = "กำลังล้างชื่อเล่น...";
-
-    try {
-
-        const response = await fetch(
-            "/api/migration/students/clean-nicknames",
-            { method: "POST" }
-        );
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.message || "Clean nicknames failed");
-        }
-
-        const sampleLines = (data.sample || [])
-            .map((row) => `#${row.student_id}: ${row.nickname}`)
-            .join("\n");
-
-        result.className = "result show ready";
-        result.textContent = `${data.message}${sampleLines ? `\n\nตัวอย่าง:\n${sampleLines}` : ""}`;
-
-    } catch (error) {
-
-        console.error(error);
-
-        result.className = "result show error";
-        result.textContent = `เกิดข้อผิดพลาด: ${error.message}`;
-
-    } finally {
-
-        button.disabled = false;
-        button.textContent = "🧹 ล้างชื่อเล่นซ้ำทั้งหมด";
 
     }
 

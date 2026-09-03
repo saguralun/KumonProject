@@ -73,46 +73,6 @@ router.post("/database/setup", async (req, res) => {
     }
 });
 
-// One-off cleanup: old data entry used to append " <realname> A" (or
-// similar) onto a student's nickname to keep nicknames unique — e.g.
-// "ซัน อัครวิทย์ A". Now that uniqueness isn't enforced that way, this
-// strips everything after the first space, keeping just the real
-// nickname. TEMPORARY — this button/route exists so every center running
-// this same codebase can run it once on their own database; remove it
-// once every center has (tracked outside this file, not automated).
-router.post("/students/clean-nicknames", async (req, res) => {
-    const client = await pool.connect();
-
-    try {
-        await client.query("BEGIN");
-
-        const result = await client.query(`
-            UPDATE kumon.student
-            SET nickname = split_part(nickname, ' ', 1)
-            WHERE nickname LIKE '% %'
-            RETURNING student_id, nickname
-        `);
-
-        await client.query("COMMIT");
-
-        res.json({
-            status: "OK",
-            message: `แก้ไขชื่อเล่นแล้ว ${result.rowCount.toLocaleString("th-TH")} คน`,
-            updatedCount: result.rowCount,
-            sample: result.rows.slice(0, 20)
-        });
-    } catch (error) {
-        await client.query("ROLLBACK").catch(() => {});
-
-        console.error("Clean Nicknames Error:");
-        console.error(error);
-
-        res.status(500).json({ status: "ERROR", message: error.message });
-    } finally {
-        client.release();
-    }
-});
-
 const migrationModules = [
     {
         id: "student",
