@@ -9,14 +9,6 @@ const els = {
 
 const setStatus = createStatusSetter(els.statusLine);
 
-// "เข้า" (in) group first, "ออก" (out) group second — matches
-// statisticsService.js's STATUS_CODES order, so the stacked bar segments
-// and the legend rows read top-to-bottom in the same "in, then out" order.
-const STATUS_GROUPS = {
-  in: ["N", "IT", "EO", "R"],
-  out: ["A", "OT", "CP"]
-};
-
 const STATUS_LABELS_TH = {
   N: "New Enrolment",
   IT: "Incoming Transfer",
@@ -28,17 +20,11 @@ const STATUS_LABELS_TH = {
   C: "Continue"
 };
 
-// Not part of the เข้า/ออก stacked bars (see buildMonthSvg) — matches the
-// muted gray the "ปัจจุบัน <n>" text itself renders in under each bar
-// (--muted in statistics.css), so the legend swatch and the actual chart
-// label read as the same thing.
-const CURRENT_COLOR = "#64748b";
-
-// Full color for the latest year's bar; STATUS_GRAYS is the same 7-step
-// light-to-dark ramp used for the two older years' bars — same relative
-// ordering (so segment proportions still read the same way), just
-// desaturated to keep the latest year visually dominant, per the original
-// "24 เดือนย้อนหลัง เป็นสีเทา เทียบกับเดือนนั้นๆ" request.
+// Full color for the latest year's bar; STATUS_GRAYS is the same ramp
+// used for the two older years' bars — same relative ordering (so segment
+// proportions still read the same way), just desaturated to keep the
+// recent year visually dominant, per the original "24 เดือนย้อนหลัง เป็น
+// สีเทา เทียบกับเดือนนั้นๆ" request.
 const STATUS_COLORS = {
   N: "#2563eb",
   IT: "#0891b2",
@@ -59,15 +45,29 @@ const STATUS_GRAYS = {
   CP: "#334155"
 };
 
+const CURRENT_COLOR = "#0f766e";
+const CURRENT_GRAY = "#94a3b8";
+
+// Three side-by-side zones per month panel, each its own tight cluster of
+// 3 year-bars (touching within a zone, a clear gap between zones) — per
+// request: [ออก][เข้า][ปัจจุบัน]. "current" has no `codes` (it's just C,
+// not a stack) and is flagged `soloColor` so buildMonthSvg draws one plain
+// bar per year instead of stacking segments.
+const ZONES = [
+  { key: "out", label: "ออก", codes: ["A", "OT", "CP"] },
+  { key: "in", label: "เข้า", codes: ["N", "IT", "EO", "R"] },
+  { key: "current", label: "ปัจจุบัน", soloColor: true }
+];
+
 function renderLegend() {
-  els.legendIn.innerHTML = STATUS_GROUPS.in.map((code) => `
+  els.legendIn.innerHTML = ZONES.find((z) => z.key === "in").codes.map((code) => `
     <div class="legend-row">
       <span class="legend-dot" style="background:${STATUS_COLORS[code]}"></span>
       ${escapeHtml(code)} — ${escapeHtml(STATUS_LABELS_TH[code])}
     </div>
   `).join("");
 
-  els.legendOut.innerHTML = STATUS_GROUPS.out.map((code) => `
+  els.legendOut.innerHTML = ZONES.find((z) => z.key === "out").codes.map((code) => `
     <div class="legend-row">
       <span class="legend-dot" style="background:${STATUS_COLORS[code]}"></span>
       ${escapeHtml(code)} — ${escapeHtml(STATUS_LABELS_TH[code])}
@@ -77,27 +77,27 @@ function renderLegend() {
   els.legendCurrent.innerHTML = `
     <div class="legend-row">
       <span class="legend-dot" style="background:${CURRENT_COLOR}"></span>
-      C — ${escapeHtml(STATUS_LABELS_TH.C)} (นอกแท่ง ดูใต้แท่ง)
+      C — ${escapeHtml(STATUS_LABELS_TH.C)}
     </div>
   `;
 }
 
-// One small multiple per calendar month, with one stacked bar per year —
-// the latest year in full color, the two older years in the matching
-// grayscale ramp. maxTotal is shared across all 12 panels (computed once
-// over the whole dataset) so bar heights stay visually comparable between
-// different months, not just within one panel.
-function buildMonthSvg(monthData, years, maxTotal, statusCodes) {
-  const barWidth = 46;
-  const barGap = 20;
-  const chartHeight = 110;
-  const marginTop = 18; // room for the total-count label above each bar
-  const marginBottom = 30; // room for the year label + the "current" count below each bar
+// zoneMax = { out, in, current } — each zone's own max, computed once over
+// the WHOLE dataset (all 12 months) so bars stay comparable month to
+// month within that zone, without letting Current's much larger scale
+// flatten the out/in zones (the whole reason these are separate zones).
+function buildMonthSvg(monthData, years, zoneMax) {
+  const barWidth = 22;
+  const gapWithinZone = 3;
+  const zoneGap = 20;
+  const chartHeight = 90;
+  const marginTop = 34; // zone label + per-bar total label
+  const marginBottom = 18; // year label
   const marginLeft = 6;
   const marginRight = 6;
 
-  const groupWidth = barWidth + barGap;
-  const chartWidth = (years.length * groupWidth) - barGap;
+  const zoneWidth = (years.length * barWidth) + ((years.length - 1) * gapWithinZone);
+  const chartWidth = (ZONES.length * zoneWidth) + ((ZONES.length - 1) * zoneGap);
   const totalWidth = marginLeft + chartWidth + marginRight;
   const totalHeight = marginTop + chartHeight + marginBottom;
   const baselineY = marginTop + chartHeight;
@@ -107,48 +107,66 @@ function buildMonthSvg(monthData, years, maxTotal, statusCodes) {
   parts.push(`<svg class="stats-svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" xmlns="http://www.w3.org/2000/svg">`);
   parts.push(`<line class="stats-baseline" x1="${marginLeft}" y1="${baselineY}" x2="${marginLeft + chartWidth}" y2="${baselineY}" />`);
 
-  years.forEach((year, yearIndex) => {
-    const isLatest = yearIndex === years.length - 1;
-    const palette = isLatest ? STATUS_COLORS : STATUS_GRAYS;
-    const yearData = monthData.years[year];
-    const barX = marginLeft + (yearIndex * groupWidth);
+  ZONES.forEach((zone, zoneIndex) => {
+    const zoneX = marginLeft + (zoneIndex * (zoneWidth + zoneGap));
 
-    parts.push(`<text class="stats-axis-label" x="${barX + (barWidth / 2)}" y="${baselineY + 13}" text-anchor="middle">${year}</text>`);
+    parts.push(`<text class="stats-zone-label" x="${zoneX + (zoneWidth / 2)}" y="10" text-anchor="middle">${escapeHtml(zone.label)}</text>`);
 
-    if (yearData.isFuture) {
-      parts.push(`<rect class="stats-future-box" x="${barX}" y="${baselineY - 22}" width="${barWidth}" height="22" rx="4" />`);
-      parts.push(`<text class="stats-future-label" x="${barX + (barWidth / 2)}" y="${baselineY - 8}" text-anchor="middle">ยังไม่ถึง</text>`);
-      return;
-    }
+    years.forEach((year, yearIndex) => {
+      const isLatest = yearIndex === years.length - 1;
+      const yearData = monthData.years[year];
+      const barX = zoneX + (yearIndex * (barWidth + gapWithinZone));
 
-    // "Current" (C) — a separate steady-state headcount, not one of the
-    // stacked in/out segments (see statisticsService.js for why: it's
-    // 10x+ larger some months and would swallow the rest of the bar).
-    // Shown as its own small line under the year label instead.
-    parts.push(`<text class="stats-current-label" x="${barX + (barWidth / 2)}" y="${totalHeight - 2}" text-anchor="middle">ปัจจุบัน ${yearData.current}</text>`);
+      parts.push(`<text class="stats-axis-label" x="${barX + (barWidth / 2)}" y="${baselineY + 13}" text-anchor="middle">${year}</text>`);
 
-    if (yearData.total > 0) {
-      parts.push(`<text class="stats-total-label" x="${barX + (barWidth / 2)}" y="${marginTop - 5}" text-anchor="middle">${yearData.total}</text>`);
-    }
-
-    let cumulativeY = baselineY;
-
-    statusCodes.forEach((code) => {
-      const value = yearData.byStatus[code] || 0;
-
-      if (value <= 0) {
+      if (yearData.isFuture) {
+        parts.push(`<rect class="stats-future-box" x="${barX}" y="${baselineY - 18}" width="${barWidth}" height="18" rx="3" />`);
         return;
       }
 
-      const segmentHeight = maxTotal > 0 ? (value / maxTotal) * chartHeight : 0;
-      const y = cumulativeY - segmentHeight;
+      if (zone.soloColor) {
+        const value = yearData.current;
+        const max = zoneMax.current;
+        const segmentHeight = max > 0 ? (value / max) * chartHeight : 0;
+        const color = isLatest ? CURRENT_COLOR : CURRENT_GRAY;
 
-      parts.push(
-        `<rect class="stats-bar-segment" x="${barX}" y="${y.toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${palette[code]}" ` +
-        `data-year="${year}" data-month="${monthData.month}" data-code="${code}" data-value="${value}" />`
-      );
+        if (value > 0) {
+          parts.push(`<text class="stats-total-label" x="${barX + (barWidth / 2)}" y="${marginTop - 5}" text-anchor="middle">${value}</text>`);
+          parts.push(
+            `<rect class="stats-bar-segment" x="${barX}" y="${(baselineY - segmentHeight).toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${color}" ` +
+            `data-year="${year}" data-month="${monthData.month}" data-code="C" data-value="${value}" />`
+          );
+        }
+        return;
+      }
 
-      cumulativeY = y;
+      const palette = isLatest ? STATUS_COLORS : STATUS_GRAYS;
+      const zoneTotal = zone.codes.reduce((sum, code) => sum + (yearData.byStatus[code] || 0), 0);
+      const max = zoneMax[zone.key];
+
+      if (zoneTotal > 0) {
+        parts.push(`<text class="stats-total-label" x="${barX + (barWidth / 2)}" y="${marginTop - 5}" text-anchor="middle">${zoneTotal}</text>`);
+      }
+
+      let cumulativeY = baselineY;
+
+      zone.codes.forEach((code) => {
+        const value = yearData.byStatus[code] || 0;
+
+        if (value <= 0) {
+          return;
+        }
+
+        const segmentHeight = max > 0 ? (value / max) * chartHeight : 0;
+        const y = cumulativeY - segmentHeight;
+
+        parts.push(
+          `<rect class="stats-bar-segment" x="${barX}" y="${y.toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${palette[code]}" ` +
+          `data-year="${year}" data-month="${monthData.month}" data-code="${code}" data-value="${value}" />`
+        );
+
+        cumulativeY = y;
+      });
     });
   });
 
@@ -178,16 +196,44 @@ function attachTooltipHandlers(container, monthLabel) {
   });
 }
 
+// One max per zone, each computed over the whole dataset (all 12 months x
+// all 3 years) — keeps bar heights comparable month-to-month WITHIN a
+// zone, while each zone's own scale stays independent of the others (the
+// whole point of splitting them out: Current is 10x+ the out/in totals
+// some months and would otherwise flatten those zones to nothing).
+function computeZoneMax(data) {
+  const max = { out: 1, in: 1, current: 1 };
+
+  data.months.forEach((monthData) => {
+    data.years.forEach((year) => {
+      const yearData = monthData.years[year];
+
+      if (yearData.isFuture) {
+        return;
+      }
+
+      ZONES.forEach((zone) => {
+        if (zone.soloColor) {
+          max[zone.key] = Math.max(max[zone.key], yearData.current);
+        } else {
+          const zoneTotal = zone.codes.reduce((sum, code) => sum + (yearData.byStatus[code] || 0), 0);
+
+          max[zone.key] = Math.max(max[zone.key], zoneTotal);
+        }
+      });
+    });
+  });
+
+  return max;
+}
+
 function renderGrid(data) {
-  const maxTotal = Math.max(
-    1,
-    ...data.months.flatMap((monthData) => data.years.map((year) => monthData.years[year].total))
-  );
+  const zoneMax = computeZoneMax(data);
 
   els.statsGrid.innerHTML = data.months.map((monthData) => `
     <div class="month-panel">
       <div class="month-panel-title">${escapeHtml(monthData.monthLabel)}</div>
-      ${buildMonthSvg(monthData, data.years, maxTotal, data.statusCodes)}
+      ${buildMonthSvg(monthData, data.years, zoneMax)}
     </div>
   `).join("");
 
