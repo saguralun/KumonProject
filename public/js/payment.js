@@ -44,6 +44,8 @@ const state = {
     paymentMethods: [],
     isReceivingPayment: false,
     isCancellingPayment: false,
+    isPrintingReceipt: false,
+    isPrintingTest: false,
     printerConnected: false,
     // The sidebar Subject/Status <select> filters were removed as
     // unnecessary; status filtering lives directly on the status summary
@@ -857,6 +859,18 @@ function exportUnpaidCsv() {
 // zero jobs ever landing in the Windows print queue across many attempts),
 // so this bypasses the browser's print pipeline entirely instead.
 async function printTestReceipt() {
+    // Same re-entry guard as printReceiptViaBackend(), same reason — a
+    // rapid double-press (Enter repeated while focused, a fast double
+    // click) with nothing here to stop it would fire an independent
+    // test print for each press.
+    if (state.isPrintingTest) {
+        return;
+    }
+
+    state.isPrintingTest = true;
+    els.printTestButton.disabled = true;
+    const originalLabel = els.printTestButton.textContent;
+    els.printTestButton.textContent = "⏳ กำลังส่ง...";
     setStatus("กำลังส่งทดสอบพิมพ์...");
 
     try {
@@ -864,6 +878,10 @@ async function printTestReceipt() {
         setStatus("ส่งทดสอบพิมพ์แล้ว — เช็คที่เครื่องพิมพ์");
     } catch (error) {
         setStatus(error.message, "error");
+    } finally {
+        state.isPrintingTest = false;
+        els.printTestButton.textContent = originalLabel;
+        els.printTestButton.disabled = !state.printerConnected;
     }
 }
 
@@ -872,10 +890,21 @@ async function printTestReceipt() {
 // buildReceiptPayload, which mirrors renderReceipt()'s markup) instead of
 // window.print()-ing the on-screen #receiptModal.
 async function printReceiptViaBackend() {
-    if (!state.receipt) {
+    // Reported live: a receipt printed several times over from what the
+    // till operator was sure was one action — this button had no
+    // re-entry guard at all (unlike receivePayment()/cancelPayment(),
+    // which both check + disable), so pressing Enter more than once
+    // while it's focused (browsers fire a button's click on Enter same
+    // as a mouse click), or any other rapid double-press, fired an
+    // independent, un-guarded print request each time.
+    if (!state.receipt || state.isPrintingReceipt) {
         return;
     }
 
+    state.isPrintingReceipt = true;
+    els.receiptPrint.disabled = true;
+    const originalLabel = els.receiptPrint.textContent;
+    els.receiptPrint.textContent = "⏳ กำลังพิมพ์";
     setStatus("กำลังพิมพ์ใบเสร็จ...");
 
     try {
@@ -886,6 +915,13 @@ async function printReceiptViaBackend() {
         setStatus("พิมพ์ใบเสร็จแล้ว");
     } catch (error) {
         setStatus(error.message, "error");
+    } finally {
+        state.isPrintingReceipt = false;
+        els.receiptPrint.textContent = originalLabel;
+        // Not just `false` — respect whatever applyPrinterConnected()
+        // last determined (the button also stays disabled whenever the
+        // printer itself isn't reachable, independent of this guard).
+        els.receiptPrint.disabled = !state.printerConnected;
     }
 }
 
