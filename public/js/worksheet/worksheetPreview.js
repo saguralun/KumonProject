@@ -248,20 +248,28 @@ function renderGradeSyncBadge(status) {
 // rather than sniffing the user agent for iPad specifically.
 const isTouchPrimary = window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 
-export function focusWorksheetControl(input) {
+export function focusWorksheetControl(input, { openPickerOnTouch = true } = {}) {
     if (!input) {
         return;
     }
 
-    // Auto-advancing focus onto the next field right after finishing this
-    // one (this function's usual caller, advanceWorksheet) is a nice
-    // keyboard convenience on desktop, but on a touch device it just pops
-    // an unwanted picker open before the user asked for one. Skip it for
-    // <select> fields there — the user taps the next one themselves when
-    // ready, same as any other touch UI; text inputs (e.g. the AT dialog's
-    // score field) still get auto-focused everywhere, since those don't
-    // have this side effect.
-    if (isTouchPrimary && input.tagName === "SELECT") {
+    // Two different callers hit this, and touch needs to treat them
+    // differently, not skip focus() everywhere (an earlier version did
+    // that — it stopped the disruptive case below, but also silently
+    // killed the genuinely useful one: no auto-advance at all means an
+    // extra manual tap on *every* field instead of just skipping the
+    // unwanted popups).
+    //   - stepWorksheet (the ‹/› step buttons) re-focuses the SAME field
+    //     after nudging its value — the user is deliberately using the
+    //     buttons to avoid the picker, so popping it back open right
+    //     after is pure friction. Callers pass openPickerOnTouch: false
+    //     for this case.
+    //   - advanceWorksheet/focusFirstMainInput move focus to a field the
+    //     user hasn't touched yet (next field on Enter, first field when
+    //     a student's just been selected) — opening its picker right
+    //     away actually saves a tap there, same as it does on desktop,
+    //     so those keep the default (true).
+    if (!openPickerOnTouch && isTouchPrimary && input.tagName === "SELECT") {
         return;
     }
 
@@ -440,7 +448,7 @@ export function stepWorksheet(kind, index, direction) {
     }
 
     input.value = moveWorksheetNo(input.value, optionsForKind(kind), direction);
-    focusWorksheetControl(input);
+    focusWorksheetControl(input, { openPickerOnTouch: false });
     updatePreview();
 }
 
