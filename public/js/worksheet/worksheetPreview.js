@@ -727,8 +727,17 @@ export function updateSecondaryActions() {
     const cdRequirement = currentCdRequirement();
     const shouldShowCdButton = Boolean(cdRequirement && !cdRequirement.hasReceived);
 
+    // Always visible once a student's loaded (was hidden entirely when
+    // not needed) — the label just below already has its own text for
+    // that case ("ไม่ต้องใช้ CD", "doesn't need a CD"), which would never
+    // actually be seen with the button hidden. Same reasoning as the
+    // Main/Zun toggle: show it and disable it when it doesn't apply,
+    // rather than hiding the control outright. classList.remove (not a
+    // toggle) because the no-context branch above is the only other
+    // place that ever adds "hidden" back — that's the real "nothing to
+    // show text for at all" case and stays hidden there.
+    els.receiveCd.classList.remove("hidden");
     els.receiveCd.disabled = !shouldShowCdButton;
-    els.receiveCd.classList.toggle("hidden", !shouldShowCdButton);
     setActionButton(
         els.receiveCd,
         "💿",
