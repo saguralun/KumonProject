@@ -406,7 +406,16 @@
     font-weight: 900;
   }
 
-  .nav-flyout:hover .nav-flyout-trigger {
+  /* Driven by .nav-flyout-open (added/removed by navFlyout.js on real
+     mouseenter/mouseleave), not `:hover` — see navFlyout.js for why: raw
+     CSS :hover re-applies the instant a page loads if the cursor already
+     happens to rest over the trigger (e.g. right after clicking a link
+     inside a flyout navigates to a new, identically-laid-out page), with
+     no "did the pointer actually just cross in" concept the way a real
+     mouseenter has. That made a flyout pop open on its own immediately
+     after navigating — looking like a random floating menu nobody asked
+     for. */
+  .nav-flyout.nav-flyout-open .nav-flyout-trigger {
     border-color: rgba(191, 219, 254, 0.7) !important;
     background: #17345a !important;
     color: #ffffff !important;
@@ -426,7 +435,7 @@
     box-shadow: 0 16px 34px rgba(2, 6, 23, 0.28);
   }
 
-  .nav-flyout:hover .nav-flyout-menu {
+  .nav-flyout.nav-flyout-open .nav-flyout-menu {
     display: grid;
     gap: 5px;
   }
