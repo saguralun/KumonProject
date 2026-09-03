@@ -3,6 +3,7 @@ const els = {
   statusLine: document.getElementById("statusLine"),
   legendIn: document.getElementById("legendIn"),
   legendOut: document.getElementById("legendOut"),
+  legendCurrent: document.getElementById("legendCurrent"),
   chartTooltip: document.getElementById("chartTooltip")
 };
 
@@ -23,8 +24,15 @@ const STATUS_LABELS_TH = {
   R: "Resumed",
   A: "Absent",
   OT: "Outgoing Transfer",
-  CP: "Completer"
+  CP: "Completer",
+  C: "Continue"
 };
+
+// Not part of the เข้า/ออก stacked bars (see buildMonthSvg) — matches the
+// muted gray the "ปัจจุบัน <n>" text itself renders in under each bar
+// (--muted in statistics.css), so the legend swatch and the actual chart
+// label read as the same thing.
+const CURRENT_COLOR = "#64748b";
 
 // Full color for the latest year's bar; STATUS_GRAYS is the same 7-step
 // light-to-dark ramp used for the two older years' bars — same relative
@@ -65,6 +73,13 @@ function renderLegend() {
       ${escapeHtml(code)} — ${escapeHtml(STATUS_LABELS_TH[code])}
     </div>
   `).join("");
+
+  els.legendCurrent.innerHTML = `
+    <div class="legend-row">
+      <span class="legend-dot" style="background:${CURRENT_COLOR}"></span>
+      C — ${escapeHtml(STATUS_LABELS_TH.C)} (นอกแท่ง ดูใต้แท่ง)
+    </div>
+  `;
 }
 
 // One small multiple per calendar month, with one stacked bar per year —
