@@ -22,6 +22,7 @@ import roleRoutes from "./routes/roleRoutes.js";
 import migrationRoutes from "./migration/migrationRoutes.js";
 import systemRoutes from "./routes/systemRoutes.js";
 import backupRoutes from "./routes/backupRoutes.js";
+import statisticsRoutes from "./routes/statisticsRoutes.js";
 import { checkAndApplySchoolYearUpgrade } from "./services/schoolYearUpgradeService.js";
 import {
   requireAuth,
@@ -139,6 +140,10 @@ app.get("/report.html", requirePermissionPage("page:report"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "report.html"));
 });
 
+app.get("/statistics.html", requirePermissionPage("page:statistics"), (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "statistics.html"));
+});
+
 // The Migration Center page lives under migration/ (alongside its import
 // scripts), not public/. Give it a clean, page-guarded URL like the others;
 // the static mount below still serves it at /migration/migrationCenter.html.
@@ -166,6 +171,7 @@ app.use("/api/export", requirePermission("page:forecast"), exportRoutes);
 app.use("/api/progress-chart", requirePermission("page:progress-chart"), progressChartRoutes);
 app.use("/api/forecast", requirePermission("page:forecast"), forecastRoutes);
 app.use("/api/report", requirePermission("page:report"), reportRoutes);
+app.use("/api/statistics", requirePermission("page:statistics"), statisticsRoutes);
 app.use("/api/users", requireAdmin, userRoutes);
 app.use("/api/roles", requireAdmin, roleRoutes);
 app.use("/api/migration", requireAdmin, migrationRoutes);

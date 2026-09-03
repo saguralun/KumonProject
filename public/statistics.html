@@ -3,18 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>KumonDB Progress Chart</title>
+  <title>KumonDB Statistics</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/progress-chart.css?v=20260902-sidebar-scroll-fix">
+  <link rel="stylesheet" href="/css/statistics.css?v=20260906-statistics-page">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
 </head>
 <body>
-  <main class="progress-page">
-    <aside class="progress-sidebar">
+  <main class="statistics-page">
+    <aside class="statistics-sidebar">
       <nav class="side-nav" aria-label="Main navigation">
-        <a class="home-link active current-page" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
+        <a class="home-link active current-page" href="/statistics.html" data-requires-permission="page:statistics">🧮 Statistics</a>
         <div class="nav-flyout">
           <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
           <div class="nav-flyout-menu">
@@ -53,46 +53,35 @@
       </nav>
 
       <div class="side-header">
-        <h1>Progress Chart</h1>
-        <div class="subtle">ระดับปัจจุบัน เทียบกับชั้นเรียน (เฉพาะเด็ก active)</div>
+        <h1>Statistics</h1>
+        <div class="subtle">เด็กเข้า-ออก รายเดือน เทียบ 3 ปีล่าสุด</div>
       </div>
 
-      <div class="sidebar-scroll">
-        <section class="filter-panel">
-          <div class="subject-tabs" id="subjectTabs"></div>
-          <div class="grade-filter-header">
-            <span>ชั้นเรียน</span>
-            <div class="grade-filter-actions">
-              <button type="button" class="grade-filter-action" id="gradeFilterAll">ทั้งหมด</button>
-              <button type="button" class="grade-filter-action" id="gradeFilterNone">ไม่เลือก</button>
-            </div>
-          </div>
-          <div class="grade-filter" id="gradeFilter"></div>
-          <button type="button" class="secondary-button" id="refreshButton">🔄 Refresh</button>
-        </section>
-
-        <div class="progress-legend">
-          <div class="progress-legend-title">สถานะเทียบชั้นเรียน</div>
-          <div id="combinedLegend"></div>
+      <div class="stats-legend">
+        <div class="stats-legend-title">สถานะ</div>
+        <div class="stats-legend-group">เข้า</div>
+        <div id="legendIn"></div>
+        <div class="stats-legend-group">ออก</div>
+        <div id="legendOut"></div>
+        <div class="stats-legend-note">
+          แท่งสี = ปีล่าสุด • แท่งเทา = 2 ปีก่อนหน้า (เทียบเดือนเดียวกัน)
         </div>
       </div>
 
       <div class="auth-bar" id="authBar"></div>
     </aside>
 
-    <section class="progress-workspace">
+    <section class="statistics-workspace">
       <header class="topbar">
         <div>
-          <div class="page-title">Progress Chart</div>
-          <div class="subtle" id="pageSubtitle">แกน X = ชั้นเรียน, แกน Y = เลเวล, จุด = นักเรียนแต่ละคน</div>
+          <div class="page-title">Enrollment Statistics</div>
+          <div class="subtle" id="pageSubtitle">นับจากเหตุการณ์เปลี่ยนสถานะจริง (enrollment_status) ไม่ใช่การนับซ้ำจากยอด active</div>
         </div>
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
-      <section class="progress-summary-cards" id="summaryCards"></section>
-
-      <section class="panel chart-panel">
-        <div class="chart-scroll" id="chartScroll">
+      <section class="panel stats-grid-panel">
+        <div class="stats-grid" id="statsGrid">
           <div class="empty-state">
             <div class="spinner"></div>
             กำลังโหลด...
@@ -110,6 +99,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/progress-chart.js?v=20260902-sidebar-scroll-fix"></script>
+  <script src="/js/statistics.js?v=20260906-statistics-page"></script>
 </body>
 </html>

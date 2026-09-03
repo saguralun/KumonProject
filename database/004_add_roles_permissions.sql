@@ -74,6 +74,7 @@ INSERT INTO permission_master (permission_key, permission_label, nav_group, sort
   ('page:payment', 'Payment', 'management', 1),
   ('page:report', 'Report', 'management', 2),
   ('page:progress-chart', 'Progress Chart', 'management', 3),
+  ('page:statistics', 'Statistics', 'management', 4),
   ('page:stock', 'Stock', 'warehouse', 1),
   ('page:stock-receive', 'Stock Receive', 'warehouse', 2),
   ('page:stock-cut', 'Stock Cut', 'warehouse', 3),
