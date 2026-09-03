@@ -44,7 +44,8 @@
   .users-page,
   .report-page,
   .forecast-page,
-  .schedule-page {
+  .schedule-page,
+  .backup-page {
     grid-template-columns: var(--app-sidebar-width) minmax(0, 1fr) !important;
     width: 100%;
     max-width: 100vw;
@@ -74,7 +75,8 @@
   .users-page.rail-collapsed,
   .report-page.rail-collapsed,
   .forecast-page.rail-collapsed,
-  .schedule-page.rail-collapsed {
+  .schedule-page.rail-collapsed,
+  .backup-page.rail-collapsed {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
@@ -88,7 +90,8 @@
   .users-page.rail-collapsed .users-sidebar,
   .report-page.rail-collapsed .report-sidebar,
   .forecast-page.rail-collapsed .forecast-sidebar,
-  .schedule-page.rail-collapsed .schedule-sidebar {
+  .schedule-page.rail-collapsed .schedule-sidebar,
+  .backup-page.rail-collapsed .backup-sidebar {
     display: none !important;
   }
 
@@ -212,7 +215,8 @@
   .users-page.rail-collapsed .rail-collapse-toggle,
   .report-page.rail-collapsed .rail-collapse-toggle,
   .forecast-page.rail-collapsed .rail-collapse-toggle,
-  .schedule-page.rail-collapsed .rail-collapse-toggle {
+  .schedule-page.rail-collapsed .rail-collapse-toggle,
+  .backup-page.rail-collapsed .rail-collapse-toggle {
     transform: translate(0, -50%);
   }
 
@@ -238,6 +242,7 @@
   .report-page.rail-collapsed .rail-collapse-toggle:hover,
   .forecast-page.rail-collapsed .rail-collapse-toggle:hover,
   .schedule-page.rail-collapsed .rail-collapse-toggle:hover,
+  .backup-page.rail-collapsed .rail-collapse-toggle:hover,
   .worksheet-page.rail-collapsed .rail-collapse-toggle:active,
   .payment-page.rail-collapsed .rail-collapse-toggle:active,
   .student-page.rail-collapsed .rail-collapse-toggle:active,
@@ -248,7 +253,8 @@
   .users-page.rail-collapsed .rail-collapse-toggle:active,
   .report-page.rail-collapsed .rail-collapse-toggle:active,
   .forecast-page.rail-collapsed .rail-collapse-toggle:active,
-  .schedule-page.rail-collapsed .rail-collapse-toggle:active {
+  .schedule-page.rail-collapsed .rail-collapse-toggle:active,
+  .backup-page.rail-collapsed .rail-collapse-toggle:active {
     transform: translate(0, -50%) !important;
   }
 
@@ -262,7 +268,8 @@
   .users-page.rail-collapsed .rail-collapse-toggle::before,
   .report-page.rail-collapsed .rail-collapse-toggle::before,
   .forecast-page.rail-collapsed .rail-collapse-toggle::before,
-  .schedule-page.rail-collapsed .rail-collapse-toggle::before {
+  .schedule-page.rail-collapsed .rail-collapse-toggle::before,
+  .backup-page.rail-collapsed .rail-collapse-toggle::before {
     content: "›";
   }
 
@@ -287,7 +294,8 @@
   .users-page.rail-collapsed .users-workspace,
   .report-page.rail-collapsed .report-workspace,
   .forecast-page.rail-collapsed .forecast-workspace,
-  .schedule-page.rail-collapsed .schedule-workspace {
+  .schedule-page.rail-collapsed .schedule-workspace,
+  .backup-page.rail-collapsed .backup-workspace {
     padding-left: 40px !important;
   }
 
@@ -301,7 +309,8 @@
   .progress-sidebar,
   .report-sidebar,
   .forecast-sidebar,
-  .schedule-sidebar {
+  .schedule-sidebar,
+  .backup-sidebar {
     display: flex !important;
     flex-direction: column !important;
     box-sizing: border-box;
@@ -446,7 +455,8 @@
   .progress-workspace,
   .report-workspace,
   .forecast-workspace,
-  .schedule-workspace {
+  .schedule-workspace,
+  .backup-workspace {
     min-width: 0;
     min-height: 0;
     /* Left padding is wider than the other sides specifically to clear
