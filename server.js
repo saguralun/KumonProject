@@ -21,6 +21,7 @@ import userRoutes from "./routes/userRoutes.js";
 import roleRoutes from "./routes/roleRoutes.js";
 import migrationRoutes from "./migration/migrationRoutes.js";
 import systemRoutes from "./routes/systemRoutes.js";
+import backupRoutes from "./routes/backupRoutes.js";
 import { checkAndApplySchoolYearUpgrade } from "./services/schoolYearUpgradeService.js";
 import {
   requireAuth,
@@ -145,6 +146,13 @@ app.get("/migration.html", requireAdminPage, (req, res) => {
   res.sendFile(path.join(process.cwd(), "migration", "migrationCenter.html"));
 });
 
+// Hardcoded admin-only, same reasoning as users.html above: this page can
+// export the whole database AND restore (overwrite) it from an uploaded
+// file, so it can never be part of the configurable permission matrix.
+app.get("/backup.html", requireAdminPage, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "backup.html"));
+});
+
 // Specific /api/* mounts must come before the generic "/api" one below —
 // Express tries middleware in registration order, and a broader prefix
 // registered first would swallow requests meant for these.
@@ -161,6 +169,7 @@ app.use("/api/report", requirePermission("page:report"), reportRoutes);
 app.use("/api/users", requireAdmin, userRoutes);
 app.use("/api/roles", requireAdmin, roleRoutes);
 app.use("/api/migration", requireAdmin, migrationRoutes);
+app.use("/api/backup", requireAdmin, backupRoutes);
 app.use("/api", requirePermission("page:tables"), tableRoutes);
 
 app.use(express.static(PUBLIC_DIR));
