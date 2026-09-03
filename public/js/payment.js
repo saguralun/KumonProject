@@ -345,6 +345,12 @@ function renderRows(rows) {
         return;
     }
 
+    // Receipt/Date/Payment are always "-" for a fully-unpaid row — there's
+    // no receipt yet, so nothing to show there. Drop those three columns
+    // entirely while the "unpaid" filter is active instead of rendering a
+    // table full of dashes.
+    const showReceiptColumns = state.statusFilter !== "unpaid";
+
     els.paymentTableWrap.innerHTML = `
         <table class="payment-table">
             <thead>
@@ -352,9 +358,11 @@ function renderRows(rows) {
                     <th>Status</th>
                     <th>Student</th>
                     <th>Subjects</th>
-                    <th>Receipt</th>
-                    <th>Date</th>
-                    <th>Payment</th>
+                    ${showReceiptColumns ? `
+                        <th>Receipt</th>
+                        <th>Date</th>
+                        <th>Payment</th>
+                    ` : ""}
                     <th>Net</th>
                     <th>Action</th>
                 </tr>
@@ -375,9 +383,11 @@ function renderRows(rows) {
                             ${row.nickname ? `<div class="payment-student-nickname">น้อง${escapeHtml(row.nickname)}</div>` : ""}
                         </td>
                         <td>${renderSubjectBadges(row.subjects)}</td>
-                        <td>${row.receiptBook ? `${escapeHtml(row.receiptBook)}/${escapeHtml(row.receiptNo)}` : "-"}</td>
-                        <td>${row.billingDate ? escapeHtml(formatDateDisplay(row.billingDate)) : "-"}</td>
-                        <td>${escapeHtml(row.paymentMethodName || "-")}</td>
+                        ${showReceiptColumns ? `
+                            <td>${row.receiptBook ? `${escapeHtml(row.receiptBook)}/${escapeHtml(row.receiptNo)}` : "-"}</td>
+                            <td>${row.billingDate ? escapeHtml(formatDateDisplay(row.billingDate)) : "-"}</td>
+                            <td>${escapeHtml(row.paymentMethodName || "-")}</td>
+                        ` : ""}
                         <td>
                             <strong>${formatMoney(rowNetAmount(row))}</strong>
                             ${row.isPartial ? `<div class="subtle">ยอดค้าง ${formatMoney(row.unpaidNetAmount || 0)} • จ่ายแล้ว ${formatMoney(row.netAmount || 0)}</div>` : ""}
