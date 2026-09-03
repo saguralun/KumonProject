@@ -77,7 +77,7 @@ function buildMonthSvg(monthData, years, maxTotal, statusCodes) {
   const barGap = 20;
   const chartHeight = 110;
   const marginTop = 18; // room for the total-count label above each bar
-  const marginBottom = 18; // room for the year label below each bar
+  const marginBottom = 30; // room for the year label + the "current" count below each bar
   const marginLeft = 6;
   const marginRight = 6;
 
@@ -98,13 +98,19 @@ function buildMonthSvg(monthData, years, maxTotal, statusCodes) {
     const yearData = monthData.years[year];
     const barX = marginLeft + (yearIndex * groupWidth);
 
-    parts.push(`<text class="stats-axis-label" x="${barX + (barWidth / 2)}" y="${totalHeight - 3}" text-anchor="middle">${year}</text>`);
+    parts.push(`<text class="stats-axis-label" x="${barX + (barWidth / 2)}" y="${baselineY + 13}" text-anchor="middle">${year}</text>`);
 
     if (yearData.isFuture) {
       parts.push(`<rect class="stats-future-box" x="${barX}" y="${baselineY - 22}" width="${barWidth}" height="22" rx="4" />`);
       parts.push(`<text class="stats-future-label" x="${barX + (barWidth / 2)}" y="${baselineY - 8}" text-anchor="middle">ยังไม่ถึง</text>`);
       return;
     }
+
+    // "Current" (C) — a separate steady-state headcount, not one of the
+    // stacked in/out segments (see statisticsService.js for why: it's
+    // 10x+ larger some months and would swallow the rest of the bar).
+    // Shown as its own small line under the year label instead.
+    parts.push(`<text class="stats-current-label" x="${barX + (barWidth / 2)}" y="${totalHeight - 2}" text-anchor="middle">ปัจจุบัน ${yearData.current}</text>`);
 
     if (yearData.total > 0) {
       parts.push(`<text class="stats-total-label" x="${barX + (barWidth / 2)}" y="${marginTop - 5}" text-anchor="middle">${yearData.total}</text>`);

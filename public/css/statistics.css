@@ -452,6 +452,12 @@ html[data-role="staff"] [data-staff-up] {
   fill: var(--text);
 }
 
+.stats-svg .stats-current-label {
+  font-size: 9px;
+  font-weight: 600;
+  fill: var(--muted);
+}
+
 .stats-svg .stats-baseline {
   stroke: var(--line);
   stroke-width: 1;
