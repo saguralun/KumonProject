@@ -14,6 +14,10 @@ node_modules/
 migration/*.csv
 migration/*.txt
 
+# Database backups (scripts/backup-database.ps1) — real student/payment
+# data. This repo is public on GitHub; these must never be committed.
+backups/
+
 # Runtime state — regenerated automatically, meaningless on another machine
 config/printer-lan-cache.json
 
