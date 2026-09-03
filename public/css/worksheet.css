@@ -364,6 +364,16 @@ h1 {
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+  /* Without this, nothing actually clips a child to this card's rounded
+     border — .history-table-wrap/.worksheet-packet-summary handle their
+     OWN internal scrolling, but if either ends up even slightly taller
+     than this panel's own allocated height (reported on a real iPad;
+     .worksheet-packet-summary's `height: 100%` chain through nested
+     grid rows is exactly the kind of thing WebKit/iOS Safari has known
+     percentage-height quirks with), there was nothing here to stop it
+     visually spilling past the rounded border instead of being cut off
+     at it. */
+  overflow: hidden;
 }
 
 .search-band {

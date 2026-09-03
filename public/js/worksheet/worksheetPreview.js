@@ -189,10 +189,15 @@ export function renderWorksheetProgress() {
         state.progressKind = "main";
     }
 
-    els.worksheetProgressTabs.classList.toggle("hidden", !hasZunProgress);
-    els.worksheetProgressTabs.setAttribute("aria-hidden", hasZunProgress ? "false" : "true");
+    // Always visible once a student's loaded (was hidden entirely when
+    // hasZunProgress was false) — per feedback, showing it lets someone
+    // notice the Main/Zun toggle exists at all, even for a student who
+    // doesn't currently have Zun progress; only the Zun button itself
+    // needs to be disabled for them, not the whole control.
+    els.worksheetProgressTabs.classList.remove("hidden");
+    els.worksheetProgressTabs.setAttribute("aria-hidden", "false");
     els.worksheetProgressTabs.querySelectorAll("[data-progress-kind]").forEach((button) => {
-        button.disabled = !hasZunProgress;
+        button.disabled = button.dataset.progressKind === "zun" && !hasZunProgress;
         button.classList.toggle("active", button.dataset.progressKind === state.progressKind);
     });
 
