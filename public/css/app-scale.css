@@ -791,27 +791,33 @@
    this wins for ≤1120px specifically while 1121-1260px (and everything
    above, i.e. desktop) is untouched. */
 @media (max-width: 1120px) {
-  /* .student-strip stops being a card itself here and becomes a plain
-     stack for two separate cards instead — WS/day pattern buttons on
-     their own, student name + Subject dropdown together below (name
-     left, Subject right) — since all three side by side in one row (the
-     desktop layout, see worksheet.css) was too cramped at this width.
-     .strip-card is `display: contents` (worksheet.css, no !important)
-     everywhere else — no-op there so desktop is untouched — turned back
-     into a real block here, taking over the border/background/shadow
-     .student-strip itself no longer has. */
+  /* Per feedback: WS/day and Subject each get their own visible card
+     (not just flowing together inside .student-strip's one shared
+     border), with Save sitting plainly alongside — not boxed itself.
+     .student-strip becomes the transparent row that holds these three,
+     instead of being a card itself. Replaces an earlier version that
+     merged everything into one shared card, and before that, one that
+     kept the student name visible — both superseded by this feedback.
+     .student-primary is hidden outright; .strip-actions-slot starts
+     empty (harmless) and is where worksheetTabletReflow.js parks
+     .preview-actions at this width — seeing it in the DOM inspector
+     without that script having run yet is expected, not a bug. */
   .worksheet-page .student-strip {
-    grid-template-columns: 1fr !important;
-    grid-auto-rows: auto !important;
-    gap: 8px !important;
+    grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.9fr) auto !important;
+    align-items: center !important;
+    gap: 10px !important;
     padding: 0 !important;
     border: 0 !important;
     box-shadow: none !important;
     background: transparent !important;
   }
 
-  .worksheet-page .strip-card {
-    display: block !important;
+  .worksheet-page .student-primary {
+    display: none !important;
+  }
+
+  .worksheet-page .pattern-control,
+  .worksheet-page .subject-select-wrap {
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--surface);
@@ -819,17 +825,32 @@
     padding: 9px 12px;
   }
 
-  .worksheet-page .strip-card-info {
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
+  /* worksheet.css's own .student-pattern-control .pattern-buttons rule
+     forces exactly 6 columns at >=44px each (>=289px total) — too wide
+     for its own card at this width. Wrap to 2 rows of 3 instead. */
+  .worksheet-page .student-pattern-control .pattern-buttons {
+    grid-template-columns: repeat(3, minmax(44px, 1fr)) !important;
   }
 
+  .worksheet-page .strip-actions-slot {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* One row instead of the 2x2 grid this used to be, now that
+     .preview-panel (below) is out of the flow entirely — its Save/CD
+     actions live in the top card now (above) and the record list/title
+     aren't shown at this width, so there's nothing left in it to give a
+     grid cell to. */
   .worksheet-page .input-layout {
-    grid-template-columns: minmax(200px, 1.05fr) minmax(200px, 1fr) !important;
+    grid-template-columns: minmax(150px, 0.8fr) minmax(160px, 0.85fr) minmax(220px, 1.35fr) !important;
     grid-auto-rows: auto !important;
     max-height: none !important;
     overflow-y: auto !important;
+  }
+
+  .worksheet-page .preview-panel {
+    display: none !important;
   }
 }

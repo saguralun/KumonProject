@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/worksheet.css?v=20260903-panel-overflow">
-  <link rel="stylesheet" href="/css/app-scale.css?v=20260903-strip-cards">
+  <link rel="stylesheet" href="/css/worksheet.css?v=20260903-tablet-reflow">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260903-separate-cards">
 </head>
 
 <body>
@@ -94,22 +94,25 @@
       </section>
 
       <section class="student-strip is-empty" id="studentStrip" aria-live="polite">
-        <div class="strip-card strip-card-pattern">
-          <div class="pattern-control student-pattern-control">
-            <span class="field-label">WS/day</span>
-            <div class="pattern-buttons" id="patternButtons"></div>
-          </div>
+        <div class="pattern-control student-pattern-control">
+          <span class="field-label">WS/day</span>
+          <div class="pattern-buttons" id="patternButtons"></div>
         </div>
-        <div class="strip-card strip-card-info">
-          <div class="student-primary">
-            <div class="student-name" id="studentName">ยังไม่ได้เลือกเด็ก</div>
-            <div class="student-meta" id="studentMeta">เลือกจากช่องค้นหาด้านบน</div>
-          </div>
-          <label class="subject-select-wrap">
-            <span>Subject</span>
-            <select id="studentSubjectSelect" disabled></select>
-          </label>
+        <div class="student-primary">
+          <div class="student-name" id="studentName">ยังไม่ได้เลือกเด็ก</div>
+          <div class="student-meta" id="studentMeta">เลือกจากช่องค้นหาด้านบน</div>
         </div>
+        <label class="subject-select-wrap">
+          <span>Subject</span>
+          <select id="studentSubjectSelect" disabled></select>
+        </label>
+        <!-- Tablet-only: .preview-actions (Save + receive-CD) gets moved
+             here at <=1120px by the reflow script near the end of this
+             file, merging it into this one card alongside WS/day +
+             Subject, and moved back to its normal spot inside
+             .preview-header above 1120px. Empty/inert at desktop width —
+             see worksheet.css's .strip-actions-slot rule. -->
+        <div class="strip-actions-slot" id="stripActionsSlot"></div>
       </section>
 
       <section class="input-layout">
@@ -288,6 +291,7 @@
   <script src="/js/sidebarDrawer.js?v=20260902-drawer-resizeobserver"></script>
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
+  <script src="/js/worksheet/worksheetTabletReflow.js?v=20260903-tablet-reflow"></script>
   <script type="module" src="/js/worksheet/worksheet.js?v=20260903-zun-toggle"></script>
 </body>
 </html>

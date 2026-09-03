@@ -524,16 +524,12 @@ html[data-role="staff"] [data-staff-up] {
   color: var(--muted);
 }
 
-/* .strip-card is a purely-structural wrapper, invisible at this
-   (desktop/full-screen) width: `display: contents` takes the wrapper
-   itself out of layout entirely, so .pattern-control/.student-primary/
-   .subject-select-wrap become .student-strip's direct grid items again
-   — exactly the desktop layout from before this wrapper existed, byte
-   for byte. Splitting them into two visible cards is a tablet-only
-   need (see the @media block further down) — a single row has plenty
-   of room for all three on a real desktop width already. */
-.strip-card {
-  display: contents;
+/* Empty and out of flow at desktop width — the tablet media query
+   further down (see app-scale.css) is what actually gives this
+   content (worksheetTabletReflow.js parks .preview-actions here at
+   <=1120px) and turns it into a real flex box. */
+.strip-actions-slot {
+  display: none;
 }
 
 .student-name {
@@ -688,12 +684,27 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .icon-button {
+  /* Grid's default align/justify-self is `stretch`, which for an
+     element with an explicit smaller width/height (34px, vs the
+     38px column it sits in) just leaves the leftover space at the
+     end of the cell rather than centering it — pin it explicitly so
+     the buttons sit centered in their 38px columns instead of
+     hugging one edge. */
+  justify-self: center;
+  align-self: center;
   width: 34px;
   height: 34px;
   border-radius: 7px;
   font-size: 24px;
   font-weight: 700;
   line-height: 1;
+  /* A tap on a touch device can otherwise be interpreted as the start
+     of a double-tap-to-zoom gesture, which some engines resolve by
+     firing the click twice in quick succession once no second tap
+     follows — reported as the date shifting by 2 days per tap on a
+     real iPad. This tells the browser up front that this element is
+     single-tap-only, skipping that ambiguity window entirely. */
+  touch-action: manipulation;
 }
 
 .receive-weekday {
