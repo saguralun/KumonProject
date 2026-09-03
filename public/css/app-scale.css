@@ -803,8 +803,14 @@
      .preview-actions at this width — seeing it in the DOM inspector
      without that script having run yet is expected, not a bug. */
   .worksheet-page .student-strip {
-    grid-template-columns: minmax(150px, 0.8fr) minmax(150px, 0.9fr) auto !important;
-    align-items: center !important;
+    grid-template-columns: minmax(150px, 1fr) minmax(150px, 1fr) auto !important;
+    /* stretch (grid's own default — spelled out since the base rule sets
+       center) so the WS/day and Subject cards match heights too, not
+       just widths: WS/day's own content (2 rows of pattern buttons) is
+       taller than Subject's (one label + one dropdown), so without this
+       Subject's card would hug its own shorter content instead of
+       matching WS/day's card. */
+    align-items: stretch !important;
     gap: 10px !important;
     padding: 0 !important;
     border: 0 !important;
@@ -823,6 +829,16 @@
     background: var(--surface);
     box-shadow: var(--shadow);
     padding: 9px 12px;
+  }
+
+  /* Subject's own content (a label + a dropdown) is short next to
+     WS/day's 2-row button grid — now that the cards match height via
+     stretch above, center Subject's content in the extra vertical room
+     instead of leaving it stuck at the top. */
+  .worksheet-page .subject-select-wrap {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
   }
 
   /* worksheet.css's own .student-pattern-control .pattern-buttons rule
