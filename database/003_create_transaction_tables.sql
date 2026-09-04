@@ -438,7 +438,12 @@ CREATE TABLE app_user (
 
   display_name VARCHAR(100) NOT NULL,
 
-  role VARCHAR(10) NOT NULL DEFAULT 'admin',
+  -- Any role_master row, not just a hardcoded admin/staff pair — admin
+  -- and guest are still hardcoded in middleware/auth.js (guest has no row
+  -- here at all, see the note above), everything else (instructor, staff,
+  -- and any role an admin adds via the Users page) is looked up through
+  -- role_permission.
+  role VARCHAR(20) NOT NULL DEFAULT 'admin',
 
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
@@ -448,8 +453,9 @@ CREATE TABLE app_user (
 
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-  CONSTRAINT app_user_role_check
-    CHECK (role IN ('admin', 'staff'))
+  CONSTRAINT fk_app_user_role
+    FOREIGN KEY (role)
+    REFERENCES role_master(role_code)
 
 );
 

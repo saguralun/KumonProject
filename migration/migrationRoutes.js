@@ -19,11 +19,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const databaseDir = path.join(__dirname, "..", "database");
 
-// Order matters — 002 seeds data into tables 001 creates, 003 creates
-// transaction tables (and its own default admin/123456 login) that
-// reference 001's master tables. Each file DROPs its own tables with
-// CASCADE before recreating them, so running these three in order is a
-// full schema wipe + rebuild, not an incremental migration.
+// Order matters — 002 seeds data into tables 001 creates (including the
+// role_master/permission_master/role_permission catalog — folded into
+// 001/002 directly once the role-permission system had shipped to every
+// machine; there's no separate migration file for it anymore), 003
+// creates transaction tables (and its own default admin/123456 login)
+// that reference 001's master tables (app_user.role in particular FKs to
+// role_master). Each file DROPs its own tables with CASCADE before
+// recreating them, so running these three in order is a full schema wipe
+// + rebuild, not an incremental migration.
 const DATABASE_SETUP_FILES = [
     "001_create_master_tables.sql",
     "002_insert_master_data.sql",

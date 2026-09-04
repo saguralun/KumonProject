@@ -836,3 +836,42 @@ VALUES
 (6,'14:00','15:00'),
 (6,'15:00','16:00'),
 (6,'16:00','17:00');
+
+-- =========================================================
+-- Role Master Data
+-- =========================================================
+
+INSERT INTO role_master (role_code, role_name, is_system, sort_order) VALUES
+('admin', 'Admin', TRUE, 0),
+('instructor', 'Instructor', FALSE, 1),
+('staff', 'Staff', FALSE, 2),
+('guest', 'Guest', TRUE, 3);
+
+-- =========================================================
+-- Permission Master Data
+-- =========================================================
+
+INSERT INTO permission_master (permission_key, permission_label, nav_group, sort_order) VALUES
+('page:payment', 'Payment', 'management', 1),
+('page:report', 'Report', 'management', 2),
+('page:progress-chart', 'Progress Chart', 'management', 3),
+('page:statistics', 'Statistics', 'management', 4),
+('page:stock', 'Stock', 'warehouse', 1),
+('page:stock-receive', 'Stock Receive', 'warehouse', 2),
+('page:stock-cut', 'Stock Cut', 'warehouse', 3),
+('page:forecast', 'Forecast & Order', 'warehouse', 4),
+('page:tables', 'Tables', 'system', 1),
+('page:opening-schedule', 'Opening Schedule', 'system', 2);
+
+-- =========================================================
+-- Role Permission Data (default grants)
+-- =========================================================
+-- instructor = everything except the ระบบ (system) group
+-- staff      = warehouse only
+-- All freely editable afterward from the Users page.
+
+INSERT INTO role_permission (role_code, permission_key)
+SELECT 'instructor', permission_key FROM permission_master WHERE nav_group IN ('management', 'warehouse');
+
+INSERT INTO role_permission (role_code, permission_key)
+SELECT 'staff', permission_key FROM permission_master WHERE nav_group = 'warehouse';

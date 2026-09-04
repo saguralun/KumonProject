@@ -1,9 +1,10 @@
 // Shared across every page. Renders the current user + a logout button into
 // #authBar (if present), gates nav links by role (hardcoded data-admin-only
 // items) and by the configurable role-permission system (data-requires-
-// permission items — see database/004_add_roles_permissions.sql and the
-// Users page's role editor), and bounces to the login page if the session
-// has expired mid-visit.
+// permission items — see role_master/permission_master/role_permission in
+// database/001_create_master_tables.sql and database/002_insert_master_data.sql,
+// plus the Users page's role editor), and bounces to the login page if the
+// session has expired mid-visit.
 
 async function loadSession() {
   const response = await fetch("/api/auth/me");

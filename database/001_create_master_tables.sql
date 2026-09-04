@@ -26,6 +26,10 @@ DROP TABLE IF EXISTS center_master CASCADE;
 DROP TABLE IF EXISTS opening_schedule CASCADE;
 DROP TABLE IF EXISTS weekday_master CASCADE;
 
+DROP TABLE IF EXISTS role_permission CASCADE;
+DROP TABLE IF EXISTS permission_master CASCADE;
+DROP TABLE IF EXISTS role_master CASCADE;
+
 -- =========================================================
 -- Subject Master
 -- =========================================================
@@ -434,6 +438,79 @@ CREATE TABLE opening_schedule (
 
 	CONSTRAINT ck_opening_schedule_time
 		CHECK (start_time < end_time)
+
+);
+
+-- =========================================================
+-- Role Master
+-- =========================================================
+-- admin/guest are fixed "system" roles (is_system = TRUE, never
+-- renamed/deleted); instructor/staff and anything an admin adds later
+-- via the Users page are ordinary rows, freely renamable/deletable. See
+-- middleware/auth.js for how role scope actually works — admin and guest
+-- are hardcoded there and never looked up via role_permission below;
+-- only a configurable role's page access comes from that table.
+
+CREATE TABLE role_master (
+
+	role_code VARCHAR(20) PRIMARY KEY,
+
+	role_name VARCHAR(100) NOT NULL,
+
+	is_system BOOLEAN NOT NULL DEFAULT FALSE,
+
+	sort_order SMALLINT NOT NULL DEFAULT 0,
+
+	created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+
+);
+
+-- =========================================================
+-- Permission Master
+-- =========================================================
+-- The catalog of gate-able pages — nav_group ties each one to a nav
+-- flyout group (management/warehouse/system). WS Input and Students are
+-- deliberately NOT in this table — they stay available to every
+-- logged-in role, guest included. Users and Migration also stay
+-- hardcoded admin-only and never appear here, so granting permissions
+-- can never be used to grant more permissions (see middleware/auth.js).
+
+CREATE TABLE permission_master (
+
+	permission_key VARCHAR(50) PRIMARY KEY,
+
+	permission_label VARCHAR(100) NOT NULL,
+
+	nav_group VARCHAR(50) NOT NULL,
+
+	sort_order SMALLINT NOT NULL DEFAULT 0
+
+);
+
+-- =========================================================
+-- Role Permission
+-- =========================================================
+-- Which roles are granted which permission keys. admin bypasses this
+-- table entirely (hardcoded full access — see middleware/auth.js).
+
+CREATE TABLE role_permission (
+
+	role_code VARCHAR(20) NOT NULL,
+
+	permission_key VARCHAR(50) NOT NULL,
+
+	CONSTRAINT fk_role_permission_role
+		FOREIGN KEY (role_code)
+		REFERENCES role_master(role_code)
+		ON DELETE CASCADE,
+
+	CONSTRAINT fk_role_permission_permission
+		FOREIGN KEY (permission_key)
+		REFERENCES permission_master(permission_key)
+		ON DELETE CASCADE,
+
+	CONSTRAINT pk_role_permission
+		PRIMARY KEY (role_code, permission_key)
 
 );
 

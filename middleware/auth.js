@@ -7,7 +7,8 @@
 //                to grant more permissions.
 //   instructor - the old two-tier model's "staff": everything except the
 //                ระบบ (system) group. Renamed when the permission system
-//                shipped (see database/004_add_roles_permissions.sql) —
+//                shipped (see role_master/permission_master/role_permission
+//                in database/001_create_master_tables.sql) —
 //                still used directly (not through role_permission) for
 //                student/enrollment master-data edits, which aren't a nav
 //                page and so were never part of the configurable matrix.
@@ -85,8 +86,9 @@ export function requireAdmin(req, res, next) {
 // deliberately never a row an admin can edit permissions for), everyone
 // else needs `permissionKey` in their role's role_permission grants. This
 // is what Payment/Report/Progress Chart/Stock*/Forecast/Tables/Opening
-// Schedule are gated with — see database/004_add_roles_permissions.sql for
-// the permission_master catalog and default grants.
+// Schedule are gated with — see database/001_create_master_tables.sql for
+// the permission_master catalog and database/002_insert_master_data.sql
+// for the default grants.
 export function requirePermission(permissionKey) {
     return async (req, res, next) => {
         const role = req.session?.user?.role;
