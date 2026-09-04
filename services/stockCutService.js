@@ -17,15 +17,15 @@ const ITEM_TYPE_CONFIG = {
         masterFk: "worksheet_master_id",
         dateColumn: "worksheet_date",
         itemNoColumn: "worksheet_no",
-        // worksheet_used.cpws (no equivalent on cd_used) marks which rows
-        // actually correspond to a physical packet page being consumed:
-        // FALSE means either a same-packet continuation day already
-        // counted once on its cpws=TRUE row (see buildGroupPreview's
-        // `cpws: index === 0` in worksheetInput.js), or a Kumon Connect
-        // enrollment (forced cpws=FALSE — KC never touches physical
-        // stock at all). Cutting those too would double-count a packet
-        // already cut, or cut stock for students who never used any.
-        requireCpws: true
+        // worksheet_used.cpws marks which rows actually correspond to a
+        // physical packet page being consumed: FALSE means either a
+        // same-packet continuation day already counted once on its
+        // cpws=TRUE row (see buildGroupPreview's cpws: index === 0 in
+        // worksheetInput.js), or a Kumon Connect enrollment (forced
+        // cpws=FALSE — KC never touches physical stock at all). Cutting
+        // those too would double-count a packet already cut, or cut
+        // stock for students who never used any.
+        cpwsColumn: "cpws"
     },
     cd: {
         stockTypeCode: "CD",
@@ -34,7 +34,12 @@ const ITEM_TYPE_CONFIG = {
         masterFk: "cd_master_id",
         dateColumn: "cd_date",
         itemNoColumn: "cd_no",
-        requireCpws: false
+        // cd_used's equivalent of worksheet_used.cpws — same idea, same
+        // reasoning, different column name: FALSE means the CD test
+        // happened but no new physical CD was actually handed out (see
+        // worksheetPreview.js's isTakingCd / "ไม่รับ CD"), so nothing
+        // should be cut from stock for that row.
+        cpwsColumn: "cpcd"
     }
 };
 
@@ -91,6 +96,12 @@ function normalizeDate(value) {
 // One row per date that still has pending (unprocessed) usage — the main
 // list view. Dates disappear from here as soon as everything on them has
 // been cut, so this is always "what's left to do", not a full history.
+// Deliberately NOT filtered by cpwsColumn — per the owner, a cpws=FALSE
+// row (packet continuation / no-physical-CD) should still show up here
+// for visibility, it just won't move stock.quantity when actually cut
+// (see processPendingDates). cutQuantity is the subset of total_quantity
+// that will really affect stock; the two only differ on a date/item that
+// has some cpws=FALSE rows mixed in.
 export async function searchPendingDates(type) {
     const config = await resolveType(type);
 
@@ -98,10 +109,10 @@ export async function searchPendingDates(type) {
         SELECT
             ${config.dateColumn} AS used_date,
             COUNT(DISTINCT ${config.masterFk})::int AS item_count,
-            COUNT(*)::int AS total_quantity
+            COUNT(*)::int AS total_quantity,
+            COUNT(*) FILTER (WHERE ${config.cpwsColumn} = TRUE)::int AS cut_quantity
         FROM ${TABLE_SCHEMA}.${config.usedTable}
         WHERE is_stock_processed = FALSE
-          ${config.requireCpws ? "AND cpws = TRUE" : ""}
         GROUP BY ${config.dateColumn}
         ORDER BY ${config.dateColumn} DESC
     `);
@@ -111,7 +122,8 @@ export async function searchPendingDates(type) {
         rows: result.rows.map((row) => ({
             date: normalizeDate(row.used_date),
             itemCount: row.item_count,
-            totalQuantity: row.total_quantity
+            totalQuantity: row.total_quantity,
+            cutQuantity: row.cut_quantity
         }))
     };
 }
@@ -119,7 +131,12 @@ export async function searchPendingDates(type) {
 // Item breakdown for one pending date — what would actually get cut, and
 // what stock.quantity would look like afterward (surfaced so a negative
 // result is visible before committing, per the owner: allowed, just
-// flagged rather than blocked).
+// flagged rather than blocked). Lists every pending item on this date
+// regardless of cpwsColumn (full visibility, per the owner), but
+// quantity/resultingStock only ever reflect the cpws=TRUE portion — the
+// real stock impact — via a FILTERed count rather than a WHERE filter, so
+// an item that's 100% cpws=FALSE still appears (quantity 0, no change)
+// instead of vanishing from the list.
 export async function getPendingDateDetail(type, date) {
     const config = await resolveType(type);
     const normalizedDate = normalizeDate(date);
@@ -143,7 +160,8 @@ export async function getPendingDateDetail(type, date) {
             sub.subject_code,
             lm.level_code,
             ${itemColumns},
-            COUNT(*)::int AS quantity,
+            COUNT(*)::int AS total_quantity,
+            COUNT(*) FILTER (WHERE u.${config.cpwsColumn} = TRUE)::int AS quantity,
             COALESCE(s.quantity, 0)::int AS current_stock
         FROM ${TABLE_SCHEMA}.${config.usedTable} u
         ${masterJoin}
@@ -151,7 +169,6 @@ export async function getPendingDateDetail(type, date) {
         LEFT JOIN ${TABLE_SCHEMA}.stock s ON s.stock_type_id = $1 AND s.master_id = u.${config.masterFk}
         WHERE u.is_stock_processed = FALSE
           AND u.${config.dateColumn} = $2::date
-          ${config.requireCpws ? "AND u.cpws = TRUE" : ""}
         GROUP BY u.${config.masterFk}, sub.subject_code, lm.level_master_id, lm.level_code, ${config.type === "ws" ? "wm." : "cm."}${config.itemNoColumn}, s.quantity
         ORDER BY sub.subject_code, lm.level_master_id, item_no
     `, [config.stockTypeId, normalizedDate]);
@@ -165,6 +182,7 @@ export async function getPendingDateDetail(type, date) {
             levelCode: row.level_code,
             itemNo: row.item_no,
             quantity: row.quantity,
+            totalQuantity: row.total_quantity,
             currentStock: row.current_stock,
             resultingStock: row.current_stock - row.quantity
         }))
@@ -190,16 +208,29 @@ export async function processPendingDates(type, dates) {
     try {
         await client.query("BEGIN");
 
+        // Real stock impact: only cpws=TRUE rows count toward the
+        // INSERT/UPDATE-stock loop below.
         const itemsResult = await client.query(`
             SELECT ${config.masterFk} AS master_id, COUNT(*)::int AS quantity
             FROM ${TABLE_SCHEMA}.${config.usedTable}
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
-              ${config.requireCpws ? "AND cpws = TRUE" : ""}
+              AND ${config.cpwsColumn} = TRUE
             GROUP BY ${config.masterFk}
         `, [normalizedDates]);
 
-        if (!itemsResult.rows.length) {
+        // Whether there's anything pending at all on these dates — real
+        // (cpws=TRUE) or "fake" (cpws=FALSE, per the owner: still shows
+        // on this page, still gets cleared out when cut, just never
+        // moves stock.quantity). Only a 404 if NEITHER kind exists.
+        const pendingCountResult = await client.query(`
+            SELECT COUNT(*)::int AS pending_count
+            FROM ${TABLE_SCHEMA}.${config.usedTable}
+            WHERE is_stock_processed = FALSE
+              AND ${config.dateColumn} = ANY($1::date[])
+        `, [normalizedDates]);
+
+        if (!pendingCountResult.rows[0].pending_count) {
             throw httpError(404, "ไม่พบรายการที่ยังไม่ได้ตัด stock ในวันที่เลือก");
         }
 
@@ -213,19 +244,17 @@ export async function processPendingDates(type, dates) {
             `, [config.stockTypeId, item.master_id, item.quantity]);
         }
 
-        // cpws = FALSE rows (continuation days / Kumon Connect) are
-        // deliberately left with is_stock_processed still FALSE — they
-        // were never counted into itemsResult above, so marking them
-        // processed here would be a lie: nothing was ever cut for them.
-        // Leaving it FALSE also keeps them editable elsewhere in the app
-        // (worksheetService.js blocks edits once is_stock_processed is
-        // TRUE), which is correct since no stock was ever locked in.
+        // Marks EVERY pending row on these dates as processed — including
+        // cpws=FALSE ones (continuation days / Kumon Connect for ws, "no
+        // CD actually handed out" for cd), which never went through the
+        // INSERT/UPDATE-stock loop above. That's the "fake cut" the owner
+        // asked for: they still disappear from the pending queue like a
+        // real cut would, they just never touched stock.quantity.
         const updateResult = await client.query(`
             UPDATE ${TABLE_SCHEMA}.${config.usedTable}
             SET is_stock_processed = TRUE
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
-              ${config.requireCpws ? "AND cpws = TRUE" : ""}
         `, [normalizedDates]);
 
         await client.query("COMMIT");
