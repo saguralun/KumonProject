@@ -366,11 +366,20 @@ h1 {
   color: var(--green);
 }
 
+/* min-height is a floor, not the flex min-height:0 trick (that's still
+   needed too, see below) — without a floor, .list-panel (flex: 1, 0
+   basis) has nothing stopping it from being squeezed toward zero by its
+   auto-basis siblings (.create-panel, .roles-panel) when their combined
+   natural height already exceeds .users-workspace's own height — see the
+   comment on .permission-matrix-wrap for how that happens. 240px keeps
+   the account table usably visible no matter how tall Roles & Permissions
+   grows; .users-workspace's own overflow: auto (already set) picks up
+   the slack by scrolling the whole page instead of hiding this table. */
 .list-panel {
   flex: 1;
+  min-height: 240px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 
 .users-table-wrap {
@@ -494,8 +503,21 @@ tbody tr.is-inactive {
   font-weight: 800;
 }
 
+/* max-height caps how tall this can grow — without it, .roles-panel (a
+   plain block, not flex-sized) takes whatever height its content needs,
+   and that content only ever grows as more permission keys get added
+   (one row per permission_master entry, e.g. adding page:statistics).
+   .users-workspace is a column flex container and .list-panel is the
+   only sibling with `flex: 1 1 0%` (0 basis) — once .roles-panel's
+   natural height got tall enough to exceed the workspace's own height,
+   .list-panel (the account table right above it) got squeezed down to
+   a sliver instead, looking like the account list had disappeared
+   entirely. overflow: auto here only actually triggers with a real
+   height cap — it was already present but had nothing to constrain it
+   against. */
 .permission-matrix-wrap {
   margin-top: 14px;
+  max-height: 320px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
