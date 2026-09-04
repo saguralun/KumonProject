@@ -364,6 +364,24 @@ h1 {
   border-radius: 8px;
   background: var(--surface);
   box-shadow: var(--shadow);
+}
+
+/* Everything above EXCEPT .search-band also gets overflow: hidden —
+   .search-band deliberately doesn't, since #searchResults (the
+   ID/name-search dropdown) is a child of .search-field, itself a child
+   of .search-band, absolutely positioned to pop out *below* this card's
+   own bottom edge. overflow: hidden here clipped that dropdown to
+   nothing (0-ish visible px of an 80px-tall popup) even though it was
+   rendering correctly in every other respect (right DOM content, right
+   position, display: block) — confirmed directly: elementFromPoint at
+   the dropdown's own computed rect found it painted and topmost, it was
+   only invisible because .search-band cut it off before it ever reached
+   the screen. */
+.student-strip,
+.input-panel,
+.preview-panel,
+.secondary-actions,
+.history-panel {
   /* Without this, nothing actually clips a child to this card's rounded
      border — .history-table-wrap/.worksheet-packet-summary handle their
      OWN internal scrolling, but if either ends up even slightly taller
