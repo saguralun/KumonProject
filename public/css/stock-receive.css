@@ -706,12 +706,21 @@ html[data-role="staff"] [data-staff-up] {
   background: rgba(15, 23, 42, 0.35);
 }
 
+/* flex column, not a plain grid-with-overflow: without this the dialog
+   scrolled as ONE block (header + item list + action buttons together),
+   so a DO with a long item list pushed the Process button further and
+   further down — needing a long scroll just to reach it, reported
+   directly. .modal-header/.modal-actions are fixed (flex: 0 0 auto,
+   below); only .do-detail-body scrolls internally, so Process stays
+   pinned right below the item list at a fixed, always-reachable spot
+   regardless of how many items are in it. */
 .do-detail-dialog {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   width: min(560px, calc(100vw - 24px));
   max-height: calc(100vh - 32px);
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
@@ -720,6 +729,7 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .modal-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -737,6 +747,9 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .do-detail-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
   display: grid;
   gap: 10px;
   font-size: 13px;
@@ -763,7 +776,17 @@ html[data-role="staff"] [data-staff-up] {
 .do-detail-items {
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow: hidden;
+  /* No overflow: hidden here (was here purely to clip the table's square
+     corners to this box's rounded ones) — per the CSS grid/flex spec, a
+     grid item's automatic min-height is content-based UNLESS its own
+     overflow is anything but visible, in which case it's 0. That 0
+     let .do-detail-body's `auto` grid row shrink this element down to
+     fit the available space instead of growing to its real content
+     height — so a long item list silently clipped rows here instead of
+     making .do-detail-body (the intended scroll container) actually
+     scroll past them. Confirmed directly: with 150 fake rows, this
+     element's own rect stayed ~450px tall (invisibly cutting off most
+     of the list) while the real table content was 6450px tall. */
 }
 
 .do-detail-items table {
@@ -824,6 +847,7 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .modal-actions {
+  flex: 0 0 auto;
   display: flex;
   justify-content: space-between;
   gap: 10px;
