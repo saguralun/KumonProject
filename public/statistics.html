@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/statistics.css?v=20260904-headyear-same-line">
+  <link rel="stylesheet" href="/css/statistics.css?v=20260904-sidebar-scroll-fix">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
 </head>
 <body>
@@ -57,16 +57,18 @@
         <div class="subtle">เด็กเข้า-ออก รายเดือน เทียบ 3 ปีล่าสุด</div>
       </div>
 
-      <div class="stats-legend">
-        <div class="stats-legend-title">สถานะ (เรียงตามที่ขึ้นในกราฟ: ออก / เข้า / เรียนต่อ)</div>
-        <div class="stats-legend-group">ออก</div>
-        <div id="legendOut"></div>
-        <div class="stats-legend-group">เข้า</div>
-        <div id="legendIn"></div>
-        <div class="stats-legend-group">เรียนต่อ</div>
-        <div id="legendCurrent"></div>
-        <div class="stats-legend-note">
-          แต่ละเดือนแบ่ง 3 zone [ออก][เข้า][เรียนต่อ] แต่ละ zone มี 3 แท่งติดกัน — หัวกราฟบอก "ปีล่าสุด" ของเดือนนั้น (เดือนที่ยังไม่ถึงในปีนี้ จะเลื่อนย้อนไป 1 ปี เช่น ปีล่าสุด 2025 แทน 2026 เพื่อให้มี 3 แท่งข้อมูลจริงครบเสมอ) • เดือนปัจจุบัน (กรอบสีฟ้า) แท่งขอบเส้นประ = ข้อมูลยังนับไม่ครบเดือน • สเกลแกน Y แยกกันคนละ zone (เรียนต่อตัวเลขสูงกว่ามาก เทียบกับสเกลเดียวกันไม่ได้) • "เรียนต่อ" นับจากบิลเดือนนั้นที่ไม่มี status อื่นพ่วง ไม่ใช่ enrollment_status
+      <div class="sidebar-scroll">
+        <div class="stats-legend">
+          <div class="stats-legend-title">สถานะ (เรียงตามที่ขึ้นในกราฟ: ออก / เข้า / เรียนต่อ)</div>
+          <div class="stats-legend-group">ออก</div>
+          <div id="legendOut"></div>
+          <div class="stats-legend-group">เข้า</div>
+          <div id="legendIn"></div>
+          <div class="stats-legend-group">เรียนต่อ</div>
+          <div id="legendCurrent"></div>
+          <div class="stats-legend-note">
+            แต่ละเดือนแบ่ง 3 zone [ออก][เข้า][เรียนต่อ] แต่ละ zone มี 3 แท่งติดกัน — หัวกราฟบอก "ปีล่าสุด" ของเดือนนั้น (เดือนที่ยังไม่ถึงในปีนี้ จะเลื่อนย้อนไป 1 ปี เช่น ปีล่าสุด 2025 แทน 2026 เพื่อให้มี 3 แท่งข้อมูลจริงครบเสมอ) • เดือนปัจจุบัน (กรอบสีฟ้า) แท่งขอบเส้นประ = ข้อมูลยังนับไม่ครบเดือน • สเกลแกน Y แยกกันคนละ zone (เรียนต่อตัวเลขสูงกว่ามาก เทียบกับสเกลเดียวกันไม่ได้) • "เรียนต่อ" นับจากบิลเดือนนั้นที่ไม่มี status อื่นพ่วง ไม่ใช่ enrollment_status
+          </div>
         </div>
       </div>
 

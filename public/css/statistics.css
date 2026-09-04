@@ -71,11 +71,24 @@ button:disabled {
   height: 100vh;
   height: 100dvh;
   min-height: 0;
-  overflow-y: auto;
+  overflow: hidden;
   border-right: 1px solid var(--line);
   background: #132033;
   color: #e5edf7;
   padding: 10px;
+}
+
+/* Everything between the nav/header and the auth bar scrolls on its own
+   — .stats-legend keeps growing (more zones, longer explanatory notes)
+   and without this the whole sidebar (nav + auth-bar included) would
+   scroll as one unit, pushing the logout button below the fold instead
+   of leaving it always reachable at the bottom (reported directly: the
+   admin/logout area had been scrolled out of view). Same fix
+   progress-chart.css already uses for the identical reason. */
+.sidebar-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .side-nav {
