@@ -20,11 +20,10 @@ const STATUS_LABELS_TH = {
   C: "Continue"
 };
 
-// Full color for the latest year's bar; STATUS_GRAYS is the same ramp
-// used for the two older years' bars — same relative ordering (so segment
-// proportions still read the same way), just desaturated to keep the
-// recent year visually dominant, per the original "24 เดือนย้อนหลัง เป็น
-// สีเทา เทียบกับเดือนนั้นๆ" request.
+// Same color for all 3 years now (was full color for the latest year,
+// grayscale for the two older ones) — with a year label already under
+// every bar, the gray/color split wasn't needed to tell them apart, per
+// feedback ("มี ปี ระบุไว้แล้ว").
 const STATUS_COLORS = {
   N: "#2563eb",
   IT: "#0891b2",
@@ -35,18 +34,7 @@ const STATUS_COLORS = {
   CP: "#dc2626"
 };
 
-const STATUS_GRAYS = {
-  N: "#cbd5e1",
-  IT: "#b6c2d1",
-  EO: "#94a3b8",
-  R: "#7c8ba0",
-  A: "#64748b",
-  OT: "#4b5768",
-  CP: "#334155"
-};
-
 const CURRENT_COLOR = "#0f766e";
-const CURRENT_GRAY = "#94a3b8";
 
 // Three side-by-side zones per month panel, each its own tight cluster of
 // 3 year-bars (touching within a zone, a clear gap between zones) — per
@@ -113,7 +101,6 @@ function buildMonthSvg(monthData, years, zoneMax) {
     parts.push(`<text class="stats-zone-label" x="${zoneX + (zoneWidth / 2)}" y="10" text-anchor="middle">${escapeHtml(zone.label)}</text>`);
 
     years.forEach((year, yearIndex) => {
-      const isLatest = yearIndex === years.length - 1;
       const yearData = monthData.years[year];
       const barX = zoneX + (yearIndex * (barWidth + gapWithinZone));
 
@@ -128,19 +115,17 @@ function buildMonthSvg(monthData, years, zoneMax) {
         const value = yearData.current;
         const max = zoneMax.current;
         const segmentHeight = max > 0 ? (value / max) * chartHeight : 0;
-        const color = isLatest ? CURRENT_COLOR : CURRENT_GRAY;
 
         if (value > 0) {
           parts.push(`<text class="stats-total-label" x="${barX + (barWidth / 2)}" y="${marginTop - 5}" text-anchor="middle">${value}</text>`);
           parts.push(
-            `<rect class="stats-bar-segment" x="${barX}" y="${(baselineY - segmentHeight).toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${color}" ` +
+            `<rect class="stats-bar-segment" x="${barX}" y="${(baselineY - segmentHeight).toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${CURRENT_COLOR}" ` +
             `data-year="${year}" data-month="${monthData.month}" data-code="C" data-value="${value}" />`
           );
         }
         return;
       }
 
-      const palette = isLatest ? STATUS_COLORS : STATUS_GRAYS;
       const zoneTotal = zone.codes.reduce((sum, code) => sum + (yearData.byStatus[code] || 0), 0);
       const max = zoneMax[zone.key];
 
@@ -161,7 +146,7 @@ function buildMonthSvg(monthData, years, zoneMax) {
         const y = cumulativeY - segmentHeight;
 
         parts.push(
-          `<rect class="stats-bar-segment" x="${barX}" y="${y.toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${palette[code]}" ` +
+          `<rect class="stats-bar-segment" x="${barX}" y="${y.toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${STATUS_COLORS[code]}" ` +
           `data-year="${year}" data-month="${monthData.month}" data-code="${code}" data-value="${value}" />`
         );
 
