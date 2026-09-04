@@ -51,14 +51,24 @@ const MONTH_LABELS_TH = [
     "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."
 ];
 
-// years/months/statuses are all fixed, tiny (3 x 12 x 7) — running the
-// aggregation query fresh on every request is cheap and always current,
-// no caching needed.
+// years/months/statuses are all fixed, tiny (4 x 12 x 7 at most) — running
+// the aggregation query fresh on every request is cheap and always
+// current, no caching needed.
 export async function getEnrollmentStatusStatistics() {
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1; // JS getMonth() is 0-based
-    const years = [currentYear - 2, currentYear - 1, currentYear];
+
+    // A month later in the current year than "now" hasn't happened yet —
+    // rather than show a 3rd, empty/placeholder bar for it (the earlier
+    // design), the whole 3-year window for that month's panel slides back
+    // one year instead, so every panel always shows 3 real, complete
+    // years of data. E.g. today in September: the September panel (month
+    // <= currentMonth) shows 2024/2025/2026; the October panel (month >
+    // currentMonth, hasn't happened in 2026 yet) shows 2023/2024/2025.
+    // Needs data back to currentYear - 3 (one year further than the
+    // simple "latest 3 years" case) to cover that shifted window.
+    const earliestYear = currentYear - 3;
 
     const [eventResult, currentResult] = await Promise.all([
         pool.query(
@@ -67,7 +77,7 @@ export async function getEnrollmentStatusStatistics() {
              JOIN ${TABLE_SCHEMA}.status_master sm ON sm.status_id = es.status_id
              WHERE sm.status_code = ANY($1) AND es.status_year >= $2
              GROUP BY es.status_year, es.status_month, sm.status_code`,
-            [STATUS_CODES, years[0]]
+            [STATUS_CODES, earliestYear]
         ),
         pool.query(
             `SELECT b.billing_year AS status_year, b.billing_month AS status_month, count(*)::int AS cnt
@@ -76,7 +86,7 @@ export async function getEnrollmentStatusStatistics() {
              JOIN ${TABLE_SCHEMA}.status_master sm ON sm.status_id = bd.status_group1_id
              WHERE sm.status_code = 'C' AND b.billing_year >= $1
              GROUP BY b.billing_year, b.billing_month`,
-            [years[0]]
+            [earliestYear]
         )
     ]);
 
@@ -103,7 +113,15 @@ export async function getEnrollmentStatusStatistics() {
     const months = [];
 
     for (let month = 1; month <= 12; month += 1) {
-        const yearsData = {};
+        // This month's own 3-year window — only ever 3 full, real years,
+        // never a placeholder. headYear (the latest year in the window)
+        // is what the panel's own heading shows.
+        const years = month <= currentMonth
+            ? [currentYear - 2, currentYear - 1, currentYear]
+            : [currentYear - 3, currentYear - 2, currentYear - 1];
+        const headYear = years[years.length - 1];
+
+        const yearData = {};
 
         years.forEach((year) => {
             const counts = countsByYearMonth.get(`${year}-${month}`) || {};
@@ -117,20 +135,22 @@ export async function getEnrollmentStatusStatistics() {
                 total += value;
             });
 
-            // A month later in the current year than "now" hasn't happened
-            // yet — its 0 isn't a real "nothing happened" data point, so
-            // the frontend needs to tell the two apart (a placeholder,
-            // not a real empty bar).
-            yearsData[year] = {
+            yearData[year] = {
                 byStatus,
                 total,
                 current: currentByYearMonth.get(`${year}-${month}`) || 0,
-                isFuture: year === currentYear && month > currentMonth
+                // The one bar, across the whole 12-panel grid, that
+                // represents literally this month and this year right
+                // now — its data is still accumulating (the month isn't
+                // over), unlike every other bar shown, which is a closed,
+                // complete month. Flagged so the frontend can mark it
+                // distinctly instead of presenting it as equally final.
+                isCurrentMonth: year === currentYear && month === currentMonth
             };
         });
 
-        months.push({ month, monthLabel: MONTH_LABELS_TH[month - 1], years: yearsData });
+        months.push({ month, monthLabel: MONTH_LABELS_TH[month - 1], years, headYear, yearData });
     }
 
-    return { years, statusCodes: STATUS_CODES, statusLabels: STATUS_LABELS, months };
+    return { statusCodes: STATUS_CODES, statusLabels: STATUS_LABELS, months };
 }

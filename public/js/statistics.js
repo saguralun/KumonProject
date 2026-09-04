@@ -20,10 +20,8 @@ const STATUS_LABELS_TH = {
   C: "Continue"
 };
 
-// Same color for all 3 years now (was full color for the latest year,
-// grayscale for the two older ones) — with a year label already under
-// every bar, the gray/color split wasn't needed to tell them apart, per
-// feedback ("มี ปี ระบุไว้แล้ว").
+// Same color for all 3 years — with a year label already under every bar,
+// a gray/color split wasn't needed to tell them apart.
 const STATUS_COLORS = {
   N: "#2563eb",
   IT: "#0891b2",
@@ -75,12 +73,25 @@ function renderLegend() {
 // the WHOLE dataset (all 12 months) so bars stay comparable month to
 // month within that zone, without letting Current's much larger scale
 // flatten the out/in zones (the whole reason these are separate zones).
-function buildMonthSvg(monthData, years, zoneMax) {
+//
+// monthData.years is THIS panel's own 3-year window — not shared across
+// panels: a month that hasn't happened yet in the current year (e.g.
+// October while today is in September) shows 2023/2024/2025 instead of
+// 2024/2025/2026, so every panel always has 3 real, complete years rather
+// than a placeholder for a year that isn't over yet. headYear (the latest
+// year in that window) is shown as a heading inside the panel so it's
+// clear which "latest year" this specific month is comparing against —
+// it's 2026 for most months, but one year behind for any month later in
+// the year than right now.
+function buildMonthSvg(monthData, zoneMax) {
+  const years = monthData.years;
   const barWidth = 22;
   const gapWithinZone = 3;
   const zoneGap = 20;
   const chartHeight = 90;
-  const marginTop = 34; // zone label + per-bar total label
+  const headRow = 16; // headYear heading
+  const zoneLabelRow = 18; // ออก/เข้า/เรียนต่อ labels
+  const marginTop = headRow + zoneLabelRow + 14; // + per-bar total label
   const marginBottom = 18; // year label
   const marginLeft = 6;
   const marginRight = 6;
@@ -94,23 +105,20 @@ function buildMonthSvg(monthData, years, zoneMax) {
   const parts = [];
 
   parts.push(`<svg class="stats-svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" xmlns="http://www.w3.org/2000/svg">`);
+  parts.push(`<text class="stats-head-year" x="${marginLeft + (chartWidth / 2)}" y="12" text-anchor="middle">ปี ${monthData.headYear}</text>`);
   parts.push(`<line class="stats-baseline" x1="${marginLeft}" y1="${baselineY}" x2="${marginLeft + chartWidth}" y2="${baselineY}" />`);
 
   ZONES.forEach((zone, zoneIndex) => {
     const zoneX = marginLeft + (zoneIndex * (zoneWidth + zoneGap));
 
-    parts.push(`<text class="stats-zone-label" x="${zoneX + (zoneWidth / 2)}" y="10" text-anchor="middle">${escapeHtml(zone.label)}</text>`);
+    parts.push(`<text class="stats-zone-label" x="${zoneX + (zoneWidth / 2)}" y="${headRow + 12}" text-anchor="middle">${escapeHtml(zone.label)}</text>`);
 
     years.forEach((year, yearIndex) => {
-      const yearData = monthData.years[year];
+      const yearData = monthData.yearData[year];
       const barX = zoneX + (yearIndex * (barWidth + gapWithinZone));
+      const currentMonthClass = yearData.isCurrentMonth ? " stats-bar-current" : "";
 
       parts.push(`<text class="stats-axis-label" x="${barX + (barWidth / 2)}" y="${baselineY + 13}" text-anchor="middle">${year}</text>`);
-
-      if (yearData.isFuture) {
-        parts.push(`<rect class="stats-future-box" x="${barX}" y="${baselineY - 18}" width="${barWidth}" height="18" rx="3" />`);
-        return;
-      }
 
       if (zone.soloColor) {
         const value = yearData.current;
@@ -120,8 +128,8 @@ function buildMonthSvg(monthData, years, zoneMax) {
         if (value > 0) {
           parts.push(`<text class="stats-total-label" x="${barX + (barWidth / 2)}" y="${marginTop - 5}" text-anchor="middle">${value}</text>`);
           parts.push(
-            `<rect class="stats-bar-segment" x="${barX}" y="${(baselineY - segmentHeight).toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${CURRENT_COLOR}" ` +
-            `data-year="${year}" data-month="${monthData.month}" data-code="C" data-value="${value}" />`
+            `<rect class="stats-bar-segment${currentMonthClass}" x="${barX}" y="${(baselineY - segmentHeight).toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${CURRENT_COLOR}" ` +
+            `data-year="${year}" data-month="${monthData.month}" data-code="C" data-value="${value}" data-current-month="${yearData.isCurrentMonth}" />`
           );
         }
         return;
@@ -136,6 +144,10 @@ function buildMonthSvg(monthData, years, zoneMax) {
 
       let cumulativeY = baselineY;
 
+      // The "still counting" dashed outline (currentMonthClass) is added
+      // to every segment of a current-month bar, not just one — each
+      // segment strokes its own edges, which reads fine as one dashed
+      // outline given how thin these stacked segments are.
       zone.codes.forEach((code) => {
         const value = yearData.byStatus[code] || 0;
 
@@ -147,8 +159,8 @@ function buildMonthSvg(monthData, years, zoneMax) {
         const y = cumulativeY - segmentHeight;
 
         parts.push(
-          `<rect class="stats-bar-segment" x="${barX}" y="${y.toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${STATUS_COLORS[code]}" ` +
-          `data-year="${year}" data-month="${monthData.month}" data-code="${code}" data-value="${value}" />`
+          `<rect class="stats-bar-segment${currentMonthClass}" x="${barX}" y="${y.toFixed(1)}" width="${barWidth}" height="${segmentHeight.toFixed(1)}" fill="${STATUS_COLORS[code]}" ` +
+          `data-year="${year}" data-month="${monthData.month}" data-code="${code}" data-value="${value}" data-current-month="${yearData.isCurrentMonth}" />`
         );
 
         cumulativeY = y;
@@ -164,10 +176,10 @@ function buildMonthSvg(monthData, years, zoneMax) {
 function attachTooltipHandlers(container, monthLabel) {
   container.querySelectorAll(".stats-bar-segment").forEach((segment) => {
     segment.addEventListener("mousemove", (event) => {
-      const { year, code, value } = segment.dataset;
+      const { year, code, value, currentMonth } = segment.dataset;
 
       els.chartTooltip.innerHTML = `
-        <div class="tooltip-title">${escapeHtml(monthLabel)} ${escapeHtml(year)}</div>
+        <div class="tooltip-title">${escapeHtml(monthLabel)} ${escapeHtml(year)}${currentMonth === "true" ? " · กำลังนับ" : ""}</div>
         <div class="tooltip-line">${escapeHtml(code)} — ${escapeHtml(STATUS_LABELS_TH[code] || code)}</div>
         <div class="tooltip-line">${escapeHtml(value)} คน</div>
       `;
@@ -182,21 +194,18 @@ function attachTooltipHandlers(container, monthLabel) {
   });
 }
 
-// One max per zone, each computed over the whole dataset (all 12 months x
-// all 3 years) — keeps bar heights comparable month-to-month WITHIN a
-// zone, while each zone's own scale stays independent of the others (the
-// whole point of splitting them out: Current is 10x+ the out/in totals
-// some months and would otherwise flatten those zones to nothing).
+// One max per zone, computed over the whole dataset (every month, and
+// each month's own 3-year window — these can differ month to month, see
+// buildMonthSvg) — keeps bar heights comparable across different months
+// within a zone, while each zone's own scale stays independent of the
+// others (Current is 10x+ the out/in totals some months and would
+// otherwise flatten those zones to nothing on a shared axis).
 function computeZoneMax(data) {
   const max = { out: 1, in: 1, current: 1 };
 
   data.months.forEach((monthData) => {
-    data.years.forEach((year) => {
-      const yearData = monthData.years[year];
-
-      if (yearData.isFuture) {
-        return;
-      }
+    monthData.years.forEach((year) => {
+      const yearData = monthData.yearData[year];
 
       ZONES.forEach((zone) => {
         if (zone.soloColor) {
@@ -216,12 +225,19 @@ function computeZoneMax(data) {
 function renderGrid(data) {
   const zoneMax = computeZoneMax(data);
 
-  els.statsGrid.innerHTML = data.months.map((monthData) => `
-    <div class="month-panel">
-      <div class="month-panel-title">${escapeHtml(monthData.monthLabel)}</div>
-      ${buildMonthSvg(monthData, data.years, zoneMax)}
-    </div>
-  `).join("");
+  els.statsGrid.innerHTML = data.months.map((monthData) => {
+    const isCurrentMonthPanel = monthData.years.some((year) => monthData.yearData[year].isCurrentMonth);
+
+    return `
+      <div class="month-panel${isCurrentMonthPanel ? " is-current-month" : ""}">
+        <div class="month-panel-title">
+          ${escapeHtml(monthData.monthLabel)}
+          ${isCurrentMonthPanel ? `<span class="current-month-badge">🔴 เดือนนี้ ยังนับไม่ครบ</span>` : ""}
+        </div>
+        ${buildMonthSvg(monthData, zoneMax)}
+      </div>
+    `;
+  }).join("");
 
   data.months.forEach((monthData, index) => {
     const panel = els.statsGrid.children[index];
@@ -238,7 +254,7 @@ async function loadStatistics() {
     const data = await requestJson("/api/statistics/enrollment-status");
 
     renderGrid(data);
-    setStatus(`โหลดแล้ว — เทียบปี ${data.years.join(" / ")}`);
+    setStatus("โหลดแล้ว");
   } catch (error) {
     els.statsGrid.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     setStatus(error.message, "error");

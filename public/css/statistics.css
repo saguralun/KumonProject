@@ -402,10 +402,29 @@ html[data-role="staff"] [data-staff-up] {
   padding: 10px 10px 6px;
 }
 
+/* The one panel, across the whole 12-month grid, whose latest year is
+   literally right now — its data is still accumulating (the month isn't
+   over yet), unlike every other panel, which is a closed, complete
+   month. Marked with its own border color so it doesn't read as "just
+   another finished month" at a glance. */
+.month-panel.is-current-month {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 1px var(--blue);
+}
+
 .month-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 14px;
   font-weight: 800;
   margin-bottom: 4px;
+}
+
+.current-month-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue);
 }
 
 .empty-state {
@@ -441,6 +460,12 @@ html[data-role="staff"] [data-staff-up] {
   fill: var(--muted);
 }
 
+.stats-svg .stats-head-year {
+  font-size: 11px;
+  font-weight: 800;
+  fill: var(--text);
+}
+
 .stats-svg .stats-axis-label {
   font-size: 9px;
   font-weight: 700;
@@ -469,11 +494,13 @@ html[data-role="staff"] [data-staff-up] {
   cursor: pointer;
 }
 
-.stats-svg .stats-future-box {
-  fill: none;
-  stroke: var(--line);
-  stroke-width: 1.5;
-  stroke-dasharray: 4 3;
+/* The bar for the current, still-accumulating month — a dashed outline
+   on top of its normal fill color, distinguishing "this is live/partial
+   data" from every other (closed, complete) bar on the page. */
+.stats-svg .stats-bar-segment.stats-bar-current {
+  stroke: var(--blue);
+  stroke-width: 1;
+  stroke-dasharray: 2 1.5;
 }
 
 .chart-tooltip {
