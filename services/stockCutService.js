@@ -16,7 +16,16 @@ const ITEM_TYPE_CONFIG = {
         masterTable: "worksheet_master",
         masterFk: "worksheet_master_id",
         dateColumn: "worksheet_date",
-        itemNoColumn: "worksheet_no"
+        itemNoColumn: "worksheet_no",
+        // worksheet_used.cpws (no equivalent on cd_used) marks which rows
+        // actually correspond to a physical packet page being consumed:
+        // FALSE means either a same-packet continuation day already
+        // counted once on its cpws=TRUE row (see buildGroupPreview's
+        // `cpws: index === 0` in worksheetInput.js), or a Kumon Connect
+        // enrollment (forced cpws=FALSE — KC never touches physical
+        // stock at all). Cutting those too would double-count a packet
+        // already cut, or cut stock for students who never used any.
+        requireCpws: true
     },
     cd: {
         stockTypeCode: "CD",
@@ -24,7 +33,8 @@ const ITEM_TYPE_CONFIG = {
         masterTable: "cd_master",
         masterFk: "cd_master_id",
         dateColumn: "cd_date",
-        itemNoColumn: "cd_no"
+        itemNoColumn: "cd_no",
+        requireCpws: false
     }
 };
 
@@ -91,6 +101,7 @@ export async function searchPendingDates(type) {
             COUNT(*)::int AS total_quantity
         FROM ${TABLE_SCHEMA}.${config.usedTable}
         WHERE is_stock_processed = FALSE
+          ${config.requireCpws ? "AND cpws = TRUE" : ""}
         GROUP BY ${config.dateColumn}
         ORDER BY ${config.dateColumn} DESC
     `);
@@ -140,6 +151,7 @@ export async function getPendingDateDetail(type, date) {
         LEFT JOIN ${TABLE_SCHEMA}.stock s ON s.stock_type_id = $1 AND s.master_id = u.${config.masterFk}
         WHERE u.is_stock_processed = FALSE
           AND u.${config.dateColumn} = $2::date
+          ${config.requireCpws ? "AND u.cpws = TRUE" : ""}
         GROUP BY u.${config.masterFk}, sub.subject_code, lm.level_master_id, lm.level_code, ${config.type === "ws" ? "wm." : "cm."}${config.itemNoColumn}, s.quantity
         ORDER BY sub.subject_code, lm.level_master_id, item_no
     `, [config.stockTypeId, normalizedDate]);
@@ -183,6 +195,7 @@ export async function processPendingDates(type, dates) {
             FROM ${TABLE_SCHEMA}.${config.usedTable}
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
+              ${config.requireCpws ? "AND cpws = TRUE" : ""}
             GROUP BY ${config.masterFk}
         `, [normalizedDates]);
 
@@ -200,11 +213,19 @@ export async function processPendingDates(type, dates) {
             `, [config.stockTypeId, item.master_id, item.quantity]);
         }
 
+        // cpws = FALSE rows (continuation days / Kumon Connect) are
+        // deliberately left with is_stock_processed still FALSE — they
+        // were never counted into itemsResult above, so marking them
+        // processed here would be a lie: nothing was ever cut for them.
+        // Leaving it FALSE also keeps them editable elsewhere in the app
+        // (worksheetService.js blocks edits once is_stock_processed is
+        // TRUE), which is correct since no stock was ever locked in.
         const updateResult = await client.query(`
             UPDATE ${TABLE_SCHEMA}.${config.usedTable}
             SET is_stock_processed = TRUE
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
+              ${config.requireCpws ? "AND cpws = TRUE" : ""}
         `, [normalizedDates]);
 
         await client.query("COMMIT");
