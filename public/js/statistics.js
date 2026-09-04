@@ -38,13 +38,14 @@ const CURRENT_COLOR = "#0f766e";
 
 // Three side-by-side zones per month panel, each its own tight cluster of
 // 3 year-bars (touching within a zone, a clear gap between zones) — per
-// request: [ออก][เข้า][ปัจจุบัน]. "current" has no `codes` (it's just C,
-// not a stack) and is flagged `soloColor` so buildMonthSvg draws one plain
-// bar per year instead of stacking segments.
+// request: [ออก][เข้า][เรียนต่อ]. "current" (key stays "current" — it's
+// just an internal id, not shown) has no `codes` (it's just C, not a
+// stack) and is flagged `soloColor` so buildMonthSvg draws one plain bar
+// per year instead of stacking segments.
 const ZONES = [
   { key: "out", label: "ออก", codes: ["A", "OT", "CP"] },
   { key: "in", label: "เข้า", codes: ["N", "IT", "EO", "R"] },
-  { key: "current", label: "ปัจจุบัน", soloColor: true }
+  { key: "current", label: "เรียนต่อ", soloColor: true }
 ];
 
 function renderLegend() {

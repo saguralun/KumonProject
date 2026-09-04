@@ -58,15 +58,15 @@
       </div>
 
       <div class="stats-legend">
-        <div class="stats-legend-title">สถานะ (เรียงตามที่ขึ้นในกราฟ: ออก / เข้า / ปัจจุบัน)</div>
+        <div class="stats-legend-title">สถานะ (เรียงตามที่ขึ้นในกราฟ: ออก / เข้า / เรียนต่อ)</div>
         <div class="stats-legend-group">ออก</div>
         <div id="legendOut"></div>
         <div class="stats-legend-group">เข้า</div>
         <div id="legendIn"></div>
-        <div class="stats-legend-group">ปัจจุบัน</div>
+        <div class="stats-legend-group">เรียนต่อ</div>
         <div id="legendCurrent"></div>
         <div class="stats-legend-note">
-          แต่ละเดือนแบ่ง 3 zone [ออก][เข้า][ปัจจุบัน] แต่ละ zone มี 3 แท่งติดกัน (2024/2025/2026 ตามป้ายใต้แท่ง) — สเกลแกน Y แยกกันคนละ zone (ปัจจุบันตัวเลขสูงกว่ามาก เทียบกับสเกลเดียวกันไม่ได้) • "ปัจจุบัน" นับจากบิลเดือนนั้นที่ไม่มี status อื่นพ่วง ไม่ใช่ enrollment_status
+          แต่ละเดือนแบ่ง 3 zone [ออก][เข้า][เรียนต่อ] แต่ละ zone มี 3 แท่งติดกัน (2024/2025/2026 ตามป้ายใต้แท่ง) — สเกลแกน Y แยกกันคนละ zone (เรียนต่อตัวเลขสูงกว่ามาก เทียบกับสเกลเดียวกันไม่ได้) • "เรียนต่อ" นับจากบิลเดือนนั้นที่ไม่มี status อื่นพ่วง ไม่ใช่ enrollment_status
         </div>
       </div>
 
@@ -101,6 +101,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/statistics.js?v=20260906-full-color-all-years"></script>
+  <script src="/js/statistics.js?v=20260906-continue-label"></script>
 </body>
 </html>
