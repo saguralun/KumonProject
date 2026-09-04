@@ -89,9 +89,8 @@ function buildMonthSvg(monthData, zoneMax) {
   const gapWithinZone = 3;
   const zoneGap = 20;
   const chartHeight = 90;
-  const headRow = 16; // headYear heading
-  const zoneLabelRow = 18; // ออก/เข้า/เรียนต่อ labels
-  const marginTop = headRow + zoneLabelRow + 14; // + per-bar total label
+  const zoneLabelRow = 12; // ออก/เข้า/เรียนต่อ labels — headYear moved out to the HTML title line, so this is the topmost row again
+  const marginTop = zoneLabelRow + 14; // + per-bar total label
   const marginBottom = 18; // year label
   const marginLeft = 6;
   const marginRight = 6;
@@ -105,13 +104,12 @@ function buildMonthSvg(monthData, zoneMax) {
   const parts = [];
 
   parts.push(`<svg class="stats-svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}" xmlns="http://www.w3.org/2000/svg">`);
-  parts.push(`<text class="stats-head-year" x="${marginLeft + (chartWidth / 2)}" y="12" text-anchor="middle">ปี ${monthData.headYear}</text>`);
   parts.push(`<line class="stats-baseline" x1="${marginLeft}" y1="${baselineY}" x2="${marginLeft + chartWidth}" y2="${baselineY}" />`);
 
   ZONES.forEach((zone, zoneIndex) => {
     const zoneX = marginLeft + (zoneIndex * (zoneWidth + zoneGap));
 
-    parts.push(`<text class="stats-zone-label" x="${zoneX + (zoneWidth / 2)}" y="${headRow + 12}" text-anchor="middle">${escapeHtml(zone.label)}</text>`);
+    parts.push(`<text class="stats-zone-label" x="${zoneX + (zoneWidth / 2)}" y="${zoneLabelRow}" text-anchor="middle">${escapeHtml(zone.label)}</text>`);
 
     years.forEach((year, yearIndex) => {
       const yearData = monthData.yearData[year];
@@ -231,7 +229,8 @@ function renderGrid(data) {
     return `
       <div class="month-panel${isCurrentMonthPanel ? " is-current-month" : ""}">
         <div class="month-panel-title">
-          ${escapeHtml(monthData.monthLabel)}
+          <span>${escapeHtml(monthData.monthLabel)}</span>
+          <span class="head-year-label">ปี ${monthData.headYear}</span>
           ${isCurrentMonthPanel ? `<span class="current-month-badge">🔴 เดือนนี้ ยังนับไม่ครบ</span>` : ""}
         </div>
         ${buildMonthSvg(monthData, zoneMax)}

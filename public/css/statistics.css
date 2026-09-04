@@ -421,6 +421,12 @@ html[data-role="staff"] [data-staff-up] {
   margin-bottom: 4px;
 }
 
+.head-year-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 .current-month-badge {
   font-size: 10px;
   font-weight: 700;
@@ -458,12 +464,6 @@ html[data-role="staff"] [data-staff-up] {
 .stats-svg text {
   font-family: var(--font);
   fill: var(--muted);
-}
-
-.stats-svg .stats-head-year {
-  font-size: 11px;
-  font-weight: 800;
-  fill: var(--text);
 }
 
 .stats-svg .stats-axis-label {
