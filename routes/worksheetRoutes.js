@@ -12,7 +12,8 @@ import {
     receiveCd,
     saveAtCompletion,
     saveWorksheetEntries,
-    searchEnrollments
+    searchEnrollments,
+    updateWorksheetEntryDate
 } from "../services/worksheetService.js";
 
 const router = express.Router();
@@ -169,6 +170,20 @@ router.delete("/entries/:worksheetUsedId", async (req, res) => {
         const result = await deleteWorksheetEntry({
             worksheetUsedId: req.params.worksheetUsedId,
             enrollmentId: req.body?.enrollmentId
+        });
+
+        res.json(result);
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.patch("/entries/:worksheetUsedId/date", async (req, res) => {
+    try {
+        const result = await updateWorksheetEntryDate({
+            worksheetUsedId: req.params.worksheetUsedId,
+            enrollmentId: req.body?.enrollmentId,
+            worksheetDate: req.body?.worksheetDate
         });
 
         res.json(result);

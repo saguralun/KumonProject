@@ -1434,6 +1434,24 @@ html[data-role="staff"] [data-staff-up] {
   background: #ffe8e4;
 }
 
+.history-date-input {
+  width: 124px;
+  min-height: 26px;
+  border: 1px solid #b7cffd;
+  border-radius: 6px;
+  background: #ffffff;
+  color: var(--text);
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.history-date-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+  outline: none;
+}
+
 .history-table tbody tr {
   transition: background-color var(--ease);
 }

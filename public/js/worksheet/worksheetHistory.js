@@ -99,7 +99,19 @@ export function renderHistory(container, rows, monthSummary) {
                                     `
                                     : ""}
                             </td>
-                            <td>${escapeHtml(formatDateDisplay(row.worksheetDate))}</td>
+                            <td>
+                                ${isUnprocessedStockRecord(row)
+                                    ? `
+                                        <input
+                                            type="date"
+                                            class="history-date-input"
+                                            value="${escapeHtml(row.worksheetDate)}"
+                                            data-edit-history-date-id="${escapeHtml(row.worksheetUsedId)}"
+                                            aria-label="Edit worksheet date"
+                                        >
+                                    `
+                                    : escapeHtml(formatDateDisplay(row.worksheetDate))}
+                            </td>
                             <td>
                                 <span class="badge ${row.worksheetType === "ZUN" ? "zun" : "main"}">
                                     ${escapeHtml(row.worksheetType)}

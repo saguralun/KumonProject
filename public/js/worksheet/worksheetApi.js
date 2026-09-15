@@ -118,5 +118,22 @@ export const worksheetApi = {
                 body: JSON.stringify({ enrollmentId })
             }
         );
+    },
+
+    async updateEntryDate({
+        enrollmentId,
+        worksheetUsedId,
+        worksheetDate
+    }) {
+        return requestJson(
+            `/api/worksheet/entries/${encodeURIComponent(worksheetUsedId)}/date`,
+            {
+                method: "PATCH",
+                body: JSON.stringify({
+                    enrollmentId,
+                    worksheetDate
+                })
+            }
+        );
     }
 };

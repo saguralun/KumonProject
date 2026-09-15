@@ -289,6 +289,51 @@ async function deleteHistoryRecord(worksheetUsedId) {
     }
 }
 
+async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
+    if (!state.context || !worksheetUsedId || !worksheetDate) {
+        return;
+    }
+
+    const recordId = Number(worksheetUsedId);
+    const row = state.history.find((item) =>
+        Number(item.worksheetUsedId) === recordId
+    );
+
+    if (
+        !row ||
+        row.isStockProcessed !== false ||
+        row.worksheetDate === worksheetDate
+    ) {
+        return;
+    }
+
+    input.disabled = true;
+    setStatus("กำลังแก้วันที่...");
+
+    try {
+        const result = await worksheetApi.updateEntryDate({
+            enrollmentId: state.context.enrollment.enrollmentId,
+            worksheetUsedId: recordId,
+            worksheetDate
+        });
+
+        state.context.completionState = result.completionState || state.context.completionState;
+        state.context.worksheetProgress = result.worksheetProgress || state.context.worksheetProgress;
+        state.context.gradeSyncStatus = result.gradeSyncStatus;
+        state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
+        state.worksheetPacketSummary = state.context.worksheetPacketSummary;
+        await refreshHistory();
+        renderWorksheetProgress();
+        renderWorksheetPacketSummary(state.worksheetPacketSummary);
+        updateSecondaryActions();
+        setStatus("แก้วันที่แล้ว", "success");
+    } catch (error) {
+        input.value = row.worksheetDate;
+        input.disabled = false;
+        setStatus(error.message, "error");
+    }
+}
+
 function bindEvents() {
     els.subjectButtons.addEventListener("click", (event) => {
         const button = event.target.closest("[data-subject]");
@@ -422,6 +467,40 @@ function bindEvents() {
             deleteHistoryRecord(button.dataset.deleteHistoryId);
         }
     });
+    els.historyTableWrap.addEventListener("keydown", (event) => {
+        const input = event.target.closest("[data-edit-history-date-id]");
+
+        if (!input) {
+            return;
+        }
+
+        if (event.key === "Enter") {
+            event.preventDefault();
+            updateHistoryRecordDate(
+                input.dataset.editHistoryDateId,
+                input.value,
+                input
+            );
+        }
+
+        if (event.key === "Escape") {
+            const row = state.history.find((item) =>
+                Number(item.worksheetUsedId) === Number(input.dataset.editHistoryDateId)
+            );
+            input.value = row?.worksheetDate || input.defaultValue;
+            input.blur();
+        }
+    });
+    els.historyTableWrap.addEventListener("blur", (event) => {
+        const input = event.target.closest("[data-edit-history-date-id]");
+
+        if (input && !input.disabled) {
+            const row = state.history.find((item) =>
+                Number(item.worksheetUsedId) === Number(input.dataset.editHistoryDateId)
+            );
+            input.value = row?.worksheetDate || input.defaultValue;
+        }
+    }, true);
 
     els.completeWsLevel.addEventListener("click", () => {
         if (state.context?.completionState?.freeLevelCompletion?.canComplete) {

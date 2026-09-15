@@ -2365,3 +2365,102 @@ export async function deleteWorksheetEntry({
         client.release();
     }
 }
+
+export async function updateWorksheetEntryDate({
+    enrollmentId,
+    worksheetUsedId,
+    worksheetDate
+}) {
+    const normalizedEnrollmentId = Number(enrollmentId);
+    const normalizedWorksheetUsedId = Number(worksheetUsedId);
+    const normalizedWorksheetDate = assertIsoDate(worksheetDate, "Worksheet date");
+    const { month, year } = dateParts(normalizedWorksheetDate);
+
+    if (!Number.isInteger(normalizedEnrollmentId) || normalizedEnrollmentId < 1) {
+        throw httpError(400, "Enrollment ID ไม่ถูกต้อง");
+    }
+
+    if (!Number.isInteger(normalizedWorksheetUsedId) || normalizedWorksheetUsedId < 1) {
+        throw httpError(400, "Worksheet record ไม่ถูกต้อง");
+    }
+
+    const client = await pool.connect();
+
+    try {
+        await client.query("BEGIN");
+
+        const result = await client.query(`
+            SELECT
+                worksheet_used_id,
+                enrollment_id,
+                is_stock_processed
+            FROM ${TABLE_SCHEMA}.worksheet_used
+            WHERE worksheet_used_id = $1
+            FOR UPDATE
+        `, [normalizedWorksheetUsedId]);
+        const row = result.rows[0];
+
+        if (!row || Number(row.enrollment_id) !== normalizedEnrollmentId) {
+            throw httpError(404, "ไม่พบ worksheet record ของ enrollment นี้");
+        }
+
+        if (row.is_stock_processed) {
+            throw httpError(409, "แก้วันที่ไม่ได้ เพราะ record นี้ตัด stock แล้ว");
+        }
+
+        const updatedResult = await client.query(`
+            WITH inserted AS (
+                UPDATE ${TABLE_SCHEMA}.worksheet_used
+                SET
+                    worksheet_date = $3,
+                    worksheet_month = $4,
+                    worksheet_year = $5
+                WHERE worksheet_used_id = $1
+                  AND enrollment_id = $2
+                  AND is_stock_processed = FALSE
+                RETURNING *
+            )
+            ${buildReturningQuery()}
+        `, [
+            normalizedWorksheetUsedId,
+            normalizedEnrollmentId,
+            normalizedWorksheetDate,
+            month,
+            year
+        ]);
+
+        await client.query("COMMIT");
+        const rawEnrollment = await getEnrollmentRow(normalizedEnrollmentId);
+        const refreshedEnrollment = rawEnrollment ? mapEnrollment(rawEnrollment) : null;
+        const [completionState, worksheetProgress, worksheetPacketSummary] = refreshedEnrollment
+            ? await Promise.all([
+                getLevelCompletionState(refreshedEnrollment),
+                getWorksheetProgress(refreshedEnrollment),
+                getWorksheetPacketSummary(refreshedEnrollment)
+            ])
+            : [null, null, null];
+        const gradeSyncStatus = refreshedEnrollment
+            ? computeGradeSyncStatus({
+                subjectCode: refreshedEnrollment.subjectCode,
+                schoolGradeClass: refreshedEnrollment.schoolGradeClass,
+                currentLevelCode: refreshedEnrollment.currentLevelCode,
+                progressPercent: worksheetProgress?.main?.percent
+            })
+            : null;
+
+        return {
+            success: true,
+            entry: updatedResult.rows[0] ? mapHistoryRow(updatedResult.rows[0]) : null,
+            worksheetUsedId: normalizedWorksheetUsedId,
+            completionState,
+            worksheetProgress,
+            gradeSyncStatus,
+            worksheetPacketSummary
+        };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
