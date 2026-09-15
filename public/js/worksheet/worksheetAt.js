@@ -23,7 +23,6 @@ function isAtFormReady() {
     const usedTime = Number(els.atTime.value);
     const atGroup = Number(els.atGroup.value);
     const maxScore = Number(els.atMaxScore.value);
-    const maxTime = Number(els.atMaxTime.value);
 
     return (
         Number.isInteger(score)
@@ -31,7 +30,6 @@ function isAtFormReady() {
         && score <= maxScore
         && Number.isInteger(usedTime)
         && usedTime > 0
-        && usedTime <= maxTime
         && Number.isInteger(atGroup)
         && atGroup >= 1
         && atGroup <= 5
@@ -115,7 +113,7 @@ export function fillAtFormFromSource({
     els.atMaxScore.value = source.maxScore ?? "";
     els.atMaxTime.value = source.maxTime ?? "";
     els.atScore.max = source.maxScore ?? "";
-    els.atTime.max = source.maxTime ?? "";
+    els.atTime.removeAttribute("max");
     els.atScore.value = edit && attempt ? attempt.score : "";
     els.atTime.value = edit && attempt ? attempt.usedTime : "";
     els.atGroup.value = edit && attempt ? attempt.atGroup : 1;
@@ -171,15 +169,14 @@ function validateAtForm() {
     const score = Number(els.atScore.value);
     const maxScore = Number(els.atMaxScore.value);
     const usedTime = Number(els.atTime.value);
-    const maxTime = Number(els.atMaxTime.value);
     const atGroup = Number(els.atGroup.value);
 
     if (!Number.isInteger(score) || score <= 0 || score > maxScore) {
         throw new Error(`Score ต้องอยู่ระหว่าง 1-${maxScore}`);
     }
 
-    if (!Number.isInteger(usedTime) || usedTime <= 0 || usedTime > maxTime) {
-        throw new Error(`Time ต้องอยู่ระหว่าง 1-${maxTime}`);
+    if (!Number.isInteger(usedTime) || usedTime <= 0) {
+        throw new Error("Time ต้องมากกว่า 0");
     }
 
     if (!Number.isInteger(atGroup) || atGroup < 1 || atGroup > 5) {

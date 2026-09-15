@@ -1910,8 +1910,7 @@ function validateAtValues({
     score,
     usedTime,
     atGroup,
-    maxScore,
-    maxTime
+    maxScore
 }) {
     if (score <= 0) {
         throw httpError(400, "Score ต้องมากกว่า 0");
@@ -1923,10 +1922,6 @@ function validateAtValues({
 
     if (usedTime <= 0) {
         throw httpError(400, "Time ต้องมากกว่า 0");
-    }
-
-    if (usedTime > Number(maxTime)) {
-        throw httpError(400, `Time ต้องไม่เกิน ${maxTime}`);
     }
 
     if (atGroup < 1 || atGroup > 5) {
@@ -1974,8 +1969,7 @@ export async function saveAtCompletion(payload) {
                 score,
                 usedTime,
                 atGroup,
-                maxScore: attempt.max_score,
-                maxTime: attempt.max_time
+                maxScore: attempt.max_score
             });
 
             await client.query(`
@@ -2035,8 +2029,7 @@ export async function saveAtCompletion(payload) {
                 score,
                 usedTime,
                 atGroup,
-                maxScore: atMaster.max_score,
-                maxTime: atMaster.max_time
+                maxScore: atMaster.max_score
             });
 
             const insertResult = await client.query(`
