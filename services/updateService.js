@@ -1,11 +1,33 @@
-import { execFile } from "child_process";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
+import path from "path";
 import { httpError } from "./httpError.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_DIR = process.cwd();
 const GITHUB_REPO = "saguralun/KumonProject";
 const GITHUB_BRANCH = "main";
+
+function scheduleAppRestart() {
+    const launcherPath = path.join(REPO_DIR, "launcher", "start.ps1");
+    const command = [
+        "Start-Sleep -Seconds 2",
+        `& '${launcherPath.replace(/'/g, "''")}' -ForceRestart`
+    ].join("; ");
+
+    const child = spawn(
+        "powershell",
+        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
+        {
+            cwd: REPO_DIR,
+            detached: true,
+            stdio: "ignore",
+            windowsHide: true
+        }
+    );
+
+    child.unref();
+}
 
 async function runGit(args) {
     return execFileAsync("git", args, { cwd: REPO_DIR, timeout: 15000 });
@@ -78,12 +100,9 @@ export async function applyUpdate() {
     }
 
     // git pull only ever brings in new CODE — it does nothing about
-    // package.json gaining a new dependency, which nodemon's restart right
-    // after this would then crash on (`ERR_MODULE_NOT_FOUND`) with no
-    // obvious link back to "an update just ran". `npm install` here closes
-    // that gap so a pulled commit always leaves node_modules in a state the
-    // new code can actually run in, on every machine that uses this button,
-    // not just whichever one happened to run `npm install` by hand.
+    // package.json gaining a new dependency. `npm install` here closes that
+    // gap so a pulled commit always leaves node_modules in a state the new
+    // code can actually run in on every machine that uses this button.
     // shell: true: on Windows npm is npm.cmd, a batch script, not a real
     // .exe — confirmed directly that execFile can't spawn it at all
     // without a shell (plain "npm" -> ENOENT, "npm.cmd" -> EINVAL; only
@@ -101,10 +120,14 @@ export async function applyUpdate() {
     }
 
     const { stdout: newHead } = await runGit(["rev-parse", "HEAD"]);
+    scheduleAppRestart();
 
     return {
         success: true,
         output: pullOut.trim(),
-        newCommit: newHead.trim().slice(0, 7)
+        newCommit: newHead.trim().slice(0, 7),
+        restartRequired: true,
+        restartScheduled: true,
+        message: "อัพเดทสำเร็จแล้ว โปรแกรมจะ restart อัตโนมัติในอีกสักครู่"
     };
 }

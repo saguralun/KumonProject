@@ -1,10 +1,14 @@
+param(
+    [switch]$ForceRestart
+)
+
 # KumonDB launcher — used by start-kumondb.bat (and the desktop shortcut).
 # 0) If another launch fired in the last 30s, do nothing — this is what
 #    stops an impatient double/triple-click from killing the server that is
 #    already booting (and stacking up extra windows).
-# 1) Kills any previous KumonDB dev-server window (marked, even if hidden)
+# 1) Kills any previous KumonDB server window (marked, even if hidden)
 #    plus anything already listening on port 3000, so relaunches never stack.
-# 2) Starts the dev server in a fully hidden PowerShell window.
+# 2) Starts the server in a fully hidden PowerShell window.
 # 3) Immediately opens Chrome "app mode" on launcher\loading.html — a splash
 #    with a progress bar that shows while the server boots and forwards
 #    itself to the login page the moment the server answers. The user sees a
@@ -26,7 +30,7 @@ $Marker = "KUMONDB_LAUNCHER_MARKER"
 # repeat double-clicks are treated as "it's already coming up, hold on".
 # A genuine restart is still possible once the window has passed.
 $LockFile = Join-Path $env:TEMP "kumondb-launcher.lock"
-if (Test-Path $LockFile) {
+if (-not $ForceRestart -and (Test-Path $LockFile)) {
     $ageSeconds = ((Get-Date) - (Get-Item $LockFile).LastWriteTime).TotalSeconds
     if ($ageSeconds -lt 30) { return }
 }
@@ -45,12 +49,12 @@ Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
     Select-Object -ExpandProperty OwningProcess -Unique |
     ForEach-Object { if ($_) { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue } }
 
-# --- 2) Start the dev server, fully hidden ------------------------------
+# --- 2) Start the server, fully hidden ----------------------------------
 
 $serverCommand = "Set-Location -LiteralPath '$ProjectDir'; " +
     "`$host.UI.RawUI.WindowTitle = 'KumonDB Server'; " +
     "# $Marker`n" +
-    "npm run dev"
+    "npm start"
 
 Start-Process powershell -WindowStyle Hidden -ArgumentList @(
     "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $serverCommand

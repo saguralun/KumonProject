@@ -99,26 +99,10 @@ function renderAuthBar(user) {
   bindUpdateButton();
 }
 
-// Same idea as the update banner on the login page, but reachable from every
-// page a staff/admin is already working on — no need to log out first just
-// to notice and pull an update.
-async function waitForServerAndReload() {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    try {
-      const response = await fetch("/api/auth/me");
-
-      if (response.ok) {
-        window.location.reload();
-        return;
-      }
-    } catch (error) {
-      // Server mid-restart — keep polling.
-    }
-  }
-
-  window.location.reload();
+function showUpdateComplete(button, message) {
+  button.textContent = "✅ กำลังเปิดใหม่";
+  button.title = "โปรแกรมจะ restart อัตโนมัติ";
+  alert(message || "อัพเดทสำเร็จแล้ว โปรแกรมจะ restart อัตโนมัติในอีกสักครู่");
 }
 
 function bindUpdateButton() {
@@ -139,13 +123,14 @@ function bindUpdateButton() {
       if (!response.ok || data.success === false) {
         throw new Error(data.error || "อัพเดทไม่สำเร็จ");
       }
+
+      showUpdateComplete(button, data.message);
+      return;
     } catch (error) {
-      // `git pull` changes files, so nodemon often restarts the server before
-      // the HTTP response makes it back — fetch then rejects with a
-      // TypeError ("Failed to fetch") even though the update itself already
-      // ran. Treat that as "restarting" and wait for it to come back. A
-      // genuine refusal (wrong branch, uncommitted changes, git pull
-      // failed) arrives as a proper HTTP error with a message instead.
+      // The currently running copy on older installs may still restart while
+      // applying this update, cutting the response before it reaches the
+      // browser. Treat that fetch drop as "probably updated; restart the app"
+      // instead of sending the user into a reload loop.
       if (!(error instanceof TypeError)) {
         alert(error.message);
         button.disabled = false;
@@ -154,8 +139,10 @@ function bindUpdateButton() {
       }
     }
 
-    button.textContent = "สำเร็จ";
-    await waitForServerAndReload();
+    showUpdateComplete(
+      button,
+      "การเชื่อมต่อหลุดระหว่างอัพเดท ซึ่งมักเกิดตอนโปรแกรมกำลัง restart ถ้าโปรแกรมไม่เปิดกลับมาเองในสักครู่ ค่อยปิดแล้วเปิดใหม่"
+    );
   });
 
   checkForUpdateAndShowButton(button);

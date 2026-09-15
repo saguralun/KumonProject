@@ -35,27 +35,10 @@ async function loadLanInfo() {
 
 loadLanInfo();
 
-// Waits for the server to come back after a git pull (nodemon restarts it
-// automatically once files change) before reloading, instead of reloading
-// immediately into a brief window where it's still down.
-async function waitForServerAndReload() {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    try {
-      const response = await fetch("/api/auth/me");
-
-      if (response.ok) {
-        window.location.reload();
-        return;
-      }
-    } catch (error) {
-      // Server mid-restart — keep polling.
-    }
-  }
-
-  // Gave up waiting — reload anyway, the update itself already succeeded.
-  window.location.reload();
+function showUpdateComplete(message) {
+  els.updateBannerMessage.textContent = message || "อัพเดทสำเร็จแล้ว โปรแกรมจะ restart อัตโนมัติในอีกสักครู่";
+  els.updateBannerButton.textContent = "กำลังเปิดใหม่";
+  els.updateBannerButton.disabled = true;
 }
 
 async function checkUpdateStatus() {
@@ -81,14 +64,14 @@ els.updateBannerButton.addEventListener("click", async () => {
   els.updateBannerButton.textContent = "กำลังอัพเดท...";
 
   try {
-    await requestJson("/api/system/update-apply", { method: "POST" });
+    const data = await requestJson("/api/system/update-apply", { method: "POST" });
+    showUpdateComplete(data.message);
+    return;
   } catch (error) {
-    // `git pull` changes files, so nodemon often restarts the server before
-    // the HTTP response makes it back — fetch then rejects with a TypeError
-    // ("Failed to fetch") even though the update itself already ran. Treat
-    // that as "restarting" and wait for it to come back. A genuine refusal
-    // (wrong branch, uncommitted changes, git pull failed) arrives as a
-    // proper HTTP error with a message instead.
+    // Older installs may still be running through nodemon; pulling this
+    // update can restart the server before the response gets back here.
+    // Make the recovery instruction explicit instead of reloading into a
+    // temporary outage.
     if (!(error instanceof TypeError)) {
       els.updateBannerMessage.textContent = error.message;
       els.updateBannerButton.disabled = false;
@@ -97,8 +80,7 @@ els.updateBannerButton.addEventListener("click", async () => {
     }
   }
 
-  els.updateBannerButton.textContent = "สำเร็จ";
-  await waitForServerAndReload();
+  showUpdateComplete("การเชื่อมต่อหลุดระหว่างอัพเดท ซึ่งมักเกิดตอนโปรแกรมกำลัง restart ถ้าโปรแกรมไม่เปิดกลับมาเองในสักครู่ ค่อยปิดแล้วเปิดใหม่");
 });
 
 function setMessage(text) {
