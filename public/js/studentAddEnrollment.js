@@ -24,7 +24,6 @@ import {
     setFormValue
 } from "./studentFormUtil.js";
 import {
-    addZunChoicesForSubject,
     dtMastersForSubject,
     formatDateInput,
     isHalfMonthStatusId,
@@ -40,7 +39,8 @@ import {
     worksheetById,
     worksheetsForDtMaster,
     worksheetsForLevel,
-    worksheetsForSubject
+    worksheetsForSubject,
+    zunLevelChoices
 } from "./studentMasters.js";
 
 function addFormSubjectId() {
@@ -149,7 +149,6 @@ export function refreshLevelSelects({
     const previousZunId = form.elements.currentZunLevelMasterId.value;
     const previousWorksheetId = form.elements.startingWorksheetMasterId.value;
     const mainLevels = levelsForSubject(subjectId, 1);
-    const zunLevels = levelsForSubject(subjectId, 2);
 
     form.elements.currentLevelMasterId.innerHTML = optionHtml(mainLevels, {
         value: (row) => row.id,
@@ -161,13 +160,19 @@ export function refreshLevelSelects({
         form.elements.currentLevelMasterId.value = previousLevelId;
     }
 
-    form.elements.currentZunLevelMasterId.innerHTML = optionHtml(zunLevels, {
-        value: (row) => row.id,
-        label: (row) => row.code,
+    // Same granular ZI1/ZI21/ZII1 choices the "+ Subject" modal offers
+    // (see zunLevelChoices — subject-agnostic, so this doesn't filter by
+    // the current subjectId) rather than the raw ZI/ZII level rows —
+    // those two rows just aren't specific enough to pick from directly.
+    const zunChoices = zunLevelChoices();
+
+    form.elements.currentZunLevelMasterId.innerHTML = optionHtml(zunChoices, {
+        value: (row) => row.value,
+        label: (row) => row.label,
         blankLabel: "No Zun"
     });
 
-    if (keepZun && zunLevels.some((row) => String(row.id) === String(previousZunId))) {
+    if (keepZun && zunChoices.some((choice) => choice.value === previousZunId)) {
         form.elements.currentZunLevelMasterId.value = previousZunId;
     }
 
@@ -569,7 +574,7 @@ export function refreshAddEnrollmentOptions() {
     }
 
     const subjectId = addFormSubjectId();
-    const zunChoices = addZunChoicesForSubject(subjectId);
+    const zunChoices = zunLevelChoices();
     const dtMasters = dtMastersForSubject(subjectId);
 
     form.elements.startingWorksheetMasterId.innerHTML = optionHtml([], {

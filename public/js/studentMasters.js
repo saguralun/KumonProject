@@ -66,8 +66,15 @@ export function dtMastersForSubject(subjectId) {
     );
 }
 
-export function addZunChoicesForSubject(subjectId) {
-    const zunLevels = levelsForSubject(subjectId, 2);
+// Zun is one shared physical worksheet set (today, ME's ZI/ZII rows) that
+// any subject's enrollment can be given — not a per-subject item — so
+// this deliberately ignores subject and just looks at every Zun-type
+// (level.type === 2) row in the masters, wherever it lives. Backend
+// enforces the same rule in assertEnrollmentMasters (studentService.js).
+export function zunLevelChoices() {
+    const zunLevels = (state.masters?.levels || []).filter((level) =>
+        Number(level.type) === 2
+    );
     const zi = zunLevels.find((level) => level.code === "ZI");
     const zii = zunLevels.find((level) => level.code === "ZII");
     const choices = [];
@@ -90,6 +97,24 @@ export function resolveAddZunLevelId(value) {
     }
 
     return String(value).split(":")[0] || "";
+}
+
+// Reverse of the above: given a saved (plain-id) currentZunLevelMasterId,
+// pick which of zunLevelChoices' composite option values should show as
+// selected. The plain id alone can't tell ZI1 from ZI21 (both resolve to
+// the same ZI level row — see zunLevelChoices), so this just lands on
+// that level's first choice; picking between them was never saved
+// anywhere to begin with.
+export function zunValueForLevelId(levelMasterId) {
+    if (!levelMasterId) {
+        return "";
+    }
+
+    const match = zunLevelChoices().find((choice) =>
+        Number(choice.levelMasterId) === Number(levelMasterId)
+    );
+
+    return match ? match.value : "";
 }
 
 export function scheduleWeekdays() {

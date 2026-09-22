@@ -12,6 +12,8 @@
   --green-soft: #e6f8f0;
   --red: #dc3545;
   --red-soft: #fdeceb;
+  --purple: #7c3aed;
+  --purple-soft: #f3e8ff;
   --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.07);
   --shadow: 0 10px 26px rgba(20, 27, 38, 0.09);
   --shadow-lg: 0 24px 60px rgba(20, 27, 38, 0.22);
@@ -619,12 +621,39 @@ label span {
   transition: background-color var(--ease), border-color var(--ease), color var(--ease);
 }
 
-.enrollment-tab.active,
 .history-tab.active {
   border-color: #93c5fd;
   background: var(--blue-soft);
   color: var(--blue);
   box-shadow: var(--shadow-sm);
+}
+
+/* Subject tabs are colored by the enrollment's current status instead of
+   the plain blue "selected" tint above — N/IT/EO/R/C (still actively being
+   studied) green, A/OT (paused/left) red, CP (finished) purple — so status
+   is visible across every tab, not just the one currently open. Which tab
+   is selected is then layered on top as a same-color ring via currentColor
+   rather than switching to blue, so status stays legible either way. */
+.enrollment-tab.status-active {
+  border-color: #86e0bd;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.enrollment-tab.status-inactive {
+  border-color: #f3a8a8;
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.enrollment-tab.status-completer {
+  border-color: #d8b4fe;
+  background: var(--purple-soft);
+  color: var(--purple);
+}
+
+.enrollment-tab.active {
+  box-shadow: 0 0 0 2px currentColor, var(--shadow-sm);
 }
 
 .enrollment-form {

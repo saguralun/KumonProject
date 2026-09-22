@@ -333,7 +333,6 @@ async function assertEnrollmentMasters(client, data) {
         SELECT
             level.subject_id AS current_level_subject_id,
             level.level_type AS current_level_type,
-            zun.subject_id AS zun_subject_id,
             zun.level_type AS zun_level_type,
             ws.level_master_id AS starting_level_master_id,
             start_level.subject_id AS starting_level_subject_id,
@@ -381,10 +380,13 @@ async function assertEnrollmentMasters(client, data) {
         throw httpError(400, "Starting worksheet ต้องเป็น level หลัก ไม่ใช่ Zun");
     }
 
-    if (data.currentZunLevelMasterId) {
-        if (Number(row.zun_subject_id) !== Number(data.subjectId) || Number(row.zun_level_type) !== 2) {
-            throw httpError(400, "Zun level ไม่ตรงกับวิชา");
-        }
+    // Zun is deliberately subject-agnostic — it's one shared physical
+    // worksheet set (today, ME's ZI/ZII rows) that any subject's
+    // enrollment can be given, not a per-subject item — so this only
+    // checks it's actually a Zun-type level, never that it belongs to
+    // this enrollment's own subject.
+    if (data.currentZunLevelMasterId && Number(row.zun_level_type) !== 2) {
+        throw httpError(400, "Zun level ไม่ถูกต้อง");
     }
 
     if (Number(row.status1_group) !== 1) {

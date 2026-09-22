@@ -18,7 +18,7 @@ import {
     setFormValue,
     setStatus
 } from "./studentFormUtil.js";
-import { resolveAddZunLevelId } from "./studentMasters.js";
+import { resolveAddZunLevelId, zunValueForLevelId } from "./studentMasters.js";
 import {
     alignStartDateForHalfMonth,
     fillAddEnrollmentDefaults,
@@ -248,7 +248,11 @@ function fillEnrollmentForm(enrollment = null) {
         keepLevel: true,
         allSubjectWorksheets: true
     });
-    setFormValue(form, "currentZunLevelMasterId", enrollment.currentZunLevelMasterId);
+    setFormValue(
+        form,
+        "currentZunLevelMasterId",
+        zunValueForLevelId(enrollment.currentZunLevelMasterId)
+    );
     setFormValue(form, "startingWorksheetMasterId", enrollment.startingWorksheetMasterId);
     setFormValue(form, "enStartDate", enrollment.enStartDate);
     setFormValue(form, "openingScheduleId1", enrollment.openingScheduleId1);
@@ -257,6 +261,26 @@ function fillEnrollmentForm(enrollment = null) {
     setFormValue(form, "currentStatusGroup2Id", enrollment.currentStatusGroup2Id);
     setFormValue(form, "remark", enrollment.remark);
     els.saveEnrollmentButton.textContent = "💾 Save Enrollment";
+}
+
+// N/IT/EO/R/C all mean the subject is actively being studied right now
+// (just started/transferred in/added/resumed/continuing); A/OT mean it's
+// currently paused or left; CP means it's finished — three outcomes worth
+// telling apart at a glance on the subject tabs, so each gets its own
+// color (see .enrollment-tab.status-* in student-manager.css).
+const ENROLLMENT_TAB_STATUS_CLASS = {
+    N: "status-active",
+    IT: "status-active",
+    EO: "status-active",
+    R: "status-active",
+    C: "status-active",
+    A: "status-inactive",
+    OT: "status-inactive",
+    CP: "status-completer"
+};
+
+function enrollmentTabStatusClass(statusGroup1Code) {
+    return ENROLLMENT_TAB_STATUS_CLASS[statusGroup1Code] || "";
 }
 
 function renderEnrollmentTabs() {
@@ -280,7 +304,7 @@ function renderEnrollmentTabs() {
     els.enrollmentTabs.innerHTML = enrollments.map((enrollment) => `
         <button
             type="button"
-            class="enrollment-tab ${Number(enrollment.enrollmentId) === Number(state.selectedEnrollmentId) ? "active" : ""}"
+            class="enrollment-tab ${enrollmentTabStatusClass(enrollment.statusGroup1Code)} ${Number(enrollment.enrollmentId) === Number(state.selectedEnrollmentId) ? "active" : ""}"
             data-enrollment-id="${escapeHtml(enrollment.enrollmentId)}"
         >
             ${escapeHtml(enrollment.subjectCode)} #${escapeHtml(enrollment.enrollmentId)}
@@ -539,6 +563,11 @@ async function saveEnrollment(event) {
 
     try {
         const payload = readForm(els.enrollmentForm);
+        // currentZunLevelMasterId comes out of the form as one of
+        // zunLevelChoices' composite "levelMasterId:label" values (e.g.
+        // "1:ZI1") — same as the "+ Subject" modal — so it needs the same
+        // unwrap back to a plain level_master id before it's sent.
+        payload.currentZunLevelMasterId = resolveAddZunLevelId(payload.currentZunLevelMasterId);
         const endpoint = `/api/students/${encodeURIComponent(state.selectedStudentId)}/enrollments/${encodeURIComponent(payload.enrollmentId)}`;
         const data = await requestJson(endpoint, {
             method: "PUT",
