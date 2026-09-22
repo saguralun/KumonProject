@@ -457,6 +457,14 @@ function bindEvents() {
         updatePreview();
         refreshWorksheetMonthSummary();
     });
+    els.receiveDate.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            // Native date input has nothing to "submit" to — jump straight
+            // into worksheet entry instead of just losing focus.
+            event.preventDefault();
+            focusFirstMainInput();
+        }
+    });
     els.datePrev.addEventListener("click", () => shiftDate(-1));
     els.dateNext.addEventListener("click", () => shiftDate(1));
     els.saveButton.addEventListener("click", saveEntries);
