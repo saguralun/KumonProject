@@ -117,6 +117,12 @@ export function zunValueForLevelId(levelMasterId) {
     return match ? match.value : "";
 }
 
+export function scheduleById(scheduleId) {
+    return (state.masters?.schedules || []).find((schedule) =>
+        Number(schedule.id) === Number(scheduleId)
+    );
+}
+
 export function scheduleWeekdays() {
     const seen = new Set();
 

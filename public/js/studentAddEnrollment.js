@@ -31,6 +31,7 @@ import {
     levelsForSubject,
     localDateParts,
     matchingSchedule,
+    scheduleById,
     scheduleTimesForWeekday,
     scheduleWeekdays,
     selectedCurrentLevelId,
@@ -321,6 +322,45 @@ export function refreshAddOpeningScheduleOptions() {
 
     ["1", "2"].forEach((slot) => {
         refreshAddOpeningTimeOptions(slot);
+        updateAddOpeningSchedule(slot);
+    });
+}
+
+// A kid adding a 2nd/3rd subject (EO) almost always comes in on the exact
+// same day/time as their existing subject(s) — one visit, multiple
+// worksheets picked up — so default Date/Time Open 1+2 to whichever
+// already-enrolled subject has schedule data set, instead of leaving staff
+// to re-pick days they just picked for the other subject. Only ever called
+// for the EO case (fillAddEnrollmentDefaults); staff can still change it.
+export function applyOpeningScheduleFromExistingEnrollment() {
+    const form = els.addEnrollmentForm;
+    const source = (state.profile?.enrollments || []).find((enrollment) =>
+        enrollment.openingScheduleId1
+    );
+
+    if (!source) {
+        return;
+    }
+
+    ["1", "2"].forEach((slot) => {
+        const schedule = scheduleById(source[`openingScheduleId${slot}`]);
+
+        if (schedule) {
+            setFormValue(form, `openingDay${slot}`, schedule.weekdayCode);
+        }
+    });
+
+    refreshAddOpeningDayOptions();
+
+    ["1", "2"].forEach((slot) => {
+        refreshAddOpeningTimeOptions(slot);
+
+        const schedule = scheduleById(source[`openingScheduleId${slot}`]);
+
+        if (schedule) {
+            setFormValue(form, `openingTime${slot}`, schedule.startTime);
+        }
+
         updateAddOpeningSchedule(slot);
     });
 }
@@ -652,6 +692,11 @@ export function fillAddEnrollmentDefaults() {
     refreshAddEnrollmentOptions();
     refreshAddStartingWorksheetFromDt();
     refreshAddOpeningScheduleOptions();
+
+    if (hasEnrollment) {
+        applyOpeningScheduleFromExistingEnrollment();
+    }
+
     updateHalfMonthByStartDate();
 }
 
