@@ -447,7 +447,9 @@ export function stepWorksheet(kind, index, direction) {
         return;
     }
 
-    input.value = moveWorksheetNo(input.value, optionsForKind(kind), direction);
+    input.value = moveWorksheetNo(input.value, optionsForKind(kind), direction, {
+        allowEmpty: kind === "zun"
+    });
     focusWorksheetControl(input, { openPickerOnTouch: false });
     updatePreview();
 }

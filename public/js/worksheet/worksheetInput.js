@@ -54,7 +54,7 @@ export function worksheetInputCount(pattern) {
     return pattern?.code === "daily20" ? 2 : 1;
 }
 
-export function moveWorksheetNo(currentValue, options, direction) {
+export function moveWorksheetNo(currentValue, options, direction, { allowEmpty = false } = {}) {
     const worksheetNos = options.map((option) => option.worksheetNo);
 
     if (worksheetNos.length === 0) {
@@ -67,7 +67,17 @@ export function moveWorksheetNo(currentValue, options, direction) {
     if (index === -1) {
         index = direction > 0 ? 0 : worksheetNos.length - 1;
     } else {
-        index = Math.max(0, Math.min(worksheetNos.length - 1, index + direction));
+        const nextIndex = index + direction;
+
+        // Zun is the only field with a blank "-" option (Main WS is
+        // required, never blank) — so stepping down past its first real
+        // option (1) goes one step further, to "-", instead of just
+        // stopping at 1 like every other field does.
+        if (allowEmpty && nextIndex < 0) {
+            return "";
+        }
+
+        index = Math.max(0, Math.min(worksheetNos.length - 1, nextIndex));
     }
 
     return String(worksheetNos[index]);
