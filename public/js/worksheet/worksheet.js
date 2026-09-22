@@ -57,6 +57,7 @@ import {
     updateAtSaveState
 } from "./worksheetAt.js";
 import {
+    changeIncompleteWsPage,
     closeIncompleteWsModal,
     openIncompleteWsModal,
     selectIncompleteWsEnrollment
@@ -526,6 +527,13 @@ function bindEvents() {
         }
     });
     els.incompleteWsTableWrap.addEventListener("click", (event) => {
+        const pageButton = event.target.closest("[data-incomplete-page]");
+
+        if (pageButton) {
+            changeIncompleteWsPage(pageButton.dataset.incompleteSection, pageButton.dataset.incompletePage);
+            return;
+        }
+
         const row = event.target.closest("[data-incomplete-enrollment-id]");
 
         if (row) {

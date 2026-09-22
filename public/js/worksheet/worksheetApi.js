@@ -68,8 +68,13 @@ export const worksheetApi = {
         );
     },
 
-    async getIncompleteWorksheets() {
-        return requestJson("/api/worksheet/incomplete-ws");
+    async getIncompleteWorksheets({ regularPage = 1, kcPage = 1 } = {}) {
+        const params = new URLSearchParams({
+            regularPage: String(regularPage),
+            kcPage: String(kcPage)
+        });
+
+        return requestJson(`/api/worksheet/incomplete-ws?${params.toString()}`);
     },
 
     async saveEntries(payload) {

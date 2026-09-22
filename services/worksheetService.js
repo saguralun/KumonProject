@@ -593,10 +593,12 @@ export async function searchEnrollments({
     return result.rows.map(mapEnrollment);
 }
 
-const INCOMPLETE_WS_REGULAR_LIMIT = 25;
-const INCOMPLETE_WS_KC_LIMIT = 5;
+const INCOMPLETE_WS_REGULAR_LIMIT = 50;
+const INCOMPLETE_WS_KC_LIMIT = 10;
 
-async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, cutoffDate }) {
+async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, page, cutoffDate }) {
+    const currentPage = Math.max(1, Number(page) || 1);
+    const offset = (currentPage - 1) * limit;
     const result = await pool.query(`
         WITH latest_ws AS (
             SELECT DISTINCT ON (wu.enrollment_id)
@@ -649,11 +651,15 @@ async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, cutoffD
             student.first_name,
             student.last_name,
             subject.subject_id
-        LIMIT $4
-    `, [ACTIVE_STATUS_CODES, isKumonConnect, cutoffDate, limit]);
+        LIMIT $4 OFFSET $5
+    `, [ACTIVE_STATUS_CODES, isKumonConnect, cutoffDate, limit, offset]);
+    const totalRows = Number(result.rows[0]?.total_rows || 0);
 
     return {
-        totalRows: Number(result.rows[0]?.total_rows || 0),
+        totalRows,
+        page: currentPage,
+        pageSize: limit,
+        totalPages: Math.max(1, Math.ceil(totalRows / limit)),
         rows: result.rows.map((row) => ({
             enrollmentId: row.enrollment_id,
             studentId: row.student_id,
@@ -670,7 +676,7 @@ async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, cutoffD
     };
 }
 
-export async function getIncompleteWorksheetStudents() {
+export async function getIncompleteWorksheetStudents({ regularPage = 1, kcPage = 1 } = {}) {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
@@ -680,11 +686,13 @@ export async function getIncompleteWorksheetStudents() {
         queryIncompleteWorksheetStudents({
             isKumonConnect: false,
             limit: INCOMPLETE_WS_REGULAR_LIMIT,
+            page: regularPage,
             cutoffDate
         }),
         queryIncompleteWorksheetStudents({
             isKumonConnect: true,
             limit: INCOMPLETE_WS_KC_LIMIT,
+            page: kcPage,
             cutoffDate
         })
     ]);

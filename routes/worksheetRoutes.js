@@ -49,7 +49,10 @@ router.get("/incomplete-ws", async (req, res) => {
     try {
         res.json({
             success: true,
-            ...(await getIncompleteWorksheetStudents())
+            ...(await getIncompleteWorksheetStudents({
+                regularPage: Number(req.query.regularPage) || 1,
+                kcPage: Number(req.query.kcPage) || 1
+            }))
         });
     } catch (error) {
         sendError(res, error);

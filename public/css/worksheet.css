@@ -1720,6 +1720,14 @@ html[data-role="staff"] [data-staff-up] {
   font-size: 13px;
 }
 
+.incomplete-ws-pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px 2px;
+}
+
 .incomplete-ws-header {
   display: flex;
   justify-content: space-between;
