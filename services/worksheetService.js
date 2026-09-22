@@ -1222,10 +1222,17 @@ async function getLevelCompletionState(enrollment) {
         && nextLevelMasterId
         && FREE_COMPLETION_LEVEL_CODES.includes(row.current_level_code)
     );
+    // Deliberately NOT gated on !hasPassed: a kid can be placed back on a
+    // level they already passed before (e.g. returning after a break and
+    // needing review) — current_level_master_id is the source of truth for
+    // where they're actually studying right now, so a fresh AT attempt is
+    // always allowed there regardless of past pass history on this same
+    // level. (hasPassed/latestAttempt are still returned below for display
+    // — e.g. the "แก้ AT ล่าสุด" edit-latest-attempt action — just not used
+    // to hide the "สอบ AT" button.)
     const canCompleteWsLevel = Boolean(
         (hasWorksheet191 || enrollment.isKumonConnect)
         && atMasterId
-        && !hasPassed
     );
 
     return {
