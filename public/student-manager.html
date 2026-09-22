@@ -536,6 +536,19 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script type="module" src="/js/student-manager.js?v=20260922-status-color-tabs"></script>
+  <!-- No ?v= cache-bust query string here, deliberately: studentFormUtil.js/
+       studentMasters.js/studentAddStudent.js/studentWsGraph.js/
+       studentAddEnrollment.js import back from this exact file
+       ("./student-manager.js", circular, no query string of their own —
+       internal ES module imports never carry one). A query string here
+       that those internal imports don't share makes the browser resolve
+       them as two different module URLs and load + execute this whole
+       file twice — silently double-binding every listener init() sets up
+       (confirmed live: a single click on any button — e.g. Save
+       Enrollment — fired its handler twice, sending the request twice).
+       Relies on the server's normal ETag revalidation (see server.js's
+       express.static) to pick up changes on reload instead. Same issue
+       and fix as worksheet.html's entry tag — see the comment there. -->
+  <script type="module" src="/js/student-manager.js"></script>
 </body>
 </html>
