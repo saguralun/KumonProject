@@ -726,16 +726,23 @@ function renderHistoryTable(data) {
     // receipt already reverses billing_detail/enrollment_status/the
     // enrollment's current status in one transaction (see
     // cancelReceiptPayment in services/paymentService.js, same endpoint
-    // the Payment page's own Cancel Receipt button uses). Gated the same
-    // way as the Absent/OT/Resume buttons above (data-staff-up).
+    // the Payment page's own Cancel Receipt button uses). Status can only
+    // have its history row deleted outright (deleteEnrollmentStatusEntry)
+    // — a plain status_action never recorded a "before" snapshot to
+    // revert current_status_group1_id to the way a bill does, so staff
+    // use the existing Absent/OT/Resume/Complete buttons afterward if the
+    // enrollment's actual current status also needs fixing. Both are
+    // data-admin-only (not the broader data-staff-up the Absent/OT/Resume
+    // buttons above use) since they permanently remove real records.
     const showCancel = data.type === "billing";
+    const showDelete = data.type === "status";
 
     els.historyTableWrap.innerHTML = `
         <table>
             <thead>
                 <tr>
                     ${data.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}
-                    ${showCancel ? `<th data-staff-up></th>` : ""}
+                    ${showCancel || showDelete ? `<th data-admin-only></th>` : ""}
                 </tr>
             </thead>
             <tbody>
@@ -749,12 +756,21 @@ function renderHistoryTable(data) {
                             return `<td>${escapeHtml(text)}</td>`;
                         }).join("")}
                         ${showCancel ? `
-                            <td data-staff-up>
+                            <td data-admin-only>
                                 <button
                                     type="button"
                                     class="danger-button compact"
                                     data-cancel-billing-id="${escapeHtml(row.billingId)}"
                                 >ยกเลิกบิล</button>
+                            </td>
+                        ` : ""}
+                        ${showDelete ? `
+                            <td data-admin-only>
+                                <button
+                                    type="button"
+                                    class="danger-button compact"
+                                    data-delete-status-id="${escapeHtml(row.enrollmentStatusId)}"
+                                >ลบ</button>
                             </td>
                         ` : ""}
                     </tr>
@@ -784,6 +800,32 @@ async function cancelBilling(billingId) {
         await loadProfile(state.selectedStudentId, { preferredEnrollmentId: state.selectedEnrollmentId });
         await loadHistory();
         setStatus("ยกเลิกบิลแล้ว");
+    } catch (error) {
+        setStatus(error.message, "error");
+    }
+}
+
+async function deleteStatusHistoryEntry(enrollmentStatusId) {
+    if (!enrollmentStatusId || !state.selectedStudentId) {
+        return;
+    }
+
+    if (!window.confirm(
+        `ลบรายการประวัติสถานะนี้ใช่ไหม? ลบแค่ log นี้เท่านั้น — ถ้าสถานะปัจจุบันของ enrollment ต้องแก้ด้วย ให้กด Absent/OT/Resume/Complete เองอีกทีหลังจากนี้`
+    )) {
+        return;
+    }
+
+    setStatus("กำลังลบรายการ...");
+
+    try {
+        await requestJson(
+            `/api/students/${encodeURIComponent(state.selectedStudentId)}/history/status/${encodeURIComponent(enrollmentStatusId)}`,
+            { method: "DELETE" }
+        );
+
+        await loadHistory();
+        setStatus("ลบรายการแล้ว");
     } catch (error) {
         setStatus(error.message, "error");
     }
@@ -1066,10 +1108,17 @@ function bindEvents() {
         loadHistory().catch((error) => setStatus(error.message, "error"));
     });
     els.historyTableWrap.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-cancel-billing-id]");
+        const cancelButton = event.target.closest("[data-cancel-billing-id]");
 
-        if (button) {
-            cancelBilling(Number(button.dataset.cancelBillingId));
+        if (cancelButton) {
+            cancelBilling(Number(cancelButton.dataset.cancelBillingId));
+            return;
+        }
+
+        const deleteButton = event.target.closest("[data-delete-status-id]");
+
+        if (deleteButton) {
+            deleteStatusHistoryEntry(Number(deleteButton.dataset.deleteStatusId));
         }
     });
     els.wsGraphButton.addEventListener("click", openWsGraphModal);

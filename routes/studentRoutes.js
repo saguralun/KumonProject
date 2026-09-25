@@ -5,6 +5,7 @@ import {
     createEnrollment,
     createStudent,
     deleteEnrollmentIfNoBilling,
+    deleteEnrollmentStatusEntry,
     deleteStudentIfNoEnrollment,
     findStudentDuplicate,
     getStudentHistory,
@@ -16,7 +17,7 @@ import {
     updateEnrollment,
     updateStudent
 } from "../services/studentService.js";
-import { requireStaff } from "../middleware/auth.js";
+import { requireAdmin, requireStaff } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -186,6 +187,20 @@ router.post("/:studentId/enrollments/:enrollmentId/status-action", requireStaff,
                 req.params.studentId,
                 req.params.enrollmentId,
                 req.body
+            ))
+        });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.delete("/:studentId/history/status/:enrollmentStatusId", requireAdmin, async (req, res) => {
+    try {
+        res.json({
+            success: true,
+            ...(await deleteEnrollmentStatusEntry(
+                req.params.studentId,
+                req.params.enrollmentStatusId
             ))
         });
     } catch (error) {

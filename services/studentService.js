@@ -1459,6 +1459,35 @@ export async function applyEnrollmentStatusAction(studentId, enrollmentId, paylo
     }
 }
 
+// Deletes a single enrollment_status history row — e.g. an Absent logged
+// for the wrong month. Unlike cancelReceiptPayment, there's nothing to
+// revert current_status_group1_id to (a plain status_action, unlike a
+// bill, never recorded a "before" snapshot anywhere), so this only
+// removes the history row itself; staff use the existing Absent/OT/
+// Resume/Complete buttons afterward to fix the enrollment's actual
+// current status if that also needs correcting. Route-level requireAdmin
+// (routes/studentRoutes.js) is the real gate — the student page's own
+// delete button is also admin-only (data-admin-only) to match.
+export async function deleteEnrollmentStatusEntry(studentId, enrollmentStatusId) {
+    const normalizedStudentId = requiredInt(studentId, "Student ID");
+    const normalizedEntryId = requiredInt(enrollmentStatusId, "Status history ID");
+
+    const result = await pool.query(`
+        DELETE FROM ${TABLE_SCHEMA}.enrollment_status es
+        USING ${TABLE_SCHEMA}.enrollment e
+        WHERE es.enrollment_status_id = $1
+          AND e.enrollment_id = es.enrollment_id
+          AND e.student_id = $2
+        RETURNING es.enrollment_status_id
+    `, [normalizedEntryId, normalizedStudentId]);
+
+    if (!result.rows.length) {
+        throw httpError(404, "ไม่พบรายการประวัติสถานะนี้ของเด็กคนนี้");
+    }
+
+    return { enrollmentStatusId: normalizedEntryId };
+}
+
 export async function getStudentHistory(studentId, type = "ws") {
     const normalizedStudentId = requiredInt(studentId, "Student ID");
     const normalizedType = String(type || "ws").toLowerCase();
@@ -1697,8 +1726,16 @@ export async function getStudentHistoryRows({
         },
         status: {
             columns: ["month", "year", "enrollment", "subject", "status"],
+            // Same idea as billing's idColumn/idField — lets the Status
+            // history tab's Delete button (admin-only: unlike a bill,
+            // there's nothing recorded to revert current_status_group1_id
+            // to, so this only removes the history row itself) target the
+            // right enrollment_status row.
+            idColumn: "enrollment_status_id",
+            idField: "enrollmentStatusId",
             sql: `
                 SELECT
+                    used.enrollment_status_id,
                     used.status_month AS month,
                     used.status_year AS year,
                     used.enrollment_id AS enrollment,
