@@ -758,6 +758,23 @@ async function loadEnrollmentIdsWithActivity({ month, year, start, end }) {
         UNION
         SELECT enrollment_id FROM ${TABLE_SCHEMA}.dt_used
             WHERE dt_date >= $3 AND dt_date < $4
+        UNION
+        -- Absent/Outgoing Transfer/Completer are logged purely as a
+        -- status change — by definition there's no WS/AT/DT/CD activity
+        -- that period to pick them up via the unions above, so without
+        -- this they silently never appear in the report at all despite
+        -- being real events for that period (caught via the Status1
+        -- summary undercounting A hugely vs. the raw enrollment_status
+        -- count). N/IT/EO/R aren't included here — those normally DO
+        -- come with worksheet activity the same period, and pulling in
+        -- every status_month row regardless of code risked resurrecting
+        -- enrollments whose only "activity" was a stale/corrected status
+        -- entry.
+        SELECT es.enrollment_id
+            FROM ${TABLE_SCHEMA}.enrollment_status es
+            JOIN ${TABLE_SCHEMA}.status_master sm ON sm.status_id = es.status_id
+            WHERE es.status_month = $1 AND es.status_year = $2
+              AND sm.status_code IN ('A', 'OT', 'CP')
     `, [month, year, start, end]);
 
     return result.rows.map((row) => row.enrollment_id);
