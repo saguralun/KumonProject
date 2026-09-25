@@ -722,10 +722,21 @@ function renderHistoryTable(data) {
         return;
     }
 
+    // Billing is the only history type with a real "undo" — cancelling a
+    // receipt already reverses billing_detail/enrollment_status/the
+    // enrollment's current status in one transaction (see
+    // cancelReceiptPayment in services/paymentService.js, same endpoint
+    // the Payment page's own Cancel Receipt button uses). Gated the same
+    // way as the Absent/OT/Resume buttons above (data-staff-up).
+    const showCancel = data.type === "billing";
+
     els.historyTableWrap.innerHTML = `
         <table>
             <thead>
-                <tr>${data.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}</tr>
+                <tr>
+                    ${data.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}
+                    ${showCancel ? `<th data-staff-up></th>` : ""}
+                </tr>
             </thead>
             <tbody>
                 ${data.rows.map((row) => `
@@ -737,11 +748,45 @@ function renderHistoryTable(data) {
                                 : formatBoolean(value);
                             return `<td>${escapeHtml(text)}</td>`;
                         }).join("")}
+                        ${showCancel ? `
+                            <td data-staff-up>
+                                <button
+                                    type="button"
+                                    class="danger-button compact"
+                                    data-cancel-billing-id="${escapeHtml(row.billingId)}"
+                                >ยกเลิกบิล</button>
+                            </td>
+                        ` : ""}
                     </tr>
                 `).join("")}
             </tbody>
         </table>
     `;
+}
+
+async function cancelBilling(billingId) {
+    if (!billingId) {
+        return;
+    }
+
+    if (!window.confirm(`ยกเลิกบิล #${billingId} ใช่ไหม? ระบบจะย้อนสถานะ enrollment ที่เกี่ยวข้องกลับไปเป็นก่อนบิลนี้ด้วย`)) {
+        return;
+    }
+
+    setStatus("กำลังยกเลิกบิล...");
+
+    try {
+        await requestJson("/api/payment/receipt/cancel", {
+            method: "POST",
+            body: JSON.stringify({ billingId })
+        });
+
+        await loadProfile(state.selectedStudentId, { preferredEnrollmentId: state.selectedEnrollmentId });
+        await loadHistory();
+        setStatus("ยกเลิกบิลแล้ว");
+    } catch (error) {
+        setStatus(error.message, "error");
+    }
 }
 
 async function loadHistory() {
@@ -1019,6 +1064,13 @@ function bindEvents() {
         });
         updateWsGraphButtonVisibility();
         loadHistory().catch((error) => setStatus(error.message, "error"));
+    });
+    els.historyTableWrap.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-cancel-billing-id]");
+
+        if (button) {
+            cancelBilling(Number(button.dataset.cancelBillingId));
+        }
     });
     els.wsGraphButton.addEventListener("click", openWsGraphModal);
     els.wsGraphClose.addEventListener("click", closeWsGraphModal);

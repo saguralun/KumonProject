@@ -1668,8 +1668,16 @@ export async function getStudentHistoryRows({
         },
         billing: {
             columns: ["date", "receipt", "month", "year", "payment", "total", "discount", "net"],
+            // billingId isn't in `columns` (so it never renders as its own
+            // table column) — the optional idColumn/idField below carries
+            // it on every row anyway, purely so the Cancel button on the
+            // student page's Billing history tab knows which billing_id
+            // to target.
+            idColumn: "billing_id",
+            idField: "billingId",
             sql: `
                 SELECT
+                    billing.billing_id,
                     billing.billing_date AS date,
                     CONCAT(billing.receipt_book, '/', billing.receipt_no) AS receipt,
                     billing.billing_month AS month,
@@ -1719,6 +1727,9 @@ export async function getStudentHistoryRows({
                 const value = row[column];
                 output[column] = value instanceof Date ? normalizeDate(value) : value;
             });
+            if (query.idColumn && query.idField) {
+                output[query.idField] = row[query.idColumn];
+            }
             return output;
         })
     };
