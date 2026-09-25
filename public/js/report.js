@@ -5,8 +5,28 @@ const els = {
   exportButton: document.getElementById("exportButton"),
   statusLine: document.getElementById("statusLine"),
   resultSubtitle: document.getElementById("resultSubtitle"),
+  status1Summary: document.getElementById("status1Summary"),
   reportTableWrap: document.getElementById("reportTableWrap")
 };
+
+// Same codes/labels as the Statistics page (public/js/statistics.js) —
+// kept as its own small copy rather than shared, matching how this app
+// already handles every other bit of duplicated master-data labeling
+// across pages with no shared JS module between them.
+const STATUS1_LABELS = {
+  N: "New Enrolment",
+  IT: "Incoming Transfer",
+  EO: "Enrolling Other Subject",
+  R: "Resumed",
+  A: "Absent",
+  OT: "Outgoing Transfer",
+  CP: "Completer",
+  C: "Continue"
+};
+
+// เข้า (in) group first, then เรียนต่อ (continue), then ออก (out) — same
+// framing as the Statistics page's zones.
+const STATUS1_ORDER = ["N", "IT", "EO", "R", "C", "A", "OT", "CP"];
 
 const state = {
   columns: [],
@@ -83,6 +103,67 @@ function renderTable() {
   `;
 }
 
+function status1Group(code) {
+  if (["N", "IT", "EO", "R", "C"].includes(code)) {
+    return "in";
+  }
+
+  if (["A", "OT"].includes(code)) {
+    return "out";
+  }
+
+  if (code === "CP") {
+    return "completer";
+  }
+
+  return "other";
+}
+
+function renderStatus1Summary() {
+  if (!state.rows.length) {
+    els.status1Summary.innerHTML = "";
+    return;
+  }
+
+  const counts = new Map();
+
+  state.rows.forEach((row) => {
+    const code = row.Status1 || "(ไม่มี)";
+
+    counts.set(code, (counts.get(code) || 0) + 1);
+  });
+
+  const codes = [...counts.keys()].sort((a, b) => {
+    const indexA = STATUS1_ORDER.indexOf(a);
+    const indexB = STATUS1_ORDER.indexOf(b);
+
+    if (indexA === -1 && indexB === -1) {
+      return a.localeCompare(b);
+    }
+
+    if (indexA === -1) {
+      return 1;
+    }
+
+    if (indexB === -1) {
+      return -1;
+    }
+
+    return indexA - indexB;
+  });
+
+  els.status1Summary.innerHTML = `
+    <span class="status1-summary-label">สรุป Status1 (${state.rows.length} รายการ):</span>
+    ${codes.map((code) => `
+      <span class="status1-chip status1-chip-${status1Group(code)}">
+        <strong>${escapeHtml(code)}</strong>
+        ${STATUS1_LABELS[code] ? `<span class="status1-chip-name">${escapeHtml(STATUS1_LABELS[code])}</span>` : ""}
+        <span class="status1-chip-count">${counts.get(code)}</span>
+      </span>
+    `).join("")}
+  `;
+}
+
 async function generateReport() {
   const month = Number(els.reportMonth.value);
   const year = Number(els.reportYear.value);
@@ -91,6 +172,7 @@ async function generateReport() {
   els.exportButton.disabled = true;
   setStatus("กำลังสร้างรายงาน...");
   els.reportTableWrap.innerHTML = `<div class="empty-state">กำลังโหลด...</div>`;
+  els.status1Summary.innerHTML = "";
 
   try {
     const data = await requestJson(`/api/report/monthly?month=${month}&year=${year}`);
@@ -98,6 +180,7 @@ async function generateReport() {
     state.columns = data.columns;
     state.rows = data.rows;
     renderTable();
+    renderStatus1Summary();
     els.resultSubtitle.textContent = `${monthName(month)} ${year} • ${state.rows.length} รายการ`;
     els.exportButton.disabled = state.rows.length === 0;
     setStatus(`สร้างรายงานแล้ว (${state.rows.length} รายการ)`, state.rows.length ? "neutral" : "error");

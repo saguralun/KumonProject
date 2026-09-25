@@ -378,6 +378,84 @@ html[data-role="staff"] [data-staff-up] {
   font-weight: 800;
 }
 
+.status1-summary {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.status1-summary:empty {
+  display: none;
+}
+
+.status1-summary-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status1-chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  background: var(--surface-soft);
+  font-size: 12px;
+}
+
+.status1-chip strong {
+  font-weight: 800;
+}
+
+.status1-chip-name {
+  color: var(--muted);
+}
+
+.status1-chip-count {
+  border-radius: 999px;
+  padding: 0 6px;
+  background: var(--surface);
+  font-weight: 800;
+}
+
+/* เข้า (N/IT/EO/R) + เรียนต่อ (C) — still actively studying */
+.status1-chip-in {
+  border-color: #bbf7d0;
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.status1-chip-in .status1-chip-count {
+  background: #ffffff;
+}
+
+/* ออก (A/OT) — paused or left */
+.status1-chip-out {
+  border-color: #fecaca;
+  background: #fff1f2;
+  color: var(--red);
+}
+
+.status1-chip-out .status1-chip-count {
+  background: #ffffff;
+}
+
+/* จบ (CP) — completed the subject */
+.status1-chip-completer {
+  border-color: #fde68a;
+  background: var(--orange-soft);
+  color: var(--orange);
+}
+
+.status1-chip-completer .status1-chip-count {
+  background: #ffffff;
+}
+
 .report-table-wrap {
   flex: 1 1 auto;
   min-height: 0;
