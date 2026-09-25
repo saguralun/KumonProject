@@ -745,37 +745,27 @@ export async function getOrderSuggestion({
     };
 }
 
-async function loadEnrollmentIdsWithActivity({ month, year, start, end }) {
+// The report's real basis: every enrollment actually billed this period
+// (i.e. paid) — not "had some WS/AT/DT/CD activity", which was the
+// original criterion here and is wrong for what this report is actually
+// for (a billing-period roster, so staff can see who has/hasn't paid).
+// UNIONed with every enrollment_status row for the period regardless of
+// status code — every "hidden" status event that period (N/IT/EO/R/A/OT/
+// CP), billed or not, e.g. an Absent that correctly has no billing row at
+// all that period. WS/AT/DT/CD/Status detail per row is still pulled in
+// separately below (loadWorksheetSummary etc.) — this function only
+// decides which enrollments make the report at all.
+async function loadBilledEnrollmentIds({ month, year }) {
     const result = await pool.query(`
-        SELECT enrollment_id FROM ${TABLE_SCHEMA}.worksheet_used
-            WHERE worksheet_month = $1 AND worksheet_year = $2
+        SELECT bd.enrollment_id
+        FROM ${TABLE_SCHEMA}.billing_detail bd
+        JOIN ${TABLE_SCHEMA}.billing b ON b.billing_id = bd.billing_id
+        WHERE b.billing_month = $1 AND b.billing_year = $2
         UNION
-        SELECT enrollment_id FROM ${TABLE_SCHEMA}.cd_used
-            WHERE cd_month = $1 AND cd_year = $2
-        UNION
-        SELECT enrollment_id FROM ${TABLE_SCHEMA}.at_used
-            WHERE at_date >= $3 AND at_date < $4
-        UNION
-        SELECT enrollment_id FROM ${TABLE_SCHEMA}.dt_used
-            WHERE dt_date >= $3 AND dt_date < $4
-        UNION
-        -- Absent/Outgoing Transfer/Completer are logged purely as a
-        -- status change — by definition there's no WS/AT/DT/CD activity
-        -- that period to pick them up via the unions above, so without
-        -- this they silently never appear in the report at all despite
-        -- being real events for that period (caught via the Status1
-        -- summary undercounting A hugely vs. the raw enrollment_status
-        -- count). N/IT/EO/R aren't included here — those normally DO
-        -- come with worksheet activity the same period, and pulling in
-        -- every status_month row regardless of code risked resurrecting
-        -- enrollments whose only "activity" was a stale/corrected status
-        -- entry.
         SELECT es.enrollment_id
-            FROM ${TABLE_SCHEMA}.enrollment_status es
-            JOIN ${TABLE_SCHEMA}.status_master sm ON sm.status_id = es.status_id
-            WHERE es.status_month = $1 AND es.status_year = $2
-              AND sm.status_code IN ('A', 'OT', 'CP')
-    `, [month, year, start, end]);
+        FROM ${TABLE_SCHEMA}.enrollment_status es
+        WHERE es.status_month = $1 AND es.status_year = $2
+    `, [month, year]);
 
     return result.rows.map((row) => row.enrollment_id);
 }
@@ -1067,11 +1057,9 @@ export async function buildMonthlyReport({ month, year }) {
     }
 
     const { start, end, prevMonth, prevYear } = periodDateRange(normalizedMonth, normalizedYear);
-    const enrollmentIds = await loadEnrollmentIdsWithActivity({
+    const enrollmentIds = await loadBilledEnrollmentIds({
         month: normalizedMonth,
-        year: normalizedYear,
-        start,
-        end
+        year: normalizedYear
     });
 
     if (!enrollmentIds.length) {
