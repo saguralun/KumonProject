@@ -601,6 +601,15 @@ async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, page, c
     const offset = (currentPage - 1) * limit;
     const result = await pool.query(`
         WITH latest_ws AS (
+            -- "Latest" means the WS row actually entered most recently
+            -- (highest worksheet_used_id = last inserted), not the one
+            -- with the highest worksheet_date. A multi-day pattern
+            -- ("5 วัน 10 แผ่น" etc.) saved in one sitting inserts several
+            -- rows spanning both past AND future dates in the same
+            -- transaction — e.g. entered today but dated up to 5 days
+            -- ahead — so sorting by worksheet_date DESC can surface a
+            -- forward-dated row that hasn't actually happened yet as the
+            -- "latest" one, making a kid look more current than they are.
             SELECT DISTINCT ON (wu.enrollment_id)
                 wu.enrollment_id,
                 wu.worksheet_date,
@@ -613,7 +622,7 @@ async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, page, c
             JOIN ${TABLE_SCHEMA}.level_master level
                 ON level.level_master_id = wm.level_master_id
             WHERE level.level_type = 1
-            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
+            ORDER BY wu.enrollment_id, wu.worksheet_used_id DESC
         )
         SELECT
             e.enrollment_id,
