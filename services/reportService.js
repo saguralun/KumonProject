@@ -826,52 +826,97 @@ async function loadWorksheetSummary(enrollmentIds, month, year) {
     return byEnrollmentId;
 }
 
-// PrevLevel/CurrentLevel snapshot: the latest main-track (level_type=1)
-// worksheet recorded within the prior/current worksheet_month+year bucket
-// (the same period tag worksheet_used rows already carry, not a recomputed
-// date boundary — that's what worksheet_month/worksheet_year are for).
-// No cpws filter: TRP's 7A/6A worksheets are never marked cpws=true at
-// all, so requiring it silently dropped every kid still in those levels.
-// Ordering by date (not by actual_worksheet_no) is what keeps this correct
-// across a level change within the same month — e.g. A161 done on the 3rd
-// then B51 on the 18th: B51 is the true latest position even though 51 <
-// 161, and picking by date rather than comparing the numbers gets that
-// right without needing any level-ordinal comparison at all.
+// PrevLevel/CurrentLevel snapshot, per enrollment, for the prior/current
+// worksheet_month+year bucket (the same period tag worksheet_used rows
+// already carry, not a recomputed date boundary). For each period:
+//   1. Pick the enrollment's level from whichever row was entered most
+//      recently (highest worksheet_used_id — see the same reasoning in
+//      queryIncompleteWorksheetStudents: a multi-day pattern saved in one
+//      sitting can carry a worksheet_date that's out of insertion order,
+//      including forward-dated ones, so date isn't a safe ordering here).
+//   2. Within that level, take the MAX actual_worksheet_no — the highest
+//      real packet done — rather than whichever row happened to be
+//      entered last within the level, matching how progress is supposed
+//      to only move forward. Not a single global MAX across the whole
+//      period/enrollment: a level change within the month (e.g. A161 on
+//      the 3rd, then B51 on the 18th) would otherwise report A's 161 as
+//      "further along" than B's 51, when B51 is the true current
+//      position.
+// Run twice per period — once restricted to WSCP (cpws=true) rows, since
+// only a real physical packet is trustworthy signal of where the kid
+// actually is, then again unrestricted — and the cpws=true pass wins
+// whenever it has anything for that enrollment. Falling back to the
+// unrestricted pass only when an enrollment has zero cpws=true rows that
+// period at all matters for TRP's 7A/6A, which are overwhelmingly
+// cpws=false (continuation days, same packet): requiring cpws=true there
+// would leave most of them blank instead of just less precise. Doing this
+// as two independent passes (rather than one query with a per-row cpws
+// fallback flag) keeps each pass's own level-change handling (step 1-2
+// above) self-contained, so a fallback on one level can't get contaminated
+// by cpws=true rows sitting in a level the enrollment has since left.
 //
 // Displayed worksheet number is +9 off the actual one (capped at 200),
 // matching the "packet" display convention used everywhere else in the
-// app (e.g. worksheet.js's displayWorksheetNo).
+// app (e.g. worksheet.js's displayWorksheetNo) — e.g. actual 51 displays
+// as 60, the last sheet of that packet.
 const MAIN_MAX_WORKSHEET_NO = 200;
 const PACKET_DISPLAY_OFFSET = 9;
 
+function levelPositionCte(monthParam, yearParam, extraWhere) {
+    return `
+        SELECT enrollment_id, level_code, MAX(actual_worksheet_no) AS actual_worksheet_no
+        FROM (
+            SELECT
+                enrollment_id,
+                actual_worksheet_no,
+                level_code,
+                FIRST_VALUE(level_code) OVER (
+                    PARTITION BY enrollment_id
+                    ORDER BY worksheet_used_id DESC
+                ) AS current_level_code
+            FROM (
+                SELECT
+                    wu.enrollment_id,
+                    wu.actual_worksheet_no,
+                    wu.worksheet_used_id,
+                    lm.level_code
+                FROM ${TABLE_SCHEMA}.worksheet_used wu
+                JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
+                JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
+                WHERE lm.level_type = 1
+                  AND wu.worksheet_month = ${monthParam} AND wu.worksheet_year = ${yearParam}
+                  AND wu.enrollment_id = ANY($1::int[])
+                  ${extraWhere}
+            ) base
+        ) with_current_level
+        WHERE level_code = current_level_code
+        GROUP BY enrollment_id, level_code
+    `;
+}
+
+// One period's worth of CTEs: <alias>_cpws (WSCP-only pass) and
+// <alias>_any (unrestricted pass) plus the combined <alias> that prefers
+// the former per enrollment.
+function periodLevelCte(alias, monthParam, yearParam) {
+    return `
+        ${alias}_cpws AS (${levelPositionCte(monthParam, yearParam, "AND wu.cpws = TRUE")}),
+        ${alias}_any AS (${levelPositionCte(monthParam, yearParam, "")}),
+        ${alias} AS (
+            SELECT
+                any_pass.enrollment_id,
+                COALESCE(cpws_pass.level_code, any_pass.level_code) AS level_code,
+                COALESCE(cpws_pass.actual_worksheet_no, any_pass.actual_worksheet_no) AS actual_worksheet_no
+            FROM ${alias}_any any_pass
+            LEFT JOIN ${alias}_cpws cpws_pass ON cpws_pass.enrollment_id = any_pass.enrollment_id
+        )
+    `;
+}
+
 async function loadLevelSnapshots(enrollmentIds, prevMonth, prevYear, month, year) {
     const result = await pool.query(`
-        WITH prev AS (
-            SELECT DISTINCT ON (wu.enrollment_id)
-                wu.enrollment_id,
-                lm.level_code,
-                wu.actual_worksheet_no
-            FROM ${TABLE_SCHEMA}.worksheet_used wu
-            JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
-            JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
-            WHERE lm.level_type = 1
-              AND wu.worksheet_month = $2 AND wu.worksheet_year = $3
-              AND wu.enrollment_id = ANY($1::int[])
-            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
-        ),
-        current AS (
-            SELECT DISTINCT ON (wu.enrollment_id)
-                wu.enrollment_id,
-                lm.level_code,
-                wu.actual_worksheet_no
-            FROM ${TABLE_SCHEMA}.worksheet_used wu
-            JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
-            JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
-            WHERE lm.level_type = 1
-              AND wu.worksheet_month = $4 AND wu.worksheet_year = $5
-              AND wu.enrollment_id = ANY($1::int[])
-            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
-        )
+        WITH
+        ${periodLevelCte("prev", "$2", "$3")},
+        ${periodLevelCte("current", "$4", "$5")}
         SELECT
             COALESCE(prev.enrollment_id, current.enrollment_id) AS enrollment_id,
             prev.level_code AS prev_level_code,
