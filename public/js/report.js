@@ -3,6 +3,7 @@ const els = {
   reportYear: document.getElementById("reportYear"),
   generateButton: document.getElementById("generateButton"),
   exportButton: document.getElementById("exportButton"),
+  exportEventSummaryButton: document.getElementById("exportEventSummaryButton"),
   statusLine: document.getElementById("statusLine"),
   resultSubtitle: document.getElementById("resultSubtitle"),
   status1Summary: document.getElementById("status1Summary"),
@@ -216,8 +217,65 @@ function exportCsv() {
   setStatus(`Export รายงานแล้ว (${state.rows.length} รายการ)`);
 }
 
+// Independent of generateReport()/state — the account holder's ask was for
+// a focused roster (new/incoming/resumed/enrolling-other/absent-or-OT)
+// with its own column set (Phone/Gender/BirthDate, none of which the main
+// report even fetches), not a filtered view of the already-loaded ~60
+// -column report — so this hits its own endpoint for whichever month/year
+// is currently selected, generated report or not.
+async function exportEventSummary() {
+  const month = Number(els.reportMonth.value);
+  const year = Number(els.reportYear.value);
+
+  els.exportEventSummaryButton.disabled = true;
+  setStatus("กำลังสร้างสรุป...");
+
+  try {
+    const data = await requestJson(`/api/report/event-summary?month=${month}&year=${year}`);
+
+    if (!data.rows.length) {
+      setStatus("ไม่พบเด็กที่ตรงเงื่อนไขในเดือน/ปีนี้", "error");
+      return;
+    }
+
+    const response = await fetch("/api/export/flat-workbook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename: `kumon-event-summary-${year}-${String(month).padStart(2, "0")}`,
+        sheetName: "Summary",
+        columns: data.columns,
+        rows: data.rows.map((row) => data.columns.map((col) => row[col]))
+      })
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+
+      throw new Error(errorBody.error || "Export ไม่สำเร็จ");
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `kumon-event-summary-${year}-${String(month).padStart(2, "0")}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setStatus(`Export สรุปแล้ว (${data.rows.length} รายการ)`);
+  } catch (error) {
+    setStatus(error.message, "error");
+  } finally {
+    els.exportEventSummaryButton.disabled = false;
+  }
+}
+
 els.generateButton.addEventListener("click", generateReport);
 els.exportButton.addEventListener("click", exportCsv);
+els.exportEventSummaryButton.addEventListener("click", exportEventSummary);
 
 function init() {
   setupMonthSelect();

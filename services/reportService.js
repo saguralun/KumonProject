@@ -1188,3 +1188,75 @@ export async function buildMonthlyReport({ month, year }) {
         return record;
     });
 }
+
+// Standalone from buildMonthlyReport — a focused roster of "kids who need
+// follow-up this period" (new/incoming/resumed/enrolling-other, or
+// stopped coming) rather than the full ~60-column activity report.
+// Membership is a straight enrollment_status read for the period (not
+// buildMonthlyReport's billing+status union), since the whole point here
+// is the event itself, billed or not. C/CP aren't included — this isn't
+// "everyone's status", just the move-in/move-out events.
+export const EVENT_SUMMARY_COLUMNS = [
+    "ID", "ชื่อจริง", "นามสกุล", "ชื่อเล่น", "Subject", "Status", "Phone", "Gender", "BirthDate"
+];
+const EVENT_SUMMARY_STATUS_CODES = ["A", "OT", "N", "EO", "R", "IT"];
+
+// OT (Outgoing Transfer) is reported as "A" too — per the account holder,
+// both mean "not actually coming in anymore" for the purposes of this
+// roster, so they're one bucket here even though they're logged as
+// distinct status codes.
+function eventSummaryStatusLabel(statusCode) {
+    return statusCode === "OT" ? "A" : statusCode;
+}
+
+export async function buildEventSummaryReport({ month, year }) {
+    const normalizedMonth = Number(month);
+    const normalizedYear = Number(year);
+
+    if (!Number.isInteger(normalizedMonth) || normalizedMonth < 1 || normalizedMonth > 12) {
+        throw httpError(400, "เดือนไม่ถูกต้อง");
+    }
+
+    if (!Number.isInteger(normalizedYear) || normalizedYear < 2000 || normalizedYear > 2600) {
+        throw httpError(400, "ปีไม่ถูกต้อง");
+    }
+
+    const result = await pool.query(`
+        SELECT DISTINCT ON (es.enrollment_id)
+            e.enrollment_id,
+            student.first_name,
+            student.last_name,
+            student.nickname,
+            subject.subject_code,
+            sm.status_code,
+            student.mobile,
+            gender.gender_name,
+            student.birth_date
+        FROM ${TABLE_SCHEMA}.enrollment_status es
+        JOIN ${TABLE_SCHEMA}.status_master sm ON sm.status_id = es.status_id
+        JOIN ${TABLE_SCHEMA}.enrollment e ON e.enrollment_id = es.enrollment_id
+        JOIN ${TABLE_SCHEMA}.student student ON student.student_id = e.student_id
+        JOIN ${TABLE_SCHEMA}.subject_master subject ON subject.subject_id = e.subject_id
+        LEFT JOIN ${TABLE_SCHEMA}.gender_master gender ON gender.gender_id = student.gender_id
+        WHERE es.status_month = $1 AND es.status_year = $2
+          AND sm.status_code = ANY($3::text[])
+        ORDER BY es.enrollment_id, es.enrollment_status_id DESC
+    `, [normalizedMonth, normalizedYear, EVENT_SUMMARY_STATUS_CODES]);
+
+    return result.rows
+        .map((row) => ({
+            ID: row.enrollment_id,
+            ชื่อจริง: row.first_name || "",
+            นามสกุล: row.last_name || "",
+            ชื่อเล่น: row.nickname || "",
+            Subject: row.subject_code || "",
+            Status: eventSummaryStatusLabel(row.status_code),
+            Phone: row.mobile || "",
+            Gender: row.gender_name || "",
+            BirthDate: formatThaiDate(row.birth_date)
+        }))
+        .sort((a, b) =>
+            a.Subject.localeCompare(b.Subject)
+            || a.ชื่อจริง.localeCompare(b.ชื่อจริง, "th")
+        );
+}

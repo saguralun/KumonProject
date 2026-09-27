@@ -1,7 +1,9 @@
 import express from "express";
 import { createSendError } from "./routeErrorHandler.js";
 import {
+    buildEventSummaryReport,
     buildMonthlyReport,
+    EVENT_SUMMARY_COLUMNS,
     REPORT_COLUMNS
 } from "../services/reportService.js";
 
@@ -19,6 +21,23 @@ router.get("/monthly", async (req, res) => {
         res.json({
             success: true,
             columns: REPORT_COLUMNS,
+            rows
+        });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.get("/event-summary", async (req, res) => {
+    try {
+        const rows = await buildEventSummaryReport({
+            month: req.query.month,
+            year: req.query.year
+        });
+
+        res.json({
+            success: true,
+            columns: EVENT_SUMMARY_COLUMNS,
             rows
         });
     } catch (error) {

@@ -56,3 +56,32 @@ export async function buildPivotWorkbook(sheets) {
 
     return workbook;
 }
+
+// Generic flat table -> single-sheet .xlsx: one header row (bold, frozen)
+// then one row per data row, both given as plain arrays already in column
+// order — no pivoting, just a straight list export (e.g. the Report
+// page's event-summary roster).
+export async function buildFlatWorkbook({ sheetName, columns, rows }) {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = "KumonDB";
+    workbook.created = new Date();
+
+    const sheet = workbook.addWorksheet(safeSheetName(sheetName));
+    const safeColumns = Array.isArray(columns) ? columns : [];
+    const safeRows = Array.isArray(rows) ? rows : [];
+
+    sheet.addRow(safeColumns);
+    sheet.getRow(1).font = { bold: true };
+
+    safeRows.forEach((row) => {
+        sheet.addRow(safeColumns.map((_, index) => row[index] ?? ""));
+    });
+
+    safeColumns.forEach((_, index) => {
+        sheet.getColumn(index + 1).width = 16;
+    });
+
+    sheet.views = [{ state: "frozen", xSplit: 0, ySplit: 1 }];
+
+    return workbook;
+}

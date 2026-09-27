@@ -167,7 +167,13 @@ app.use("/api/payment", requirePermission("page:payment"), paymentRoutes);
 app.use("/api/stock-receive", requirePermission("page:stock-receive"), stockReceiveRoutes);
 app.use("/api/stock-cut", requirePermission("page:stock-cut"), stockCutRoutes);
 app.use("/api/stock-summary", requirePermission("page:stock"), stockSummaryRoutes);
-app.use("/api/export", requirePermission("page:forecast"), exportRoutes);
+// A pure formatter (client-supplied rows -> .xlsx bytes), not a data
+// source — every endpoint here just re-shapes whatever the browser
+// already legitimately fetched from its own page-gated endpoint (Forecast/
+// Order's pivots and, now, Report's event-summary roster), so requireAuth
+// is the right gate: no page:xxx permission check would actually restrict
+// anything real here, since nothing sensitive is read inside this router.
+app.use("/api/export", requireAuth, exportRoutes);
 app.use("/api/progress-chart", requirePermission("page:progress-chart"), progressChartRoutes);
 app.use("/api/forecast", requirePermission("page:forecast"), forecastRoutes);
 app.use("/api/report", requirePermission("page:report"), reportRoutes);
