@@ -45,6 +45,7 @@ const state = {
     isReceivingPayment: false,
     isCancellingPayment: false,
     isPrintingReceipt: false,
+    receiptPrintUsed: false,
     isPrintingTest: false,
     printerConnected: false,
     // The sidebar Subject/Status <select> filters were removed as
@@ -687,6 +688,8 @@ function focusPrimaryReceiptAction() {
 function openReceipt(row) {
     state.selectedRow = row;
     state.receipt = null;
+    state.receiptPrintUsed = false;
+    updateReceiptPrintButton();
     // row.billingId is the billing record for whatever HAS been paid this
     // period — for a fully-paid row that's the whole receipt (reprint/cancel
     // it), but for a partial row it only covers the already-paid subject.
@@ -897,12 +900,13 @@ async function printReceiptViaBackend() {
     // while it's focused (browsers fire a button's click on Enter same
     // as a mouse click), or any other rapid double-press, fired an
     // independent, un-guarded print request each time.
-    if (!state.receipt || state.isPrintingReceipt) {
+    if (!state.receipt || state.isPrintingReceipt || state.receiptPrintUsed || !state.printerConnected) {
         return;
     }
 
     state.isPrintingReceipt = true;
-    els.receiptPrint.disabled = true;
+    state.receiptPrintUsed = true;
+    updateReceiptPrintButton();
     const originalLabel = els.receiptPrint.textContent;
     els.receiptPrint.textContent = "⏳ กำลังพิมพ์";
     setStatus("กำลังพิมพ์ใบเสร็จ...");
@@ -918,11 +922,18 @@ async function printReceiptViaBackend() {
     } finally {
         state.isPrintingReceipt = false;
         els.receiptPrint.textContent = originalLabel;
-        // Not just `false` — respect whatever applyPrinterConnected()
-        // last determined (the button also stays disabled whenever the
-        // printer itself isn't reachable, independent of this guard).
-        els.receiptPrint.disabled = !state.printerConnected;
+        updateReceiptPrintButton();
+        if (!els.receiptModal.classList.contains("hidden")) {
+            focusPrimaryReceiptAction();
+        }
     }
+}
+
+function updateReceiptPrintButton() {
+    els.receiptPrint.disabled = !state.printerConnected || state.isPrintingReceipt || state.receiptPrintUsed;
+    els.receiptPrint.title = state.receiptPrintUsed
+        ? "สั่งพิมพ์แล้ว หากต้องการพิมพ์ซ้ำให้ปิดและเปิดใบเสร็จใหม่"
+        : state.printerConnected ? "" : "เครื่องพิมพ์ยังไม่พร้อม — เช็คสถานะที่มุมขวาบนก่อน";
 }
 
 // Reads real Windows printer status server-side (browsers have no API for
@@ -933,8 +944,7 @@ function applyPrinterConnected(connected) {
 
     const title = connected ? "" : "เครื่องพิมพ์ยังไม่พร้อม — เช็คสถานะที่มุมขวาบนก่อน";
 
-    els.receiptPrint.disabled = !connected;
-    els.receiptPrint.title = title;
+    updateReceiptPrintButton();
     els.printTestButton.disabled = !connected;
     els.printTestButton.title = title;
 }
