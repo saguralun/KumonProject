@@ -3,6 +3,7 @@ import { createSendError } from "./routeErrorHandler.js";
 import {
     buildEventSummaryReport,
     buildMonthlyReport,
+    buildLevelSummaryReport,
     EVENT_SUMMARY_COLUMNS,
     REPORT_COLUMNS
 } from "../services/reportService.js";
@@ -23,6 +24,15 @@ router.get("/monthly", async (req, res) => {
             columns: REPORT_COLUMNS,
             rows
         });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.get("/level-summary", async (req, res) => {
+    try {
+        const subjects = await buildLevelSummaryReport({ month: req.query.month, year: req.query.year });
+        res.json({ success: true, subjects });
     } catch (error) {
         sendError(res, error);
     }

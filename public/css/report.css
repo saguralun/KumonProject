@@ -464,6 +464,55 @@ html[data-role="staff"] [data-staff-up] {
   border-radius: 8px;
 }
 
+.level-summary {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 65%;
+  overflow: auto;
+  padding-bottom: 14px;
+}
+
+.level-summary .secondary-button {
+  min-height: 36px;
+}
+
+.level-summary-tables {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.level-summary-tables table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.level-summary-tables caption {
+  padding: 8px;
+  text-align: left;
+  font-weight: 800;
+  color: var(--blue);
+}
+
+.level-summary-tables th,
+.level-summary-tables td {
+  border-bottom: 1px solid var(--line);
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.level-summary-tables th,
+.level-summary-tables tfoot {
+  background: var(--surface-soft);
+  font-weight: 800;
+}
+
+@media (max-width: 600px) {
+  .level-summary-tables { grid-template-columns: 1fr; }
+  .level-summary .panel-header { flex-wrap: wrap; }
+}
+
 .report-table {
   border-collapse: collapse;
 }

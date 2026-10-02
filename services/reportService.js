@@ -775,6 +775,7 @@ async function loadEnrollmentBase(enrollmentIds) {
         SELECT
             e.enrollment_id,
             e.kumon_student_id,
+            e.student_id,
             s.school_grade_id,
             sgm.school_grade,
             s.birth_date,
@@ -1134,6 +1135,8 @@ export async function buildMonthlyReport({ month, year }) {
         const tests = testsByEnrollmentId.get(row.enrollment_id) || [];
         const record = {
             ID: row.enrollment_id,
+            StudentId: row.student_id,
+            CurrentLevelCode: levelSnapshot?.current_level_code || "",
             รหัสคุมอง: row.kumon_student_id || "",
             IDGrade: row.school_grade_id ?? "",
             Grade: row.school_grade || "",
@@ -1189,13 +1192,41 @@ export async function buildMonthlyReport({ month, year }) {
     });
 }
 
-// Standalone from buildMonthlyReport — a focused roster of "kids who need
-// follow-up this period" (new/incoming/resumed/enrolling-other, or
-// stopped coming) rather than the full ~60-column activity report.
-// Membership is a straight enrollment_status read for the period (not
-// buildMonthlyReport's billing+status union), since the whole point here
-// is the event itself, billed or not. C/CP aren't included — this isn't
-// "everyone's status", just the move-in/move-out events.
+export function summarizeStudentsByLevel(records, levels) {
+    return ["ME", "EFL", "TRP"].map((subject) => {
+        const counts = new Map(levels.filter((level) => level.subject_code === subject)
+            .map((level) => [level.level_code, new Set()]));
+        const students = new Set();
+
+        // A student with multiple enrollments in one subject belongs to the newest one.
+        for (const record of [...records].sort((a, b) => Number(b.ID) - Number(a.ID))) {
+            if (record.Subject !== subject) continue;
+            const studentId = record.StudentId ?? record.ID;
+            if (students.has(studentId)) continue;
+            students.add(studentId);
+            const level = record.CurrentLevelCode || "ไม่มีข้อมูลเลเวล";
+            if (!counts.has(level)) counts.set(level, new Set());
+            counts.get(level).add(studentId);
+        }
+
+        const rows = [...counts].map(([level, students]) => ({ level, count: students.size }));
+        return { subject, rows, total: students.size };
+    });
+}
+
+export async function buildLevelSummaryReport({ month, year }) {
+    const records = await buildMonthlyReport({ month, year });
+    const { rows: levels } = await pool.query(`
+        SELECT sub.subject_code, lm.level_code
+        FROM ${TABLE_SCHEMA}.level_master lm
+        JOIN ${TABLE_SCHEMA}.subject_master sub ON sub.subject_id = lm.subject_id
+        WHERE lm.level_type = 1 AND sub.subject_code IN ('ME', 'EFL', 'TRP')
+        ORDER BY lm.subject_id, lm.level_master_id
+    `);
+    return summarizeStudentsByLevel(records, levels);
+}
+
+// Event membership comes from enrollment_status for the selected period, billed or not.
 export const EVENT_SUMMARY_COLUMNS = [
     "ID", "ชื่อจริง", "นามสกุล", "ชื่อเล่น", "Subject", "Status", "Phone", "Gender", "BirthDate"
 ];

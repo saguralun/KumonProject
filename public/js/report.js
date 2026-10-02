@@ -4,6 +4,11 @@ const els = {
   generateButton: document.getElementById("generateButton"),
   exportButton: document.getElementById("exportButton"),
   exportEventSummaryButton: document.getElementById("exportEventSummaryButton"),
+  levelSummaryButton: document.getElementById("levelSummaryButton"),
+  exportLevelSummaryButton: document.getElementById("exportLevelSummaryButton"),
+  levelSummary: document.getElementById("levelSummary"),
+  levelSummarySubtitle: document.getElementById("levelSummarySubtitle"),
+  levelSummaryTables: document.getElementById("levelSummaryTables"),
   statusLine: document.getElementById("statusLine"),
   resultSubtitle: document.getElementById("resultSubtitle"),
   status1Summary: document.getElementById("status1Summary"),
@@ -31,7 +36,9 @@ const STATUS1_ORDER = ["N", "IT", "EO", "R", "C", "A", "OT", "CP"];
 
 const state = {
   columns: [],
-  rows: []
+  rows: [],
+  levelSummary: null,
+  levelSummaryRequest: 0
 };
 
 const setStatus = createStatusSetter(els.statusLine);
@@ -274,6 +281,89 @@ async function exportEventSummary() {
 }
 
 els.generateButton.addEventListener("click", generateReport);
+async function generateLevelSummary() {
+  const requestId = ++state.levelSummaryRequest;
+  const month = Number(els.reportMonth.value);
+  const year = Number(els.reportYear.value);
+  state.levelSummary = null;
+  els.levelSummaryButton.disabled = true;
+  els.exportLevelSummaryButton.disabled = true;
+  els.levelSummary.classList.remove("hidden");
+  els.levelSummaryTables.innerHTML = '<div class="empty-state">กำลังโหลด...</div>';
+  els.levelSummarySubtitle.textContent = `${monthName(month)} ${year} • ตามผลรายงานรายเดือน`;
+  setStatus("กำลังสรุปนักเรียนตามเลเวล...");
+  try {
+    const data = await requestJson(`/api/report/level-summary?month=${month}&year=${year}`);
+    if (requestId !== state.levelSummaryRequest) return;
+    state.levelSummary = { month, year, subjects: data.subjects };
+    els.levelSummaryTables.innerHTML = data.subjects.map((subject) => `
+      <table>
+        <caption>${escapeHtml(subject.subject)} • ${subject.total} คน</caption>
+        <thead><tr><th>เลเวล</th><th>นักเรียน (คน)</th></tr></thead>
+        <tbody>${subject.rows.map((row) => `<tr><td>${escapeHtml(row.level)}</td><td>${row.count}</td></tr>`).join("")}</tbody>
+        <tfoot><tr><td>รวม</td><td>${subject.total}</td></tr></tfoot>
+      </table>
+    `).join("");
+    els.exportLevelSummaryButton.disabled = false;
+    setStatus("สรุปนักเรียนตามเลเวลแล้ว");
+  } catch (error) {
+    if (requestId !== state.levelSummaryRequest) return;
+    els.levelSummaryTables.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    setStatus(error.message, "error");
+  } finally {
+    els.levelSummaryButton.disabled = false;
+  }
+}
+
+async function exportLevelSummary() {
+  const summary = state.levelSummary;
+  if (!summary) return;
+  els.exportLevelSummaryButton.disabled = true;
+  try {
+    const filename = `kumon-level-summary-${summary.year}-${String(summary.month).padStart(2, "0")}`;
+    const response = await fetch("/api/export/flat-workbook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        filename,
+        sheetName: "นักเรียนตามเลเวล",
+        columns: ["เดือน", "ปี", "วิชา", "เลเวล", "นักเรียน (คน)"],
+        rows: summary.subjects.flatMap((subject) => [
+          ...subject.rows.map((row) => [summary.month, summary.year, subject.subject, row.level, row.count]),
+          [summary.month, summary.year, subject.subject, "รวม", subject.total]
+        ])
+      })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || "Export ไม่สำเร็จ");
+    }
+    const url = URL.createObjectURL(await response.blob());
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${filename}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setStatus("Export สรุปนักเรียนตามเลเวลแล้ว");
+  } catch (error) {
+    setStatus(error.message, "error");
+  } finally {
+    els.exportLevelSummaryButton.disabled = !state.levelSummary;
+  }
+}
+
+els.levelSummaryButton.addEventListener("click", generateLevelSummary);
+els.exportLevelSummaryButton.addEventListener("click", exportLevelSummary);
+for (const input of [els.reportMonth, els.reportYear]) {
+  input.addEventListener("change", () => {
+    state.levelSummary = null;
+    state.levelSummaryRequest += 1;
+    els.levelSummary.classList.add("hidden");
+    els.exportLevelSummaryButton.disabled = true;
+  });
+}
 els.exportButton.addEventListener("click", exportCsv);
 els.exportEventSummaryButton.addEventListener("click", exportEventSummary);
 
