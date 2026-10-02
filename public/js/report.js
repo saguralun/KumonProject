@@ -290,7 +290,7 @@ async function generateLevelSummary() {
   els.exportLevelSummaryButton.disabled = true;
   els.levelSummary.classList.remove("hidden");
   els.levelSummaryTables.innerHTML = '<div class="empty-state">กำลังโหลด...</div>';
-  els.levelSummarySubtitle.textContent = `${monthName(month)} ${year} • ตามผลรายงานรายเดือน`;
+  els.levelSummarySubtitle.textContent = `${monthName(month)} ${year} • นักเรียน Active ตามเลเวลปัจจุบัน`;
   setStatus("กำลังสรุปนักเรียนตามเลเวล...");
   try {
     const data = await requestJson(`/api/report/level-summary?month=${month}&year=${year}`);

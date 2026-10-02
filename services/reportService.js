@@ -781,6 +781,7 @@ async function loadEnrollmentBase(enrollmentIds) {
             s.birth_date,
             e.en_start_date,
             lm_start.level_code AS start_level_code,
+            lm_current.level_code AS enrollment_level_code,
             wm_start.worksheet_no AS start_worksheet_no,
             s.first_name,
             s.last_name,
@@ -794,6 +795,7 @@ async function loadEnrollmentBase(enrollmentIds) {
         LEFT JOIN ${TABLE_SCHEMA}.school_grade_master sgm ON sgm.school_grade_id = s.school_grade_id
         JOIN ${TABLE_SCHEMA}.worksheet_master wm_start ON wm_start.worksheet_master_id = e.starting_worksheet_master_id
         JOIN ${TABLE_SCHEMA}.level_master lm_start ON lm_start.level_master_id = wm_start.level_master_id
+        LEFT JOIN ${TABLE_SCHEMA}.level_master lm_current ON lm_current.level_master_id = e.current_level_master_id
         JOIN ${TABLE_SCHEMA}.status_master st1 ON st1.status_id = e.current_status_group1_id
         LEFT JOIN ${TABLE_SCHEMA}.status_master st2 ON st2.status_id = e.current_status_group2_id
         WHERE e.enrollment_id = ANY($1::int[])
@@ -1137,6 +1139,8 @@ export async function buildMonthlyReport({ month, year }) {
             ID: row.enrollment_id,
             StudentId: row.student_id,
             CurrentLevelCode: levelSnapshot?.current_level_code || "",
+            EnrollmentLevelCode: row.enrollment_level_code || "",
+            EnrollmentStatusCode: row.status1_code || "",
             รหัสคุมอง: row.kumon_student_id || "",
             IDGrade: row.school_grade_id ?? "",
             Grade: row.school_grade || "",
@@ -1193,18 +1197,19 @@ export async function buildMonthlyReport({ month, year }) {
 }
 
 export function summarizeStudentsByLevel(records, levels) {
+    const activeRecords = records.filter((record) => ACTIVE_STATUS_CODES.includes(record.EnrollmentStatusCode));
     return ["ME", "EFL", "TRP"].map((subject) => {
         const counts = new Map(levels.filter((level) => level.subject_code === subject)
             .map((level) => [level.level_code, new Set()]));
         const students = new Set();
 
         // A student with multiple enrollments in one subject belongs to the newest one.
-        for (const record of [...records].sort((a, b) => Number(b.ID) - Number(a.ID))) {
+        for (const record of [...activeRecords].sort((a, b) => Number(b.ID) - Number(a.ID))) {
             if (record.Subject !== subject) continue;
             const studentId = record.StudentId ?? record.ID;
             if (students.has(studentId)) continue;
             students.add(studentId);
-            const level = record.CurrentLevelCode || "ไม่มีข้อมูลเลเวล";
+            const level = record.EnrollmentLevelCode || "ไม่มีข้อมูลเลเวล";
             if (!counts.has(level)) counts.set(level, new Set());
             counts.get(level).add(studentId);
         }
