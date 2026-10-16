@@ -417,6 +417,7 @@ function emptyIssueMaps() {
             olderThanRetention: new Map(),
             missingEnrollment: new Map(),
             missingMaster: new Map(),
+            zeroWorksheet: new Map(),
             existing: new Map(),
             duplicate: new Map(),
             booleanDefaults: new Map(),
@@ -586,7 +587,7 @@ function buildSourceRow(record, csvRow) {
     };
 }
 
-function buildWorksheetRow(record, csvRow, masters, issues, cutoffDate) {
+export function buildWorksheetRow(record, csvRow, masters, issues, cutoffDate) {
     const row = {
         ...buildSourceRow(record, csvRow),
         worksheet_used_id: null,
@@ -661,7 +662,10 @@ function buildWorksheetRow(record, csvRow, masters, issues, cutoffDate) {
         addError(row, issues.errors, "number", record.YearWS, worksheetYear.error);
     }
 
-    if (actualWorksheetNo.error) {
+    if (clean(record.LevelWS) === "0") {
+        addInfo(row, issues.info, "zeroWorksheet", record.LevelWS, "LevelWS is 0; row skipped.");
+        row.import_action = "SKIP";
+    } else if (actualWorksheetNo.error) {
         addError(row, issues.errors, "number", record.LevelWS, actualWorksheetNo.error);
     } else {
         row.packet_worksheet_no = worksheetPacketNo(actualWorksheetNo.value);
@@ -871,6 +875,7 @@ function buildSummary(cache) {
         { label: "Older Than 3 Years", value: cache.infoCounts.olderThanRetention },
         { label: "Missing Enrollment", value: cache.infoCounts.missingEnrollment },
         { label: "Missing Master", value: cache.infoCounts.missingMaster },
+        { label: "Zero Worksheet", value: cache.infoCounts.zeroWorksheet },
         { label: "Existing", value: cache.infoCounts.existing },
         { label: "Exact Duplicates", value: cache.infoCounts.duplicate },
         { label: "Boolean Defaults", value: cache.infoCounts.booleanDefaults },
@@ -888,6 +893,7 @@ function buildValidation(cache) {
         validationItem("Date", cache.errorCounts.date),
         validationItem("Required ID", cache.errorCounts.required),
         validationItem("Number Fields", cache.errorCounts.number),
+        validationItem("Zero Worksheet", 0, cache.infoCounts.zeroWorksheet),
         validationItem("Existing Target Rows", 0, cache.infoCounts.existing),
         validationItem("Exact Duplicate", 0, cache.infoCounts.duplicate),
         validationItem("Boolean Defaults", 0, 0, cache.infoCounts.booleanDefaults),
