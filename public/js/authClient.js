@@ -99,12 +99,6 @@ function renderAuthBar(user) {
   bindUpdateButton();
 }
 
-function showUpdateComplete(button, message) {
-  button.textContent = "✅ กำลังเปิดใหม่";
-  button.title = "โปรแกรมจะ restart อัตโนมัติ";
-  alert(message || "อัพเดทสำเร็จแล้ว โปรแกรมจะ restart อัตโนมัติในอีกสักครู่");
-}
-
 function bindUpdateButton() {
   const button = document.getElementById("authUpdateButton");
 
@@ -117,32 +111,25 @@ function bindUpdateButton() {
     button.textContent = "⏳ กำลังอัพเดท...";
 
     try {
-      const response = await fetch("/api/system/update-apply", { method: "POST" });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok || data.success === false) {
-        throw new Error(data.error || "อัพเดทไม่สำเร็จ");
+      const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261016-verified-restart");
+      let previousInstanceId = await getRuntimeInstanceId();
+      try {
+        const response = await fetch("/api/system/update-apply", { method: "POST" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) throw new Error(data.error || "อัพเดทไม่สำเร็จ");
+        previousInstanceId = data.previousInstanceId || previousInstanceId;
+      } catch (error) {
+        if (!(error instanceof TypeError)) throw error;
       }
-
-      showUpdateComplete(button, data.message);
-      return;
+      button.textContent = "กำลังรอโปรแกรมเปิดใหม่...";
+      button.title = "กำลังตรวจว่า server ใหม่พร้อมใช้งาน";
+      await waitForUpdatedServer(previousInstanceId);
+      window.location.reload();
     } catch (error) {
-      // The currently running copy on older installs may still restart while
-      // applying this update, cutting the response before it reaches the
-      // browser. Treat that fetch drop as "probably updated; restart the app"
-      // instead of sending the user into a reload loop.
-      if (!(error instanceof TypeError)) {
-        alert(error.message);
-        button.disabled = false;
-        button.textContent = "🔄 อัพเดท";
-        return;
-      }
+      alert(error.message);
+      button.disabled = false;
+      button.textContent = "🔄 อัพเดท";
     }
-
-    showUpdateComplete(
-      button,
-      "การเชื่อมต่อหลุดระหว่างอัพเดท ซึ่งมักเกิดตอนโปรแกรมกำลัง restart ถ้าโปรแกรมไม่เปิดกลับมาเองในสักครู่ ค่อยปิดแล้วเปิดใหม่"
-    );
   });
 
   checkForUpdateAndShowButton(button);

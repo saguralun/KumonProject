@@ -35,12 +35,6 @@ async function loadLanInfo() {
 
 loadLanInfo();
 
-function showUpdateComplete(message) {
-  els.updateBannerMessage.textContent = message || "อัพเดทสำเร็จแล้ว โปรแกรมจะ restart อัตโนมัติในอีกสักครู่";
-  els.updateBannerButton.textContent = "กำลังเปิดใหม่";
-  els.updateBannerButton.disabled = true;
-}
-
 async function checkUpdateStatus() {
   try {
     const response = await fetch("/api/system/update-check");
@@ -64,23 +58,23 @@ els.updateBannerButton.addEventListener("click", async () => {
   els.updateBannerButton.textContent = "กำลังอัพเดท...";
 
   try {
-    const data = await requestJson("/api/system/update-apply", { method: "POST" });
-    showUpdateComplete(data.message);
-    return;
-  } catch (error) {
-    // Older installs may still be running through nodemon; pulling this
-    // update can restart the server before the response gets back here.
-    // Make the recovery instruction explicit instead of reloading into a
-    // temporary outage.
-    if (!(error instanceof TypeError)) {
-      els.updateBannerMessage.textContent = error.message;
-      els.updateBannerButton.disabled = false;
-      els.updateBannerButton.textContent = "อัพเดทตอนนี้";
-      return;
+    const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261016-verified-restart");
+    let previousInstanceId = await getRuntimeInstanceId();
+    try {
+      const data = await requestJson("/api/system/update-apply", { method: "POST" });
+      previousInstanceId = data.previousInstanceId || previousInstanceId;
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error;
     }
+    els.updateBannerMessage.textContent = "กำลังรอโปรแกรมเปิดใหม่...";
+    els.updateBannerButton.textContent = "กำลังเปิดใหม่";
+    await waitForUpdatedServer(previousInstanceId);
+    window.location.reload();
+  } catch (error) {
+    els.updateBannerMessage.textContent = error.message;
+    els.updateBannerButton.disabled = false;
+    els.updateBannerButton.textContent = "อัพเดทตอนนี้";
   }
-
-  showUpdateComplete("การเชื่อมต่อหลุดระหว่างอัพเดท ซึ่งมักเกิดตอนโปรแกรมกำลัง restart ถ้าโปรแกรมไม่เปิดกลับมาเองในสักครู่ ค่อยปิดแล้วเปิดใหม่");
 });
 
 function setMessage(text) {

@@ -1,6 +1,6 @@
 import express from "express";
 import { createSendError } from "./routeErrorHandler.js";
-import { applyUpdate, checkForUpdate } from "../services/updateService.js";
+import { applyUpdate, checkForUpdate, getRuntimeStatus } from "../services/updateService.js";
 import { requireAdmin } from "../middleware/auth.js";
 import {
     createOpeningSchedule,
@@ -12,6 +12,11 @@ import {
 const router = express.Router();
 
 const sendError = createSendError("Unexpected system error");
+
+router.get("/runtime", (req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.json({ success: true, ...getRuntimeStatus() });
+});
 
 router.get("/update-check", async (req, res) => {
     // Express adds an ETag by default, which lets a browser reuse a

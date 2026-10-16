@@ -1,32 +1,58 @@
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import path from "path";
+import fs from "fs/promises";
+import { openSync, closeSync } from "fs";
+import { randomUUID } from "crypto";
 import { httpError } from "./httpError.js";
 
 const execFileAsync = promisify(execFile);
 const REPO_DIR = process.cwd();
 const GITHUB_REPO = "saguralun/KumonProject";
 const GITHUB_BRANCH = "main";
+const INSTANCE_ID = randomUUID();
+let updateInProgress = false;
 
-function scheduleAppRestart() {
-    const launcherPath = path.join(REPO_DIR, "launcher", "start.ps1");
-    const command = [
-        "Start-Sleep -Seconds 2",
-        `& '${launcherPath.replace(/'/g, "''")}' -ForceRestart`
-    ].join("; ");
+export function getRuntimeStatus() {
+    return { instanceId: INSTANCE_ID, processId: process.pid };
+}
 
-    const child = spawn(
-        "powershell",
-        ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", command],
-        {
-            cwd: REPO_DIR,
-            detached: true,
-            stdio: "ignore",
-            windowsHide: true
-        }
-    );
-
+export async function scheduleAppRestart() {
+    const restartPath = path.join(REPO_DIR, "launcher", "restart-hidden.vbs");
+    const statusPath = path.join(REPO_DIR, "logs", `restart-${process.pid}.log`);
+    await fs.mkdir(path.dirname(statusPath), { recursive: true });
+    await fs.rm(statusPath, { force: true });
+    const outputFd = openSync(path.join(REPO_DIR, "logs", `restart-helper-${process.pid}.log`), "a");
+    let child;
+    try {
+        child = spawn(
+            "wscript.exe",
+            ["//B", "//Nologo", restartPath, String(process.pid), REPO_DIR,
+                process.execPath, String(Number(process.env.PORT) || 3000), statusPath],
+            {
+                cwd: REPO_DIR,
+                detached: true,
+                stdio: ["ignore", outputFd, outputFd],
+                windowsHide: true
+            }
+        );
+        await new Promise((resolve, reject) => {
+            child.once("spawn", resolve);
+            child.once("error", reject);
+        });
+    } finally {
+        closeSync(outputFd);
+    }
     child.unref();
+    // Confirm that PowerShell actually entered the helper before reporting a restart.
+    for (let attempt = 0; attempt < 100; attempt++) {
+        const status = await fs.readFile(statusPath, "utf8").catch(() => "");
+        if (status.includes("ERROR")) throw httpError(500, "เริ่มตัว restart ไม่สำเร็จ ตรวจ logs/restart-*.log");
+        if (status.includes("READY")) return;
+        if (child.exitCode !== null && child.exitCode !== 0) throw httpError(500, `ตัว restart หยุดทำงาน (exit ${child.exitCode}) ตรวจ logs/restart-helper-*.log`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw httpError(500, "อัพเดทโค้ดแล้ว แต่ตัว restart ไม่ตอบรับ กรุณาเปิดผ่าน start-kumondb.bat ใหม่ และตรวจ logs/restart-*.log");
 }
 
 async function runGit(args) {
@@ -78,6 +104,17 @@ export async function checkForUpdate() {
 }
 
 export async function applyUpdate() {
+    if (updateInProgress) throw httpError(409, "กำลังอัพเดทหรือ restart อยู่ กรุณารอให้โปรแกรมเปิดกลับมา");
+    updateInProgress = true;
+    try {
+        return await performUpdate();
+    } catch (error) {
+        updateInProgress = false;
+        throw error;
+    }
+}
+
+async function performUpdate() {
     const { stdout: branchOut } = await runGit(["rev-parse", "--abbrev-ref", "HEAD"]);
     const branch = branchOut.trim();
 
@@ -120,7 +157,7 @@ export async function applyUpdate() {
     }
 
     const { stdout: newHead } = await runGit(["rev-parse", "HEAD"]);
-    scheduleAppRestart();
+    await scheduleAppRestart();
 
     return {
         success: true,
@@ -128,6 +165,7 @@ export async function applyUpdate() {
         newCommit: newHead.trim().slice(0, 7),
         restartRequired: true,
         restartScheduled: true,
+        previousInstanceId: INSTANCE_ID,
         message: "อัพเดทสำเร็จแล้ว โปรแกรมจะ restart อัตโนมัติในอีกสักครู่"
     };
 }
