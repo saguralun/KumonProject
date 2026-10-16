@@ -776,9 +776,10 @@ function renderHistoryTable(data) {
                         ` : ""}
                         ${showReturnCd ? `
                             <td data-staff-up>
-                                ${row.cpcd === true ? `<button type="button" class="danger-button compact"
+                                <button type="button" class="danger-button compact"
                                     data-return-cd-id="${escapeHtml(row.cdUsedId)}"
-                                    data-stock-processed="${row.stock === true}">เอา CD คืน</button>` : ""}
+                                    data-cpcd="${row.cpcd === true}"
+                                    data-stock-processed="${row.stock === true}">${row.cpcd === true ? "เอา CD คืน" : "ยกเลิกรายการ CD"}</button>
                             </td>
                         ` : ""}
                     </tr>
@@ -793,7 +794,10 @@ async function returnCd(button) {
     const studentId = state.selectedStudentId;
     const cdUsedId = Number(button.dataset.returnCdId);
     const stockProcessed = button.dataset.stockProcessed === "true";
-    if (!window.confirm(stockProcessed
+    const receivedCd = button.dataset.cpcd === "true";
+    if (!window.confirm(!receivedCd
+        ? "ยกเลิกรายการไม่ได้รับ CD นี้ใช่ไหม? สามารถกลับไปเลือกใหม่ได้ และสต็อกจะไม่เปลี่ยน"
+        : stockProcessed
         ? "เอา CD คืนและยกเลิกรายการให้ CD นี้ใช่ไหม? ระบบจะคืนสต็อก 1 แผ่นด้วย"
         : "เอา CD คืนและยกเลิกรายการให้ CD นี้ใช่ไหม? รายการนี้ยังไม่ตัดสต็อก จึงไม่เพิ่มสต็อก")) return;
     button.disabled = true;
@@ -803,7 +807,8 @@ async function returnCd(button) {
             await loadProfile(studentId, { preferredEnrollmentId: state.selectedEnrollmentId });
             await loadHistory();
         }
-        setStatus(data.stockReturned ? "เอา CD คืนแล้ว และคืนสต็อก 1 แผ่น" : "เอา CD คืนแล้ว (ยังไม่ได้ตัดสต็อก)");
+        setStatus(data.stockReturned ? "เอา CD คืนแล้ว และคืนสต็อก 1 แผ่น"
+            : receivedCd ? "เอา CD คืนแล้ว (ยังไม่ได้ตัดสต็อก)" : "ยกเลิกรายการ CD แล้ว สต็อกไม่เปลี่ยน");
     } catch (error) {
         setStatus(error.message, "error");
     } finally {

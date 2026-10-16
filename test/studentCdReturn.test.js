@@ -51,8 +51,10 @@ test("a CD belonging to another student cannot be returned", async (t) => {
 
 test("no-physical-CD records cannot restore stock", async (t) => {
     const db = mockCdClient(t, { cd_used_id: 1, cd_master_id: 8, cpcd: false, is_stock_processed: true });
-    await assert.rejects(returnStudentCd(60, 1), { statusCode: 409 });
+    assert.equal((await returnStudentCd(60, 1)).stockReturned, false);
     assert.equal(db.stock, 5);
+    assert.ok(db.calls.some((call) => call.sql.includes("DELETE FROM kumon.cd_used")));
+    await assert.rejects(returnStudentCd(60, 1), { statusCode: 404 });
 });
 
 test("CD return permission allows only Admin and Instructor", () => {

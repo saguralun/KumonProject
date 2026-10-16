@@ -1581,9 +1581,8 @@ export async function returnStudentCd(studentId, cdUsedId) {
         `, [normalizedCdUsedId, normalizedStudentId]);
         const cd = rows[0];
         if (!cd) throw httpError(404, "ไม่พบรายการ CD หรือรายการนี้ถูกคืนแล้ว");
-        if (cd.cpcd !== true) throw httpError(409, "รายการนี้ไม่ได้รับ CD จึงไม่สามารถคืนได้");
-
-        if (cd.is_stock_processed === true) {
+        const stockReturned = cd.cpcd === true && cd.is_stock_processed === true;
+        if (stockReturned) {
             const stockType = await client.query(`
                 SELECT stock_type_id FROM ${TABLE_SCHEMA}.stock_type_master WHERE stock_type_code = 'CD'
             `);
@@ -1598,7 +1597,7 @@ export async function returnStudentCd(studentId, cdUsedId) {
         }
         await client.query(`DELETE FROM ${TABLE_SCHEMA}.cd_used WHERE cd_used_id = $1`, [normalizedCdUsedId]);
         await client.query("COMMIT");
-        return { cdUsedId: normalizedCdUsedId, stockReturned: cd.is_stock_processed === true };
+        return { cdUsedId: normalizedCdUsedId, stockReturned };
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;
