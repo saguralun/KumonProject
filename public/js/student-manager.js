@@ -722,8 +722,7 @@ function renderHistoryTable(data) {
         return;
     }
 
-    // Billing is the only history type with a real "undo" — cancelling a
-    // receipt already reverses billing_detail/enrollment_status/the
+    // Cancelling a receipt reverses billing_detail/enrollment_status/the
     // enrollment's current status in one transaction (see
     // cancelReceiptPayment in services/paymentService.js, same endpoint
     // the Payment page's own Cancel Receipt button uses). Status can only
@@ -736,6 +735,7 @@ function renderHistoryTable(data) {
     // buttons above use) since they permanently remove real records.
     const showCancel = data.type === "billing";
     const showDelete = data.type === "status";
+    const showReturnCd = data.type === "cd";
 
     els.historyTableWrap.innerHTML = `
         <table>
@@ -743,6 +743,7 @@ function renderHistoryTable(data) {
                 <tr>
                     ${data.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}
                     ${showCancel || showDelete ? `<th data-admin-only></th>` : ""}
+                    ${showReturnCd ? `<th data-staff-up></th>` : ""}
                 </tr>
             </thead>
             <tbody>
@@ -773,11 +774,41 @@ function renderHistoryTable(data) {
                                 >ลบ</button>
                             </td>
                         ` : ""}
+                        ${showReturnCd ? `
+                            <td data-staff-up>
+                                ${row.cpcd === true ? `<button type="button" class="danger-button compact"
+                                    data-return-cd-id="${escapeHtml(row.cdUsedId)}"
+                                    data-stock-processed="${row.stock === true}">เอา CD คืน</button>` : ""}
+                            </td>
+                        ` : ""}
                     </tr>
                 `).join("")}
             </tbody>
         </table>
     `;
+}
+
+async function returnCd(button) {
+    if (button.disabled || !state.selectedStudentId) return;
+    const studentId = state.selectedStudentId;
+    const cdUsedId = Number(button.dataset.returnCdId);
+    const stockProcessed = button.dataset.stockProcessed === "true";
+    if (!window.confirm(stockProcessed
+        ? "เอา CD คืนและยกเลิกรายการให้ CD นี้ใช่ไหม? ระบบจะคืนสต็อก 1 แผ่นด้วย"
+        : "เอา CD คืนและยกเลิกรายการให้ CD นี้ใช่ไหม? รายการนี้ยังไม่ตัดสต็อก จึงไม่เพิ่มสต็อก")) return;
+    button.disabled = true;
+    try {
+        const data = await requestJson(`/api/students/${encodeURIComponent(studentId)}/history/cd/${encodeURIComponent(cdUsedId)}`, { method: "DELETE" });
+        if (state.selectedStudentId === studentId) {
+            await loadProfile(studentId, { preferredEnrollmentId: state.selectedEnrollmentId });
+            await loadHistory();
+        }
+        setStatus(data.stockReturned ? "เอา CD คืนแล้ว และคืนสต็อก 1 แผ่น" : "เอา CD คืนแล้ว (ยังไม่ได้ตัดสต็อก)");
+    } catch (error) {
+        setStatus(error.message, "error");
+    } finally {
+        button.disabled = false;
+    }
 }
 
 async function cancelBilling(billingId) {
@@ -1108,6 +1139,11 @@ function bindEvents() {
         loadHistory().catch((error) => setStatus(error.message, "error"));
     });
     els.historyTableWrap.addEventListener("click", (event) => {
+        const returnCdButton = event.target.closest("[data-return-cd-id]");
+        if (returnCdButton) {
+            returnCd(returnCdButton);
+            return;
+        }
         const cancelButton = event.target.closest("[data-cancel-billing-id]");
 
         if (cancelButton) {

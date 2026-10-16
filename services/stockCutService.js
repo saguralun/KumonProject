@@ -208,6 +208,19 @@ export async function processPendingDates(type, dates) {
     try {
         await client.query("BEGIN");
 
+        // Lock the exact pending CD rows so returns and cuts cannot change stock twice.
+        let pendingParams = [normalizedDates];
+        let pendingCdFilter = "";
+        if (config.type === "cd") {
+            const pending = await client.query(`
+                SELECT cd_used_id FROM ${TABLE_SCHEMA}.cd_used
+                WHERE is_stock_processed = FALSE AND cd_date = ANY($1::date[])
+                ORDER BY cd_used_id FOR UPDATE
+            `, [normalizedDates]);
+            pendingParams = [normalizedDates, pending.rows.map((row) => row.cd_used_id)];
+            pendingCdFilter = "AND cd_used_id = ANY($2::int[])";
+        }
+
         // Real stock impact: only cpws=TRUE rows count toward the
         // INSERT/UPDATE-stock loop below.
         const itemsResult = await client.query(`
@@ -216,8 +229,9 @@ export async function processPendingDates(type, dates) {
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
               AND ${config.cpwsColumn} = TRUE
+              ${pendingCdFilter}
             GROUP BY ${config.masterFk}
-        `, [normalizedDates]);
+        `, pendingParams);
 
         // Whether there's anything pending at all on these dates — real
         // (cpws=TRUE) or "fake" (cpws=FALSE, per the owner: still shows
@@ -228,7 +242,8 @@ export async function processPendingDates(type, dates) {
             FROM ${TABLE_SCHEMA}.${config.usedTable}
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
-        `, [normalizedDates]);
+              ${pendingCdFilter}
+        `, pendingParams);
 
         if (!pendingCountResult.rows[0].pending_count) {
             throw httpError(404, "ไม่พบรายการที่ยังไม่ได้ตัด stock ในวันที่เลือก");
@@ -255,7 +270,8 @@ export async function processPendingDates(type, dates) {
             SET is_stock_processed = TRUE
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
-        `, [normalizedDates]);
+              ${pendingCdFilter}
+        `, pendingParams);
 
         await client.query("COMMIT");
 

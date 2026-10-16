@@ -1566,6 +1566,47 @@ export async function getStudentWsGraph({
     };
 }
 
+export async function returnStudentCd(studentId, cdUsedId) {
+    const normalizedStudentId = requiredInt(studentId, "Student ID");
+    const normalizedCdUsedId = requiredInt(cdUsedId, "CD Used ID");
+    const client = await pool.connect();
+    try {
+        await client.query("BEGIN");
+        const { rows } = await client.query(`
+            SELECT used.cd_used_id, used.cd_master_id, used.cpcd, used.is_stock_processed
+            FROM ${TABLE_SCHEMA}.cd_used used
+            JOIN ${TABLE_SCHEMA}.enrollment e ON e.enrollment_id = used.enrollment_id
+            WHERE used.cd_used_id = $1 AND e.student_id = $2
+            FOR UPDATE OF used
+        `, [normalizedCdUsedId, normalizedStudentId]);
+        const cd = rows[0];
+        if (!cd) throw httpError(404, "ไม่พบรายการ CD หรือรายการนี้ถูกคืนแล้ว");
+        if (cd.cpcd !== true) throw httpError(409, "รายการนี้ไม่ได้รับ CD จึงไม่สามารถคืนได้");
+
+        if (cd.is_stock_processed === true) {
+            const stockType = await client.query(`
+                SELECT stock_type_id FROM ${TABLE_SCHEMA}.stock_type_master WHERE stock_type_code = 'CD'
+            `);
+            if (!stockType.rows[0]) throw httpError(500, "ไม่พบ stock_type_master สำหรับ CD");
+            await client.query(`
+                INSERT INTO ${TABLE_SCHEMA}.stock (stock_type_id, master_id, quantity)
+                VALUES ($1, $2, 1)
+                ON CONFLICT (stock_type_id, master_id) DO UPDATE
+                    SET quantity = ${TABLE_SCHEMA}.stock.quantity + 1,
+                        updated_at = CURRENT_TIMESTAMP
+            `, [stockType.rows[0].stock_type_id, cd.cd_master_id]);
+        }
+        await client.query(`DELETE FROM ${TABLE_SCHEMA}.cd_used WHERE cd_used_id = $1`, [normalizedCdUsedId]);
+        await client.query("COMMIT");
+        return { cdUsedId: normalizedCdUsedId, stockReturned: cd.is_stock_processed === true };
+    } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
 export async function getStudentHistoryRows({
     studentId,
     type = "ws",
@@ -1624,9 +1665,12 @@ export async function getStudentHistoryRows({
             `
         },
         cd: {
+            idColumn: "cd_used_id",
+            idField: "cdUsedId",
             columns: ["date", "enrollment", "subject", "level", "cd", "cpcd", "stock"],
             sql: `
                 SELECT
+                    used.cd_used_id,
                     used.cd_date AS date,
                     used.enrollment_id AS enrollment,
                     subject.subject_code AS subject,

@@ -14,6 +14,7 @@ import {
     getStudentProfile,
     getStudentWsGraph,
     searchStudents,
+    returnStudentCd,
     updateEnrollment,
     updateStudent
 } from "../services/studentService.js";
@@ -189,6 +190,14 @@ router.post("/:studentId/enrollments/:enrollmentId/status-action", requireStaff,
                 req.body
             ))
         });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
+
+router.delete("/:studentId/history/cd/:cdUsedId", requireStaff, async (req, res) => {
+    try {
+        res.json({ success: true, ...(await returnStudentCd(req.params.studentId, req.params.cdUsedId)) });
     } catch (error) {
         sendError(res, error);
     }
