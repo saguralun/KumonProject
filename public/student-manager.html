@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/student-manager.css?v=20260922-status-color-tabs">
+  <link rel="stylesheet" href="/css/student-manager.css?v=20261019-ksis-preview">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
 </head>
 <body>
@@ -287,6 +287,16 @@
           <button type="button" class="modal-close" id="addStudentCancel" aria-label="Close">✕</button>
         </div>
         <div class="modal-message hidden" id="addStudentMessage"></div>
+
+        <section class="ksis-import" aria-label="นำเข้าข้อมูล KSIS">
+          <div class="ksis-import-toolbar">
+            <label><span>ลิงก์นักเรียน KSIS</span><input id="ksisStudentUrl" type="text" inputmode="url" autocomplete="off" placeholder="https://kao.ksis.kumon.com/kth/#/student/..."></label>
+            <button type="button" class="secondary-button" id="ksisPreviewButton">Preview</button>
+            <button type="button" class="secondary-button" id="ksisApplyButton" disabled>นำลงฟอร์ม</button>
+          </div>
+          <div class="ksis-import-status" id="ksisImportStatus" role="status"></div>
+          <div class="ksis-preview" id="ksisPreview"></div>
+        </section>
 
         <div class="add-section">
           <div class="section-label">ข้อมูลนักเรียน</div>

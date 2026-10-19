@@ -1,4 +1,5 @@
 import { bindFourDigitYearDateInputs } from "./dateInputYear.js";
+import { bindKsisImport, resetKsisImport } from "./studentKsisImport.js";
 import { closeWsGraphModal, loadWsGraph, openWsGraphModal, updateWsGraphButtonVisibility } from "./studentWsGraph.js";
 import {
     bindSelectAllInput,
@@ -92,6 +93,11 @@ export const els = {
     addStudentClose: document.getElementById("addStudentClose"),
     addStudentSave: document.getElementById("addStudentSave"),
     addStudentMessage: document.getElementById("addStudentMessage"),
+    ksisStudentUrl: document.getElementById("ksisStudentUrl"),
+    ksisPreviewButton: document.getElementById("ksisPreviewButton"),
+    ksisApplyButton: document.getElementById("ksisApplyButton"),
+    ksisImportStatus: document.getElementById("ksisImportStatus"),
+    ksisPreview: document.getElementById("ksisPreview"),
     copyAddressSearch: document.getElementById("copyAddressSearch"),
     copyAddressSearchButton: document.getElementById("copyAddressSearchButton"),
     copyAddressSummary: document.getElementById("copyAddressSummary"),
@@ -395,6 +401,7 @@ function openAddStudentModal() {
     state.addStudentValidationActive = false;
     state.addStudentDuplicate = null;
     resetCopyAddressTool();
+    resetKsisImport();
     setFormValue(form, "prefixId", state.masters.prefixes[0]?.id || "");
     updateAddStudentGenderFromPrefix();
     updateAddStudentAddressHints();
@@ -404,6 +411,7 @@ function openAddStudentModal() {
 }
 
 function closeAddStudentModal() {
+    resetKsisImport();
     els.addStudentModal.classList.add("hidden");
     state.addStudentValidationActive = false;
     state.addStudentDuplicate = null;
@@ -1192,6 +1200,7 @@ async function init() {
         state.masters = data.masters;
         fillMasterSelects();
         bindEvents();
+        bindKsisImport();
         await loadStudents();
         const firstStudent = state.students[0];
 

@@ -19,10 +19,24 @@ import {
     updateStudent
 } from "../services/studentService.js";
 import { requireAdmin, requireStaff } from "../middleware/auth.js";
+import { previewKsisStudent } from "../services/ksisStudentService.js";
 
 const router = express.Router();
 
 const sendError = createSendError("Unexpected student manager error");
+
+router.post("/ksis/preview", requireStaff, async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const address = req.socket.remoteAddress;
+    if (!["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address)) {
+        return res.status(403).json({ success: false, error: "กรุณาใช้ฟังก์ชัน KSIS ผ่าน localhost บนเครื่องที่รัน KumonDB เพื่อเข้าสู่ระบบใน Chrome ของเครื่องนั้น" });
+    }
+    try {
+        res.json({ success: true, ...(await previewKsisStudent({ url: req.body?.url, userId: req.session.user.userId })) });
+    } catch (error) {
+        sendError(res, error);
+    }
+});
 
 router.get("/masters", async (req, res) => {
     try {
