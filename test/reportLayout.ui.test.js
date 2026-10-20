@@ -32,6 +32,7 @@ test("Report B subject tabs, 20-person pages and period invalidation work on des
       const url = new URL(route.request().url());
       const data = url.pathname === "/api/auth/me" ? { user: { role: "admin", displayName: "UI Test" }, permissions: ["*"] }
         : url.pathname === "/api/report/monthly" ? { success: true, columns: ["ID", "Subject", "Status1"], rows }
+          : url.pathname === "/api/report/level-summary" ? { success: true, subjects: ["ME", "EFL", "TRP"].map((subject) => ({ subject, total: 1, rows: [{ level: "A", count: 1 }] })) }
           : { success: true, rows: [] };
       await route.fulfill({ contentType: "application/json", body: JSON.stringify(data) });
     });
@@ -69,6 +70,18 @@ test("Report B subject tabs, 20-person pages and period invalidation work on des
     }
     await page.setViewportSize({ width: 1720, height: 1040 });
     await page.screenshot({ path: path.join(os.tmpdir(), "kumondb-report-b-desktop.png"), fullPage: true });
+    await page.locator("#levelSummaryButton").click();
+    await page.locator("#levelSummaryTables table").first().waitFor();
+    assert.equal(await page.locator("#levelSummary").isVisible(), true);
+    for (const selector of ["#reportTableWrap", "#subjectTabs", "#status1Summary", ".report-pagination", "#exportButton"]) {
+      assert.equal(await page.locator(selector).isVisible(), false);
+    }
+    await page.screenshot({ path: path.join(os.tmpdir(), "kumondb-report-summary-only.png"), fullPage: true });
+    await page.locator("#generateButton").click();
+    await page.locator(".report-table").waitFor();
+    assert.equal(await page.locator("#levelSummary").isVisible(), false);
+    assert.equal(await page.locator("#reportTableWrap").isVisible(), true);
+    assert.equal(await page.locator(".report-pagination").isVisible(), true);
     await page.locator("#nextPage").click();
     assert.match(await page.locator("#pageRange").textContent(), /21–40/);
     await page.locator("#nextPage").click();

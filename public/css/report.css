@@ -468,9 +468,9 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .level-summary {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
   min-height: 0;
-  max-height: 65%;
+  max-height: none;
   overflow: auto;
   padding-bottom: 14px;
 }

@@ -48,10 +48,28 @@ const state = {
   subject: "ME",
   page: 1,
   period: null,
-  reportRequest: 0
+  reportRequest: 0,
+  view: "report"
 };
 
 const setStatus = createStatusSetter(els.statusLine);
+
+function setReportView(view) {
+  state.view = view;
+  document.querySelectorAll("[data-report-view]").forEach((element) => {
+    element.classList.toggle("hidden", element.dataset.reportView !== view);
+  });
+  els.levelSummary.classList.toggle("hidden", view !== "summary");
+  document.querySelector(".page-title").textContent = view === "summary" ? "สรุปนักเรียนตามเลเวล" : "Report B";
+  if (view === "report") {
+    state.levelSummaryRequest++;
+    els.levelSummaryButton.disabled = false;
+    fitReportRows();
+  } else {
+    state.reportRequest++;
+    els.generateButton.disabled = false;
+  }
+}
 
 function monthName(month) {
   return [
@@ -194,6 +212,7 @@ function renderStatus1Summary() {
 }
 
 async function generateReport() {
+  setReportView("report");
   const requestId = ++state.reportRequest;
   const month = Number(els.reportMonth.value);
   const year = Number(els.reportYear.value);
@@ -307,13 +326,13 @@ async function exportEventSummary() {
 
 els.generateButton.addEventListener("click", generateReport);
 async function generateLevelSummary() {
+  setReportView("summary");
   const requestId = ++state.levelSummaryRequest;
   const month = Number(els.reportMonth.value);
   const year = Number(els.reportYear.value);
   state.levelSummary = null;
   els.levelSummaryButton.disabled = true;
   els.exportLevelSummaryButton.disabled = true;
-  els.levelSummary.classList.remove("hidden");
   els.levelSummaryTables.innerHTML = '<div class="empty-state">กำลังโหลด...</div>';
   els.levelSummarySubtitle.textContent = `${monthName(month)} ${year} • นักเรียน Active ตามเลเวลปัจจุบัน`;
   setStatus("กำลังสรุปนักเรียนตามเลเวล...");
@@ -336,7 +355,7 @@ async function generateLevelSummary() {
     els.levelSummaryTables.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     setStatus(error.message, "error");
   } finally {
-    els.levelSummaryButton.disabled = false;
+    if (requestId === state.levelSummaryRequest) els.levelSummaryButton.disabled = false;
   }
 }
 
@@ -392,7 +411,9 @@ for (const input of [els.reportMonth, els.reportYear]) {
     renderTable();
     state.levelSummary = null;
     state.levelSummaryRequest += 1;
-    els.levelSummary.classList.add("hidden");
+    els.levelSummaryButton.disabled = false;
+    els.levelSummaryTables.innerHTML = '<div class="empty-state">เลือกเดือน/ปี แล้วกดสรุปนักเรียนตามเลเวล</div>';
+    els.levelSummarySubtitle.textContent = "";
     els.exportLevelSummaryButton.disabled = true;
   });
 }
@@ -414,6 +435,7 @@ function init() {
   setupMonthSelect();
   setDefaultPeriod();
   renderTable();
+  setReportView("report");
   new ResizeObserver(fitReportRows).observe(els.reportTableWrap);
   const menu = document.getElementById("reportMenuButton");
   const closeMenu = () => {
@@ -427,6 +449,7 @@ function init() {
   document.getElementById("reportMenuBackdrop").addEventListener("click", closeMenu);
   document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
   els.generateButton.addEventListener("click", closeMenu);
+  els.levelSummaryButton.addEventListener("click", closeMenu);
 }
 
 init();

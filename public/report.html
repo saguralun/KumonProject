@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/report.css?v=20261020-report-grid">
+  <link rel="stylesheet" href="/css/report.css?v=20261020-exclusive-views">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
 </head>
 <body>
@@ -67,7 +67,7 @@
           <input id="reportYear" type="number" min="2000" max="2600" step="1">
         </label>
         <button type="button" class="primary-button" id="generateButton">📊 สร้างรายงาน</button>
-        <button type="button" class="secondary-button" id="exportButton" disabled>⬇️ Export CSV</button>
+        <button type="button" class="secondary-button" id="exportButton" data-report-view="report" disabled>⬇️ Export CSV</button>
         <button type="button" class="secondary-button" id="exportEventSummaryButton">📋 Export สรุป N/EO/R/IT/Absent</button>
         <button type="button" class="secondary-button" id="levelSummaryButton">สรุปนักเรียนตามเลเวล</button>
       </section>
@@ -86,11 +86,11 @@
       </header>
 
       <section class="panel report-table-panel">
-        <div class="panel-header">
+        <div class="panel-header" data-report-view="report">
           <div class="subject-tabs" id="subjectTabs" role="tablist" aria-label="รายวิชา"></div>
           <div class="subtle" id="resultSubtitle">เลือกเดือน/ปี แล้วกดสร้างรายงาน</div>
         </div>
-        <div class="status1-summary" id="status1Summary"></div>
+        <div class="status1-summary" id="status1Summary" data-report-view="report"></div>
         <section class="level-summary hidden" id="levelSummary">
           <div class="panel-header">
             <div>
@@ -101,10 +101,10 @@
           </div>
           <div class="level-summary-tables" id="levelSummaryTables"></div>
         </section>
-        <div class="report-table-wrap" id="reportTableWrap">
+        <div class="report-table-wrap" id="reportTableWrap" data-report-view="report">
           <div class="empty-state">ยังไม่มีรายงาน</div>
         </div>
-        <footer class="report-pagination" aria-label="เปลี่ยนหน้ารายงาน">
+        <footer class="report-pagination" data-report-view="report" aria-label="เปลี่ยนหน้ารายงาน">
           <span id="pageRange">0 คน</span>
           <div class="page-controls">
             <button type="button" id="previousPage" title="หน้าก่อนหน้า" aria-label="หน้าก่อนหน้า" disabled>‹</button>
@@ -125,6 +125,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script type="module" src="/js/report.js?v=20261020-fit-20"></script>
+  <script type="module" src="/js/report.js?v=20261020-exclusive-views"></script>
 </body>
 </html>
