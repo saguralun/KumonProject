@@ -12,8 +12,7 @@ export function ksisProfileDirectory(userId) {
     return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), ".local", "share"), "KumonDB", "ksis", project, String(userId));
 }
 
-export async function previewKsisStudent({ url, userId }) {
-    const sourceUrl = normalizeKsisStudentUrl(url);
+export async function withKsisPage({ sourceUrl, userId }, action) {
     if (!Number.isSafeInteger(Number(userId)) || Number(userId) < 1) throw httpError(401, "กรุณาเข้าสู่ระบบด้วยบัญชีผู้ใช้");
     const key = Number(userId);
     let session = sessions.get(key);
@@ -42,16 +41,23 @@ export async function previewKsisStudent({ url, userId }) {
             await page.goto("about:blank");
             await page.goto(sourceUrl, { waitUntil: "domcontentloaded", timeout: 25000 });
         }
-        await page.waitForFunction(() => location.hash.includes("/login")
-            || Boolean(document.getElementById("firstName")?.value && document.getElementById("lastName")?.value), { }, { timeout: 15000 });
-        if (page.url().includes("/login")) return { requiresLogin: true, sourceUrl };
-        if (normalizeKsisStudentUrl(page.url()) !== sourceUrl) throw httpError(409, "หน้า KSIS เปลี่ยนไป กรุณาลองอ่านลิงก์นักเรียนอีกครั้ง");
-        const student = normalizeKsisStudentData(await page.evaluate(readKsisStudentDocument));
-        return { requiresLogin: false, sourceUrl, student };
+        return await action(page);
     } catch (error) {
         if (error.statusCode) throw error;
         throw httpError(502, "อ่านข้อมูล KSIS ไม่สำเร็จ กรุณาตรวจการเชื่อมต่อ และรอให้หน้าข้อมูลนักเรียนโหลดครบก่อนลองใหม่");
     } finally {
         session.busy = false;
     }
+}
+
+export async function previewKsisStudent({ url, userId }) {
+    const sourceUrl = normalizeKsisStudentUrl(url);
+    return withKsisPage({ sourceUrl, userId }, async (page) => {
+        await page.waitForFunction(() => location.hash.includes("/login")
+            || Boolean(document.getElementById("firstName")?.value && document.getElementById("lastName")?.value), {}, { timeout: 15000 });
+        if (page.url().includes("/login")) return { requiresLogin: true, sourceUrl };
+        if (normalizeKsisStudentUrl(page.url()) !== sourceUrl) throw httpError(409, "หน้า KSIS เปลี่ยนไป กรุณาลองอ่านลิงก์นักเรียนอีกครั้ง");
+        const student = normalizeKsisStudentData(await page.evaluate(readKsisStudentDocument));
+        return { requiresLogin: false, sourceUrl, student };
+    });
 }

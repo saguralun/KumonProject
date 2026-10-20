@@ -7,6 +7,7 @@ import {
     statusFromIssueCounts
 } from "./migrationPreviewCommon.js";
 import { readSourceRecords } from "./migrationImportCommon.js";
+import { normalizeKumonStudentId } from "../services/kumonStudentId.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1198,7 +1199,7 @@ function buildEnrollmentPreview(enrollment, masters, issues, warnings, blockingR
         student_name: `${enrollment.firstName} ${enrollment.lastName}`,
         subject_id: subject?.subject_id || null,
         subject_code: subject?.subject_code || clean(enrollment.subjectCode) || null,
-        kumon_student_id: nullable(enrollment.record.IDKumonStudent),
+        kumon_student_id: nullable(normalizeKumonStudentId(enrollment.record.IDKumonStudent)),
         current_level_master_id: currentLevel.id,
         current_level_code: currentLevel.code,
         current_zun_level_master_id: zunLevel.id,

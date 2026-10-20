@@ -1,6 +1,7 @@
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
+import { normalizeKumonStudentId } from "./kumonStudentId.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
@@ -293,7 +294,7 @@ function requireStudentCreateFields(data) {
 function enrollmentPayload(payload) {
     return {
         subjectId: requiredInt(payload.subjectId, "วิชา"),
-        kumonStudentId: nullableText(payload.kumonStudentId),
+        kumonStudentId: nullableText(normalizeKumonStudentId(payload.kumonStudentId)),
         isKumonConnect: normalizeBoolean(payload.isKumonConnect),
         currentLevelMasterId: optionalPositiveInt(payload.currentLevelMasterId),
         currentZunLevelMasterId: nullableInt(payload.currentZunLevelMasterId),

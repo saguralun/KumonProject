@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/report.css?v=20261020-exclusive-views">
+  <link rel="stylesheet" href="/css/report.css?v=20261020-ksis-matching">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
 </head>
 <body>
@@ -70,6 +70,7 @@
         <button type="button" class="secondary-button" id="exportButton" data-report-view="report" disabled>⬇️ Export CSV</button>
         <button type="button" class="secondary-button" id="exportEventSummaryButton">📋 Export สรุป N/EO/R/IT/Absent</button>
         <button type="button" class="secondary-button" id="levelSummaryButton">สรุปนักเรียนตามเลเวล</button>
+        <button type="button" class="secondary-button" id="ksisMatchingButton" data-staff-up>จับคู่รหัสคุมอง</button>
       </section>
 
       <div class="auth-bar" id="authBar"></div>
@@ -86,6 +87,25 @@
       </header>
 
       <section class="panel report-table-panel">
+        <section class="ksis-matching hidden" id="ksisMatching" data-report-view="matching">
+          <div class="matching-toolbar">
+            <button type="button" class="secondary-button" id="ksisReadRoster">อ่านรายชื่อ KSIS ทุกหน้า</button>
+            <button type="button" class="secondary-button" id="ksisSelectExact" disabled>เลือกคู่ที่ตรงแน่นอน</button>
+            <button type="button" class="primary-button" id="ksisConfirmMatches" disabled>ยืนยันรหัสที่เลือก</button>
+          </div>
+          <div class="subtle" id="ksisMatchingSource" role="status">ยังไม่ได้อ่านรายชื่อ</div>
+          <div class="matching-filters">
+            <label>รายการ<select id="ksisMatchFilter"><option value="all">ทั้งหมด</option><option value="exact">ตรงแน่นอน</option><option value="review">วันเกิดต่างกัน</option><option value="ambiguous">พบหลายคู่</option><option value="conflict">รหัสขัดแย้ง</option><option value="unmatched">ไม่พบคู่</option><option value="invalid">ข้อมูลไม่ครบ</option><option value="matched">มีรหัสตรงแล้ว</option></select></label>
+            <label>ค้นหา<input id="ksisMatchSearch" type="search" placeholder="ชื่อ / รหัสคุมอง"></label>
+            <span id="ksisMatchCount" role="status"></span>
+          </div>
+          <div class="matching-table-wrap" id="ksisMatchRows"><div class="empty-state">ยังไม่มีรายการจับคู่</div></div>
+          <dialog id="ksisMatchConfirmDialog" class="matching-dialog">
+            <h2>ยืนยันบันทึกรหัสคุมอง</h2><p id="ksisMatchConfirmText"></p>
+            <p>บันทึกเฉพาะรหัสคุมองในรายวิชาของเด็กที่เลือก ไม่เปลี่ยน Student ID หรือ Enrollment ID และไม่บันทึกข้อมูลลง KSIS</p>
+            <div class="matching-toolbar"><button type="button" class="secondary-button" id="ksisCancelConfirm">ยกเลิก</button><button type="button" class="primary-button" id="ksisSaveConfirm">ยืนยันบันทึก</button></div>
+          </dialog>
+        </section>
         <div class="panel-header" data-report-view="report">
           <div class="subject-tabs" id="subjectTabs" role="tablist" aria-label="รายวิชา"></div>
           <div class="subtle" id="resultSubtitle">เลือกเดือน/ปี แล้วกดสร้างรายงาน</div>
@@ -125,6 +145,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script type="module" src="/js/report.js?v=20261020-exclusive-views"></script>
+  <script type="module" src="/js/report.js?v=20261020-ksis-matching"></script>
 </body>
 </html>

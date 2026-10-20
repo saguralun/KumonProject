@@ -139,6 +139,28 @@ button:disabled {
   display: none !important;
 }
 
+.ksis-matching { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 0; gap: 10px; }
+.matching-toolbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.matching-toolbar button { min-height: 34px; }
+.matching-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; font-size: 12px; }
+.matching-filters label { display: grid; gap: 4px; }
+.matching-filters select, .matching-filters input { height: 32px; border: 1px solid #bcc9d9; border-radius: 4px; padding: 4px 8px; }
+.matching-table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.matching-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.matching-table th, .matching-table td { border-bottom: 1px solid #d8e2ee; padding: 8px; text-align: left; }
+.matching-table th { position: sticky; top: 0; background: #edf2f7; z-index: 1; }
+.matching-table td:first-child { width: 42px; }
+.matching-table td:nth-child(3) { white-space: nowrap; }
+.matching-table input[type="checkbox"] { width: 17px; height: 17px; min-height: 0 !important; accent-color: #059669; }
+.matching-table select { width: 100%; max-width: 390px; min-width: 220px; font-size: 12px; }
+.match-state { display: inline-block; border-radius: 4px; padding: 3px 6px; background: #f1f5f9; white-space: nowrap; }
+.match-exact, .match-matched { background: #e7f8ef; color: #047857; }
+.match-review, .match-ambiguous { background: #fff4db; color: #92400e; }
+.match-conflict, .match-invalid { background: #fff1f2; color: #b91c1c; }
+.matching-dialog { max-width: min(520px, calc(100vw - 32px)); border: 1px solid #bcc9d9; border-radius: 8px; padding: 20px; font-size: 14px; }
+.matching-dialog h2 { font-size: 18px; margin-top: 0; }
+.matching-dialog::backdrop { background: #0006; }
+
 .filter-panel {
   display: grid;
   gap: 11px;

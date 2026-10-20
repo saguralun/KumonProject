@@ -20,10 +20,32 @@ import {
 } from "../services/studentService.js";
 import { requireAdmin, requireStaff } from "../middleware/auth.js";
 import { previewKsisStudent } from "../services/ksisStudentService.js";
+import { readKsisReportRoster } from "../services/ksisRosterService.js";
+import { createKsisMatchingPreview, saveKsisMatchingPreview } from "../services/ksisMatchingService.js";
 
 const router = express.Router();
 
 const sendError = createSendError("Unexpected student manager error");
+
+router.post("/ksis/matching/preview", requireStaff, async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    if (!["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress)) {
+        return res.status(403).json({ success: false, error: "กรุณาเปิดผ่าน localhost บนเครื่องที่รัน KumonDB เพื่อเข้าสู่ระบบ KSIS ใน Chrome" });
+    }
+    try {
+        const userId = req.session.user.userId;
+        const roster = await readKsisReportRoster({ userId });
+        res.json({ success: true, ...(roster.requiresLogin ? roster : await createKsisMatchingPreview({ roster, userId })) });
+    } catch (error) { sendError(res, error); }
+});
+
+router.post("/ksis/matching/confirm", requireStaff, async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    try {
+        res.json({ success: true, ...(await saveKsisMatchingPreview({ previewId: req.body?.previewId,
+            selections: req.body?.selections, userId: req.session.user.userId })) });
+    } catch (error) { sendError(res, error); }
+});
 
 router.post("/ksis/preview", requireStaff, async (req, res) => {
     res.set("Cache-Control", "no-store");
