@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/report.css?v=20261002-level-summary">
+  <link rel="stylesheet" href="/css/report.css?v=20261020-report-grid">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
 </head>
 <body>
@@ -77,16 +77,17 @@
 
     <section class="report-workspace">
       <header class="topbar">
+        <button type="button" class="report-mobile-menu" id="reportMenuButton" aria-label="เปิดเมนู" title="เปิดเมนู" aria-expanded="false">☰</button>
         <div>
-          <div class="page-title">Monthly Report</div>
-          <div class="subtle">รายชื่อ enrollment ที่ถูกออกบิล (จ่ายเงินแล้ว) หรือมี status event (N/IT/EO/R/A/OT/CP) ในเดือนที่เลือก</div>
+          <div class="page-title">Report B</div>
+          <div class="subtle">รายงานนักเรียนรายเดือน</div>
         </div>
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
 
       <section class="panel report-table-panel">
         <div class="panel-header">
-          <div class="panel-title">ผลลัพธ์</div>
+          <div class="subject-tabs" id="subjectTabs" role="tablist" aria-label="รายวิชา"></div>
           <div class="subtle" id="resultSubtitle">เลือกเดือน/ปี แล้วกดสร้างรายงาน</div>
         </div>
         <div class="status1-summary" id="status1Summary"></div>
@@ -103,8 +104,19 @@
         <div class="report-table-wrap" id="reportTableWrap">
           <div class="empty-state">ยังไม่มีรายงาน</div>
         </div>
+        <footer class="report-pagination" aria-label="เปลี่ยนหน้ารายงาน">
+          <span id="pageRange">0 คน</span>
+          <div class="page-controls">
+            <button type="button" id="previousPage" title="หน้าก่อนหน้า" aria-label="หน้าก่อนหน้า" disabled>‹</button>
+            <label for="pageNumber">หน้า</label><input id="pageNumber" type="number" min="1" step="1" value="1" aria-label="หน้ารายงาน" disabled>
+            <span id="pageTotal">/ 1</span>
+            <button type="button" id="nextPage" title="หน้าถัดไป" aria-label="หน้าถัดไป" disabled>›</button>
+          </div>
+          <span>20 คน / หน้า</span>
+        </footer>
       </section>
     </section>
+    <button type="button" id="reportMenuBackdrop" class="report-menu-backdrop" aria-label="ปิดเมนู"></button>
   </main>
 
   <script src="/js/authClient.js?v=20261016-verified-restart"></script>
@@ -113,6 +125,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/report.js?v=20261002-active-current-level"></script>
+  <script type="module" src="/js/report.js?v=20261020-fit-20"></script>
 </body>
 </html>

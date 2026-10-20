@@ -1,3 +1,5 @@
+import { REPORT_SUBJECTS, subjectReportRows, reportPage, renderReportTable } from "./reportLayout.js";
+
 const els = {
   reportMonth: document.getElementById("reportMonth"),
   reportYear: document.getElementById("reportYear"),
@@ -12,7 +14,13 @@ const els = {
   statusLine: document.getElementById("statusLine"),
   resultSubtitle: document.getElementById("resultSubtitle"),
   status1Summary: document.getElementById("status1Summary"),
-  reportTableWrap: document.getElementById("reportTableWrap")
+  reportTableWrap: document.getElementById("reportTableWrap"),
+  subjectTabs: document.getElementById("subjectTabs"),
+  previousPage: document.getElementById("previousPage"),
+  nextPage: document.getElementById("nextPage"),
+  pageNumber: document.getElementById("pageNumber"),
+  pageTotal: document.getElementById("pageTotal"),
+  pageRange: document.getElementById("pageRange")
 };
 
 // Same codes/labels as the Statistics page (public/js/statistics.js) —
@@ -30,15 +38,17 @@ const STATUS1_LABELS = {
   C: "Continue"
 };
 
-// เข้า (in) group first, then เรียนต่อ (continue), then ออก (out) — same
-// framing as the Statistics page's zones.
-const STATUS1_ORDER = ["N", "IT", "EO", "R", "C", "A", "OT", "CP"];
+const STATUS1_ORDER = ["A", "OT", "C", "N", "R", "EO", "IT", "CP"];
 
 const state = {
   columns: [],
   rows: [],
   levelSummary: null,
-  levelSummaryRequest: 0
+  levelSummaryRequest: 0,
+  subject: "ME",
+  page: 1,
+  period: null,
+  reportRequest: 0
 };
 
 const setStatus = createStatusSetter(els.statusLine);
@@ -92,23 +102,33 @@ function csvCell(value) {
 }
 
 function renderTable() {
-  if (!state.rows.length) {
-    els.reportTableWrap.innerHTML = `<div class="empty-state">ไม่พบข้อมูลในเดือน/ปีนี้</div>`;
-    return;
-  }
+  const rows = subjectReportRows(state.rows, state.subject);
+  const page = reportPage(rows, state.page);
+  state.page = page.page;
+  els.subjectTabs.innerHTML = REPORT_SUBJECTS.map((subject) => `<button type="button" role="tab"
+    aria-selected="${subject === state.subject}" data-subject="${subject}">${subject}<span>${state.rows.filter((row) => row.Subject === subject).length}</span></button>`).join("");
+  els.reportTableWrap.innerHTML = page.total ? renderReportTable(page.rows, escapeHtml)
+    : `<div class="empty-state">${state.period ? "ไม่พบข้อมูลวิชานี้ในเดือน/ปีที่เลือก" : "เลือกเดือน/ปี แล้วกดสร้างรายงาน"}</div>`;
+  els.pageNumber.value = String(page.page);
+  els.pageNumber.max = String(page.pages);
+  els.pageNumber.disabled = !page.total;
+  els.pageTotal.textContent = `/ ${page.pages}`;
+  els.previousPage.disabled = page.page <= 1 || !page.total;
+  els.nextPage.disabled = page.page >= page.pages || !page.total;
+  els.pageRange.textContent = page.total ? `${page.start + 1}–${page.start + page.rows.length} จาก ${page.total} คน` : "0 คน";
+  els.resultSubtitle.textContent = state.period ? `${monthName(state.period.month)} ${state.period.year} • ${state.subject} • ${page.total} คน` : "ยังไม่มีรายงาน";
+  els.reportTableWrap.scrollTop = 0;
+  renderStatus1Summary();
+  fitReportRows();
+}
 
-  els.reportTableWrap.innerHTML = `
-    <table class="report-table">
-      <thead>
-        <tr>${state.columns.map((col) => `<th>${escapeHtml(col)}</th>`).join("")}</tr>
-      </thead>
-      <tbody>
-        ${state.rows.map((row) => `
-          <tr>${state.columns.map((col) => `<td>${escapeHtml(row[col])}</td>`).join("")}</tr>
-        `).join("")}
-      </tbody>
-    </table>
-  `;
+function fitReportRows() {
+  const table = els.reportTableWrap.querySelector(".report-table");
+  if (!table) return;
+  // Reserve 20 equal slots on short final pages too; never stretch five people across the screen.
+  const available = els.reportTableWrap.clientHeight - table.tHead.getBoundingClientRect().height - 2;
+  const denseRows = [...table.tBodies[0].rows].filter((row) => [...row.cells].some((cell) => cell.children.length > 2)).length;
+  table.style.setProperty("--report-row-height", `${Math.max(23, (available - denseRows * 12) / 20)}px`);
 }
 
 function status1Group(code) {
@@ -128,14 +148,15 @@ function status1Group(code) {
 }
 
 function renderStatus1Summary() {
-  if (!state.rows.length) {
+  const rows = subjectReportRows(state.rows, state.subject);
+  if (!rows.length) {
     els.status1Summary.innerHTML = "";
     return;
   }
 
   const counts = new Map();
 
-  state.rows.forEach((row) => {
+  rows.forEach((row) => {
     const code = row.Status1 || "(ไม่มี)";
 
     counts.set(code, (counts.get(code) || 0) + 1);
@@ -161,7 +182,7 @@ function renderStatus1Summary() {
   });
 
   els.status1Summary.innerHTML = `
-    <span class="status1-summary-label">สรุป Status1 (${state.rows.length} รายการ):</span>
+    <span class="status1-summary-label">${state.subject} (${rows.length} คน):</span>
     ${codes.map((code) => `
       <span class="status1-chip status1-chip-${status1Group(code)}">
         <strong>${escapeHtml(code)}</strong>
@@ -173,10 +194,14 @@ function renderStatus1Summary() {
 }
 
 async function generateReport() {
+  const requestId = ++state.reportRequest;
   const month = Number(els.reportMonth.value);
   const year = Number(els.reportYear.value);
 
   els.generateButton.disabled = true;
+  state.rows = [];
+  state.period = null;
+  renderTable();
   els.exportButton.disabled = true;
   setStatus("กำลังสร้างรายงาน...");
   els.reportTableWrap.innerHTML = `<div class="empty-state">กำลังโหลด...</div>`;
@@ -184,19 +209,20 @@ async function generateReport() {
 
   try {
     const data = await requestJson(`/api/report/monthly?month=${month}&year=${year}`);
-
+    if (requestId !== state.reportRequest) return;
     state.columns = data.columns;
     state.rows = data.rows;
+    state.period = { month, year };
+    state.page = 1;
     renderTable();
-    renderStatus1Summary();
-    els.resultSubtitle.textContent = `${monthName(month)} ${year} • ${state.rows.length} รายการ`;
     els.exportButton.disabled = state.rows.length === 0;
     setStatus(`สร้างรายงานแล้ว (${state.rows.length} รายการ)`, state.rows.length ? "neutral" : "error");
   } catch (error) {
+    if (requestId !== state.reportRequest) return;
     els.reportTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     setStatus(error.message, "error");
   } finally {
-    els.generateButton.disabled = false;
+    if (requestId === state.reportRequest) els.generateButton.disabled = false;
   }
 }
 
@@ -205,11 +231,10 @@ function exportCsv() {
     return;
   }
 
-  const month = Number(els.reportMonth.value);
-  const year = Number(els.reportYear.value);
+  const { month, year } = state.period;
   const lines = [
     state.columns.map(csvCell).join(","),
-    ...state.rows.map((row) => state.columns.map((col) => csvCell(row[col])).join(","))
+    ...REPORT_SUBJECTS.flatMap((subject) => subjectReportRows(state.rows, subject)).map((row) => state.columns.map((col) => csvCell(row[col])).join(","))
   ];
   const blob = new Blob([`﻿${lines.join("\n")}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
@@ -358,6 +383,13 @@ els.levelSummaryButton.addEventListener("click", generateLevelSummary);
 els.exportLevelSummaryButton.addEventListener("click", exportLevelSummary);
 for (const input of [els.reportMonth, els.reportYear]) {
   input.addEventListener("change", () => {
+    state.reportRequest += 1;
+    state.rows = [];
+    state.period = null;
+    state.page = 1;
+    els.generateButton.disabled = false;
+    els.exportButton.disabled = true;
+    renderTable();
     state.levelSummary = null;
     state.levelSummaryRequest += 1;
     els.levelSummary.classList.add("hidden");
@@ -367,9 +399,34 @@ for (const input of [els.reportMonth, els.reportYear]) {
 els.exportButton.addEventListener("click", exportCsv);
 els.exportEventSummaryButton.addEventListener("click", exportEventSummary);
 
+els.subjectTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-subject]");
+  if (!button) return;
+  state.subject = button.dataset.subject;
+  state.page = 1;
+  renderTable();
+});
+els.previousPage.addEventListener("click", () => { state.page--; renderTable(); });
+els.nextPage.addEventListener("click", () => { state.page++; renderTable(); });
+els.pageNumber.addEventListener("change", () => { state.page = Math.trunc(Number(els.pageNumber.value)) || 1; renderTable(); });
+
 function init() {
   setupMonthSelect();
   setDefaultPeriod();
+  renderTable();
+  new ResizeObserver(fitReportRows).observe(els.reportTableWrap);
+  const menu = document.getElementById("reportMenuButton");
+  const closeMenu = () => {
+    document.querySelector(".report-page").classList.remove("report-menu-open");
+    menu.setAttribute("aria-expanded", "false");
+  };
+  menu.addEventListener("click", () => {
+    const open = document.querySelector(".report-page").classList.toggle("report-menu-open");
+    menu.setAttribute("aria-expanded", String(open));
+  });
+  document.getElementById("reportMenuBackdrop").addEventListener("click", closeMenu);
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeMenu(); });
+  els.generateButton.addEventListener("click", closeMenu);
 }
 
 init();
