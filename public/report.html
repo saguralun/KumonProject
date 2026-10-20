@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/report.css?v=20261020-ksis-matching">
+  <link rel="stylesheet" href="/css/report.css?v=20261020-at">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
 </head>
 <body>
@@ -71,6 +71,7 @@
         <button type="button" class="secondary-button" id="exportEventSummaryButton">📋 Export สรุป N/EO/R/IT/Absent</button>
         <button type="button" class="secondary-button" id="levelSummaryButton">สรุปนักเรียนตามเลเวล</button>
         <button type="button" class="secondary-button" id="ksisMatchingButton" data-staff-up>จับคู่รหัสคุมอง</button>
+        <button type="button" class="secondary-button" id="ksisDraftButton" data-staff-up>กรอก Report B ใน KSIS</button>
       </section>
 
       <div class="auth-bar" id="authBar"></div>
@@ -87,6 +88,21 @@
       </header>
 
       <section class="panel report-table-panel">
+        <section class="ksis-matching hidden" id="ksisDraft" data-report-view="draft">
+          <div class="matching-toolbar">
+            <label>วิชา<select id="ksisDraftSubject"><option value="ME">ME</option><option value="EFL">EFL</option><option value="TRP">TRP</option></select></label>
+            <button type="button" class="secondary-button" id="ksisDraftPreview">เตรียมข้อมูล / อ่านหน้า KSIS ปัจจุบัน</button>
+            <button type="button" class="primary-button" id="ksisDraftFill" disabled>กรอกโดยไม่บันทึกหลัก</button>
+            <button type="button" class="secondary-button hidden" id="ksisDraftAcknowledge">ตรวจและจัดการข้อมูลบน KSIS แล้ว</button>
+          </div>
+          <div id="ksisDraftSource" class="subtle" role="status">ยังไม่ได้เตรียมข้อมูล</div>
+          <div class="matching-table-wrap" id="ksisDraftRows"><div class="empty-state">ยังไม่มี Preview</div></div>
+          <dialog id="ksisDraftDialog" class="matching-dialog">
+            <h2>ยืนยันกรอก Report B</h2><p id="ksisDraftConfirmText"></p>
+            <p>กรอกระดับ หน้า WS ที่ใช้ ST1, Zun Zun และ AT (ติ๊กผ่าน) เฉพาะหน้าปัจจุบัน ไม่กรอก DT และไม่กดบันทึกหลักของ Report B</p>
+            <div class="matching-toolbar"><button type="button" id="ksisDraftCancel" class="secondary-button">ยกเลิก</button><button type="button" id="ksisDraftConfirm" class="primary-button">ยืนยันกรอก</button></div>
+          </dialog>
+        </section>
         <section class="ksis-matching hidden" id="ksisMatching" data-report-view="matching">
           <div class="matching-toolbar">
             <button type="button" class="secondary-button" id="ksisReadRoster">อ่านรายชื่อ KSIS ทุกหน้า</button>
@@ -145,6 +161,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script type="module" src="/js/report.js?v=20261020-ksis-matching"></script>
+  <script type="module" src="/js/report.js?v=20261020-at"></script>
 </body>
 </html>

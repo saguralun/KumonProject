@@ -25,7 +25,8 @@ test("Report B subject tabs, 20-person pages and period invalidation work on des
       "ชื่อจริง": `นักเรียน${String(index).padStart(2, "0")}`, "นามสกุล": "ทดสอบ", "วันเกิด": "01/01/2020", "วันที่สมัคร": "01/01/2026",
       StartLevel: "6A1", PrevLevel: "5A140", CurrentLevel: "5A160", WksUsed: 4,
       TestType: index === 2 ? "AT" : "", Score: index === 2 ? 71 : "", Time: index === 2 ? 28 : "",
-      TestType2: index === 2 ? "DT" : "", UsedZII: index === 4 ? 10 : 0
+      TestType2: index === 2 ? "DT" : "", UsedZI: index === 5 ? 2 : 0, ZIWorksheetNo: 30,
+      UsedZII: index === 5 ? 10 : 0, ZIIWorksheetNo: 100
     }));
     rows.push({ ...rows[0], ID: 99, Subject: "EFL", "ชื่อจริง": "ภาษาอังกฤษ" });
     await page.route("**/api/**", async (route) => {
@@ -43,7 +44,9 @@ test("Report B subject tabs, 20-person pages and period invalidation work on des
     assert.match(await page.locator("#pageRange").textContent(), /1–20.*45/);
     assert.equal(await page.locator("#previousPage").isDisabled(), true);
     assert.equal(await page.locator(".student-start").first().getAttribute("data-enrollment-id"), "1");
-    assert.equal(await page.locator(".report-table thead").innerText().then((value) => value.includes("ZunZun")), true);
+    assert.match(await page.locator(".report-table thead").innerText(), /Zun Zun/);
+    const zun = page.locator('[data-enrollment-id="6"] .report-zun');
+    assert.deepEqual(await zun.locator(".report-zun-grid").allTextContents(), ["ZI302", "ZII10010"]);
     const borders = await page.locator(".student-start").first().evaluate((row) => ({
       fine: getComputedStyle(row.cells[4]).borderRightColor,
       main: getComputedStyle(row.cells[5]).borderRightColor,
@@ -65,6 +68,8 @@ test("Report B subject tabs, 20-person pages and period invalidation work on des
         throw new Error(`${width}x${height}: ${JSON.stringify(dimensions)}: ${error.message}`);
       });
       assert.equal(await page.locator(".student-start").count(), 20);
+      assert.equal(await zun.locator(".report-zun-grid").evaluateAll((lines) => lines.every((line) =>
+        [...line.children].every((cell) => cell.scrollWidth <= cell.clientWidth + 1))), true);
       assert.equal(await page.locator(".student-start").last().evaluate((row) => row.getBoundingClientRect().bottom <= document.getElementById("reportTableWrap").getBoundingClientRect().bottom), true);
       await page.screenshot({ path: path.join(os.tmpdir(), `kumondb-report-b-fit-${width}.png`), fullPage: true });
     }

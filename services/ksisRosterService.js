@@ -13,8 +13,9 @@ export function readKsisRosterDocument() {
         page: Number(pager?.querySelector("li.active")?.textContent.trim() || 1),
         hasPrevious: Boolean(state("‹") && !state("‹").classList.contains("disabled")),
         hasNext: Boolean(state("›") && !state("›").classList.contains("disabled")),
-        context: Array.from(document.querySelectorAll("body *")).find((element) => element.children.length === 0
-            && element.textContent.includes("ชื่อศูนย์") && element.textContent.includes("ประจำเดือน"))?.textContent.trim() || "",
+        context: (document.querySelector(".container-header")?.textContent || Array.from(document.querySelectorAll("body *"))
+            .filter((element) => element.textContent.includes("ชื่อศูนย์") && element.textContent.includes("ประจำเดือน") && element.textContent.length < 250)
+            .at(-1)?.textContent || "").replace(/\s+/g, " ").trim(),
         rows: tables.map((table) => {
             const cells = table.rows[0]?.cells || [];
             return { fullName: cells[1]?.textContent.trim() || "", kumonId: cells[2]?.textContent.trim() || "", birthDate: cells[4]?.textContent.trim() || "" };

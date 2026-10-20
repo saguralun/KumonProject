@@ -31,14 +31,21 @@ test("Report B level parts handle number-prefixed and Roman levels", () => {
   assert.equal(reportDate(""), "");
 });
 
-test("Report B renders all tests, six CDs, both Zun totals, zero score and escaped names", () => {
+test("Report B renders all tests, six CDs, both Zun positions and totals, zero score and escaped names", () => {
   const row = record(1, "C", 1, '<script>bad</script>', { TestType: "AT", Score: 0, Time: 28, TestType2: "DT", LevelTest2: "III",
-    CD6: "A", Level6: 3, UsedZI: 2, UsedZII: 4 });
+    CD6: "A", Level6: 3, UsedZI: 2, UsedZII: 4, ZIWorksheetNo: 30, ZIIWorksheetNo: 50 });
   const html = renderReportTable([row], escape);
   assert.equal((html.match(/data-enrollment-id=/g) || []).length, 1);
   assert.ok(html.includes("CD A 3"));
-  assert.ok(html.includes("(Lvl ZI # Used 2)"));
-  assert.ok(html.includes("(Lvl ZII # Used 4)"));
+  assert.ok(html.includes("<span>ZI</span><span>30</span><span>2</span>"));
+  assert.ok(html.includes("<span>ZII</span><span>50</span><span>4</span>"));
   assert.ok(html.includes(">0</div>"));
   assert.ok(!html.includes("<script>"));
+});
+
+test("Report B leaves unused Zun blank and does not invent a missing position", () => {
+  const html = renderReportTable([record(1, "C", 1, "ก", { UsedZI: 2 }), record(2, "C", 1)], escape);
+  assert.ok(html.includes("<span>ZI</span><span>-</span><span>2</span>"));
+  assert.ok(html.includes('<td class="report-zun"></td>'));
+  assert.ok(!html.includes("<span>ZII</span>"));
 });

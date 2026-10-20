@@ -1,5 +1,6 @@
-import { REPORT_SUBJECTS, subjectReportRows, reportPage, renderReportTable } from "./reportLayout.js";
+import { REPORT_SUBJECTS, subjectReportRows, reportPage, renderReportTable } from "./reportLayout.js?v=20261020-zun-position";
 import { setupKsisMatching } from "./reportKsisMatching.js";
+import { setupKsisDraft } from "./reportKsisDraft.js?v=20261020-at";
 
 const els = {
   reportMonth: document.getElementById("reportMonth"),
@@ -61,7 +62,7 @@ function setReportView(view) {
     element.classList.toggle("hidden", element.dataset.reportView !== view);
   });
   els.levelSummary.classList.toggle("hidden", view !== "summary");
-  document.querySelector(".page-title").textContent = view === "summary" ? "สรุปนักเรียนตามเลเวล" : view === "matching" ? "จับคู่รหัสคุมอง" : "Report B";
+  document.querySelector(".page-title").textContent = view === "summary" ? "สรุปนักเรียนตามเลเวล" : view === "matching" ? "จับคู่รหัสคุมอง" : view === "draft" ? "กรอก Report B ใน KSIS" : "Report B";
   if (view === "report") {
     state.levelSummaryRequest++;
     els.levelSummaryButton.disabled = false;
@@ -69,7 +70,7 @@ function setReportView(view) {
   } else {
     state.reportRequest++;
     els.generateButton.disabled = false;
-    if (view === "matching") {
+    if (["matching", "draft"].includes(view)) {
       state.levelSummaryRequest++;
       els.levelSummaryButton.disabled = false;
     }
@@ -456,6 +457,8 @@ function init() {
   els.generateButton.addEventListener("click", closeMenu);
   els.levelSummaryButton.addEventListener("click", closeMenu);
   setupKsisMatching({ open: () => { setReportView("matching"); closeMenu(); }, setStatus });
+  setupKsisDraft({ open: () => { setReportView("draft"); closeMenu(); }, setStatus,
+    getPeriod: () => ({ month: Number(els.reportMonth.value), year: Number(els.reportYear.value) }) });
 }
 
 init();

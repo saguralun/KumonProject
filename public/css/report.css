@@ -153,6 +153,8 @@ button:disabled {
 .matching-table td:nth-child(3) { white-space: nowrap; }
 .matching-table input[type="checkbox"] { width: 17px; height: 17px; min-height: 0 !important; accent-color: #059669; }
 .matching-table select { width: 100%; max-width: 390px; min-width: 220px; font-size: 12px; }
+#ksisDraftRows .matching-table { min-width: 1100px; }
+#ksisDraftRows .matching-table td:first-child { width: 220px; }
 .match-state { display: inline-block; border-radius: 4px; padding: 3px 6px; background: #f1f5f9; white-space: nowrap; }
 .match-exact, .match-matched { background: #e7f8ef; color: #047857; }
 .match-review, .match-ambiguous { background: #fff4db; color: #92400e; }
@@ -613,6 +615,10 @@ html[data-role="staff"] [data-staff-up] {
 .report-table tbody tr:hover td { background: #eff6ff; }
 .report-table .student-start { height: var(--report-row-height, 30px); }
 .report-table .report-cell-line { min-height: 11px; line-height: 11px; white-space: nowrap; }
+.report-table .report-zun-grid { display: grid; grid-template-columns: 30px 1fr 1fr; text-align: center; }
+.report-table .report-zun-grid > span + span { border-left: 1px solid var(--report-grid-fine); }
+.report-table .report-zun-heading .report-zun-grid { border-top: 1px solid var(--report-grid-fine); font-weight: 400; }
+.report-table .report-zun-grid > span:first-child { font-weight: 700; }
 .report-table tbody td { font-size: 11px !important; height: auto; padding: 0 2px !important; line-height: 12px; }
 .report-table .student-name { line-height: 13px; }
 .report-table .report-cd, .report-table tbody .report-remark { font-size: 10px !important; }

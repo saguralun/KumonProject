@@ -811,7 +811,9 @@ async function loadWorksheetSummary(enrollmentIds, month, year) {
             wu.enrollment_id,
             COUNT(*) FILTER (WHERE lm.level_type = 1)::int AS wks_used,
             COUNT(*) FILTER (WHERE lm.level_code = 'ZI')::int AS used_zi,
-            COUNT(*) FILTER (WHERE lm.level_code = 'ZII')::int AS used_zii
+            COUNT(*) FILTER (WHERE lm.level_code = 'ZII')::int AS used_zii,
+            MAX(wm.worksheet_no) FILTER (WHERE lm.level_code = 'ZI') AS zi_packet_no,
+            MAX(wm.worksheet_no) FILTER (WHERE lm.level_code = 'ZII') AS zii_packet_no
         FROM ${TABLE_SCHEMA}.worksheet_used wu
         JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id = wu.worksheet_master_id
         JOIN ${TABLE_SCHEMA}.level_master lm ON lm.level_master_id = wm.level_master_id
@@ -837,8 +839,9 @@ async function loadWorksheetSummary(enrollmentIds, month, year) {
 //      queryIncompleteWorksheetStudents: a multi-day pattern saved in one
 //      sitting can carry a worksheet_date that's out of insertion order,
 //      including forward-dated ones, so date isn't a safe ordering here).
-//   2. Within that level, take the MAX actual_worksheet_no — the highest
-//      real packet done — rather than whichever row happened to be
+//   2. Within that level, take the MAX worksheet_master.worksheet_no — the highest
+//      packet done — rather than the daily sheet number (e.g. 86 belongs to packet 81).
+//      Do not use whichever row happened to be
 //      entered last within the level, matching how progress is supposed
 //      to only move forward. Not a single global MAX across the whole
 //      period/enrollment: a level change within the month (e.g. A161 on
@@ -858,7 +861,7 @@ async function loadWorksheetSummary(enrollmentIds, month, year) {
 // above) self-contained, so a fallback on one level can't get contaminated
 // by cpws=true rows sitting in a level the enrollment has since left.
 //
-// Displayed worksheet number is +9 off the actual one (capped at 200),
+// Displayed worksheet number is +9 off the packet start (capped at 200),
 // matching the "packet" display convention used everywhere else in the
 // app (e.g. worksheet.js's displayWorksheetNo) — e.g. actual 51 displays
 // as 60, the last sheet of that packet.
@@ -880,7 +883,7 @@ function levelPositionCte(monthParam, yearParam, extraWhere) {
             FROM (
                 SELECT
                     wu.enrollment_id,
-                    wu.actual_worksheet_no,
+                    wm.worksheet_no AS actual_worksheet_no,
                     wu.worksheet_used_id,
                     lm.level_code
                 FROM ${TABLE_SCHEMA}.worksheet_used wu
@@ -943,6 +946,13 @@ function displayWorksheetNo(actualWorksheetNo) {
     return actualWorksheetNo === null || actualWorksheetNo === undefined
         ? null
         : Math.min(MAIN_MAX_WORKSHEET_NO, Number(actualWorksheetNo) + PACKET_DISPLAY_OFFSET);
+}
+
+function displayZunWorksheetNo(packetNo) {
+    if (packetNo === null || packetNo === undefined) return null;
+    const packet = Number(packetNo);
+    return Number.isInteger(packet) && packet >= 1 && packet <= 91 && (packet - 1) % 10 === 0
+        ? packet + PACKET_DISPLAY_OFFSET : null;
 }
 
 // Status1/Status2 as they actually were for this report's month, not
@@ -1163,7 +1173,9 @@ export async function buildMonthlyReport({ month, year }) {
             Status1: status1Code,
             Status2: status2Code,
             UsedZI: ws ? ws.used_zi : 0,
-            UsedZII: ws ? ws.used_zii : 0
+            UsedZII: ws ? ws.used_zii : 0,
+            ZIWorksheetNo: displayZunWorksheetNo(ws?.zi_packet_no),
+            ZIIWorksheetNo: displayZunWorksheetNo(ws?.zii_packet_no)
         };
 
         for (let slot = 0; slot < 3; slot++) {
