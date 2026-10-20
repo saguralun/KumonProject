@@ -10,6 +10,29 @@ const document = () => ({ context: "ชื่อศูนย์ TEST ประ�
         level: field("C", ["C", "D"]), worksheet: field("80", ["80", "90", "100"]), used: field("0"), status: field("C", ["C", "A", "R", "OT"]) }] });
 const period = { month: 10, year: 2026 };
 
+test("All-subject draft plans ME, EFL and TRP separately for the same student", () => {
+    const doc = document();
+    doc.rows = ["ME", "EFL", "TRP"].map((subject) => ({ ...doc.rows[0], subject, key: `student-${subject}` }));
+    const records = ["TRP", "EFL", "ME", "OTHER"].map((Subject, index) => record({ ID: index + 1, Subject, WksUsed: index + 4 }));
+    const rows = planKsisReportDraft(records, doc, period, "ALL");
+    assert.deepEqual(rows.map((row) => row.subject), ["ME", "EFL", "TRP"]);
+    assert.deepEqual(rows.map((row) => row.desired.used), [6, 5, 4]);
+    assert.ok(rows.every((row) => row.ready));
+    for (const subject of ["ME", "EFL", "TRP"]) {
+        assert.deepEqual(planKsisReportDraft(records, doc, period, subject).map((row) => row.subject), [subject]);
+    }
+    assert.throws(() => planKsisReportDraft(records, doc, period, "OTHER"), { statusCode: 400 });
+});
+
+test("All-subject preview keeps invalid and off-page subjects isolated", () => {
+    const doc = document();
+    doc.rows.push({ ...doc.rows[0], subject: "EFL", key: "student-efl" });
+    const rows = planKsisReportDraft([record(), record({ ID: 2, Subject: "EFL", CurrentLevel: "C85" }), record({ ID: 3, Subject: "TRP" })], doc, period, "ALL");
+    assert.equal(rows[0].ready, true);
+    assert.equal(rows[1].ready, false);
+    assert.match(rows[2].reason, /ไม่อยู่ในหน้า/);
+});
+
 test("Zun ends at page 100 from packet 91 and never allows a main-level page 190", () => {
     assert.equal(planKsisReportDraft([record({ ZIIWorksheetNo: 100 })], document(), period, "ME")[0].ready, true);
     for (const page of [0, -10, 95, 110, 190, null]) {

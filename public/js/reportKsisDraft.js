@@ -5,6 +5,7 @@ export function setupKsisDraft({ open, setStatus, getPeriod }) {
   let preview = null, busy = false, pending = false, generation = 0;
   const call = (action, data) => requestJson(`/api/report/ksis-draft/${action}`, { method: "POST", body: JSON.stringify(data) });
   const text = (value) => escapeHtml(String(value ?? ""));
+  const subjectLabel = (value) => value === "ALL" ? "ทุกวิชา (ME / EFL / TRP)" : value;
   function buttons() {
     read.disabled = busy || pending; subject.disabled = busy || pending;
     fill.disabled = busy || pending || !preview?.rows.some((row) => row.ready);
@@ -18,7 +19,7 @@ export function setupKsisDraft({ open, setStatus, getPeriod }) {
       <td>${text(row.before.used.value)} → ${text(row.desired.used)}</td><td>${text(row.before.status.value)} → ${text(row.desired.status)}</td>
       <td>${row.desired.zun.map((zun) => `${text(zun.level)} ${text(zun.worksheet)} • ${text(zun.used)} ชุด`).join("<br>") || "—"}</td>
       <td>${(row.desired.at || []).map((test) => `${text(test.date?.split("-").reverse().join("/"))} • ${text(test.level)}<br>${text(test.time)} นาที • ${text(test.score)} คะแนน • G${text(test.group)} • ผ่าน`).join("<br>") || "—"}</td>
-      <td><span class="match-state ${row.ready ? "match-exact" : "match-conflict"}">${row.ready ? "พร้อมกรอก" : text(row.reason)}</span></td></tr>`).join("")}</tbody></table>` : '<div class="empty-state">ไม่มีข้อมูลตรงกับหน้า KSIS ปัจจุบัน</div>';
+      <td><span class="match-state ${row.ready ? "match-exact" : "match-conflict"}">${row.ready ? "พร้อมกรอก" : text(row.reason)}</span></td></tr>`).join("")}</tbody></table>` : `<div class="empty-state">${preview && !preview.rows.length ? "ไม่มีรายการใน Report ของเดือนและวิชาที่เลือก (รายชื่อมาจากบิลหรือประวัติสถานะของเดือนนั้น)" : "ไม่มีข้อมูลตรงกับหน้า KSIS ปัจจุบัน"}</div>`;
     buttons();
   }
   get("ksisDraftButton").addEventListener("click", open);
@@ -32,7 +33,7 @@ export function setupKsisDraft({ open, setStatus, getPeriod }) {
       if (requestId !== generation) return;
       if (data.requiresLogin) { source.textContent = "กรุณาเข้าสู่ระบบใน Chrome ที่โปรแกรมเปิด แล้วกดเตรียมข้อมูลอีกครั้ง"; return; }
       preview = data;
-      source.textContent = `${data.context} • หน้า ${data.page} • ${data.subject} • พร้อม ${data.rows.filter((row) => row.ready).length} รายวิชา • นอกหน้า ${data.rows.filter((row) => !row.before).length} รายการ • ยังไม่กรอก`;
+      source.textContent = `${data.context} • หน้า ${data.page} • ${subjectLabel(data.subject)} • พร้อม ${data.rows.filter((row) => row.ready).length} รายวิชา • นอกหน้า ${data.rows.filter((row) => !row.before).length} รายการ • ยังไม่กรอก`;
       setStatus("ตรวจ Preview ก่อนกรอก KSIS");
     } catch (error) { source.textContent = error.message; setStatus(error.message, "error"); }
     finally { busy = false; render(); }
@@ -42,7 +43,7 @@ export function setupKsisDraft({ open, setStatus, getPeriod }) {
   for (const id of ["reportMonth", "reportYear"]) get(id).addEventListener("change", invalidate);
   fill.addEventListener("click", () => {
     if (!preview || busy || pending) return;
-    get("ksisDraftConfirmText").textContent = `กรอก ${preview.rows.filter((row) => row.ready).length} รายวิชา • ${preview.subject} • ${preview.period.month}/${preview.period.year} • หน้า KSIS ${preview.page}`;
+    get("ksisDraftConfirmText").textContent = `กรอก ${preview.rows.filter((row) => row.ready).length} รายวิชา • ${subjectLabel(preview.subject)} • ${preview.period.month}/${preview.period.year} • หน้า KSIS ${preview.page}`;
     dialog.showModal();
   });
   get("ksisDraftCancel").addEventListener("click", () => dialog.close());

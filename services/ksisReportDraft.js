@@ -6,6 +6,7 @@ import { normalizeKsisBirthDate } from "./ksisStudentData.js";
 import { httpError } from "./httpError.js";
 
 const REPORT_URL = "https://kao.ksis.kumon.com/kth/#/reportbeditgrid";
+const REPORT_SUBJECTS = ["ME", "EFL", "TRP"];
 const previews = new Map();
 const hash = (data) => createHash("sha256").update(JSON.stringify(data)).digest("hex");
 const compactName = (value) => String(value || "").normalize("NFC").replace(/\s+/g, "");
@@ -47,13 +48,15 @@ export function ksisContextPeriod(context) {
 }
 
 export function planKsisReportDraft(records, document, period, subject) {
+    if (!["ALL", ...REPORT_SUBJECTS].includes(subject)) throw httpError(400, "กรุณาเลือกวิชาหรือทุกวิชา");
     const websitePeriod = ksisContextPeriod(document.context);
     if (!websitePeriod || websitePeriod.month !== Number(period.month) || websitePeriod.year !== Number(period.year)) throw httpError(409, "เดือน/ปีใน KSIS ไม่ตรงกับรายงาน หยุดไว้ก่อน ยังไม่กรอก");
     if (document.modalOpen) throw httpError(409, "กรุณาปิดหน้าต่างย่อยใน KSIS ก่อนอ่าน Preview");
     if (document.rows.some((row) => row.dirty)) throw httpError(409, "หน้า KSIS มีข้อมูลที่แก้ค้างอยู่ กรุณาจัดการข้อมูลเดิมก่อน ไม่เขียนทับ");
     const result = [];
     const keyFor = (code, subjectCode) => `${normalizeKumonStudentId(code)}:${subjectCode}`;
-    for (const record of records.filter((row) => row.Subject === subject)) {
+    const subjects = subject === "ALL" ? REPORT_SUBJECTS : [subject];
+    for (const record of subjects.flatMap((code) => records.filter((row) => row.Subject === code))) {
         const kumonId = normalizeKumonStudentId(record["รหัสคุมอง"]);
         const targets = document.rows.filter((row) => keyFor(row.kumonId, row.subject) === keyFor(kumonId, record.Subject));
         const duplicates = records.filter((row) => keyFor(row["รหัสคุมอง"], row.Subject) === keyFor(kumonId, record.Subject));
@@ -96,7 +99,7 @@ async function loadedDocument(page) {
 }
 
 export async function previewKsisReportDraft({ userId, month, year, subject }) {
-    if (!["ME", "EFL", "TRP"].includes(subject)) throw httpError(400, "กรุณาเลือกวิชา");
+    if (!["ALL", ...REPORT_SUBJECTS].includes(subject)) throw httpError(400, "กรุณาเลือกวิชาหรือทุกวิชา");
     const records = await buildMonthlyReport({ month, year });
     return withKsisPage({ sourceUrl: REPORT_URL, userId }, async (page) => {
         const document = await loadedDocument(page);

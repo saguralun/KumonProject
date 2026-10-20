@@ -69,6 +69,43 @@ test("Draft fills main fields plus two Z dialogs, never saves main or touches AT
     } finally { await browser.close(); }
 });
 
+test("All-subject fill updates each subject row without crossing data or saving main", {
+    skip: process.env.TEST_BROWSER_UI !== "1", timeout: 25000
+}, async () => {
+    const browser = await chromium.launch({ channel: "chrome", headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage(); let writes = 0;
+        await page.route("**/*", (route) => {
+            if (route.request().method() === "POST") { writes++; return route.fulfill({ body: "{}" }); }
+            return route.fulfill({ contentType: "text/html; charset=utf-8", body: fixture() });
+        });
+        await page.goto("https://kao.ksis.kumon.com/kth/#/reportbeditgrid");
+        await page.evaluate(() => {
+            const row = document.querySelector('tr[data-clrowid="student-me"]');
+            for (const [code, name] of [["EFL", "English EFL"], ["TRP", "Thai Reading"]]) {
+                const clone = row.cloneNode(true);
+                clone.setAttribute("data-clrowid", `student-${code.toLowerCase()}`);
+                clone.cells[1].textContent = name;
+                if (code === "TRP") clone.cells[5].querySelector("select").innerHTML = "<option>CI</option><option>CII</option>";
+                row.parentElement.append(clone);
+            }
+        });
+        const records = [["ME", "C90", 8], ["EFL", "D100", 4], ["TRP", "CII90", 6]].map(([Subject, CurrentLevel, WksUsed], index) => ({
+            ID: index + 1, Subject, CurrentLevel, WksUsed, Status1: "C", "รหัสคุมอง": "7642650000001", "ชื่อจริง": "ตัวอย่าง", "นามสกุล": "ทดสอบ"
+        }));
+        const rows = planKsisReportDraft(records, await page.evaluate(readKsisDraftDocument), { month: 10, year: 2026 }, "ALL");
+        assert.equal(rows.length, 3); assert.ok(rows.every((row) => row.ready));
+        const guard = await installKsisDraftGuard(page);
+        await fillKsisReportRows(page, rows, guard);
+        const actual = (await page.evaluate(readKsisDraftDocument)).rows;
+        assert.deepEqual(actual.map((row) => [row.subject, row.level.value, row.worksheet.value, row.used.value]), [
+            ["ME", "C", "90", "8"], ["EFL", "D", "100", "4"], ["TRP", "CII", "90", "6"]
+        ]);
+        assert.equal(writes, 0); assert.equal(guard.blocked(), 0);
+        await guard.handoff(); await guard.release();
+    } finally { await browser.close(); }
+});
+
 test("Draft adds three ATs with dates, levels, time, zero score, group and passed checked, without saving main", {
     skip: process.env.TEST_BROWSER_UI !== "1", timeout: 25000
 }, async () => {
@@ -148,26 +185,34 @@ test("Draft UI previews before fill, requires confirmation, and locks reads unti
             const url = new URL(route.request().url());
             let data = { success: true, rows: [] };
             if (url.pathname === "/api/auth/me") data = { user: { role: "admin", displayName: "UI Test" }, permissions: ["*"] };
-            if (url.pathname.endsWith("ksis-draft/preview")) data = { success: true, previewId: "draft-token", page: 1, context: "ชื่อศูนย์ TEST ประจำเดือน Oct - 2026", period: { month: 10, year: 2026 }, subject: "ME",
+            if (url.pathname.endsWith("ksis-draft/preview")) {
+                assert.equal(route.request().postDataJSON().subject, "ALL");
+                data = { success: true, previewId: "draft-token", page: 1, context: "ชื่อศูนย์ TEST ประจำเดือน Oct - 2026", period: { month: 10, year: 2026 }, subject: "ALL",
                 rows: [{ name: "ตัวอย่าง ทดสอบ", kumonId: "7642650000001", subject: "ME", ready: true,
                     before: { level: { value: "C" }, worksheet: { value: "80" }, used: { value: "0" }, status: { value: "C" } },
                     desired: { level: "C", worksheet: 90, used: 8, status: "C", zun: [{ level: "ZI", worksheet: 30, used: 2 }, { level: "ZII", worksheet: 50, used: 3 }],
                         at: [{ date: "2026-10-01", level: "C", time: 150, score: 71, group: 4, passed: true }] } }] };
-            if (url.pathname.endsWith("ksis-draft/fill")) { fills++; data = { success: true, filled: 1, page: 1 }; }
+                data.rows.push(...["EFL", "TRP"].map((subject) => ({ ...data.rows[0], subject })));
+            }
+            if (url.pathname.endsWith("ksis-draft/fill")) { fills++; data = { success: true, filled: 3, page: 1 }; }
             if (url.pathname.endsWith("ksis-draft/acknowledge")) { acknowledgements++; data = { success: true, acknowledged: true }; }
             await route.fulfill({ contentType: "application/json", body: JSON.stringify(data) });
         });
         await page.goto(`http://127.0.0.1:${server.address().port}/report.html`);
         await page.locator("#ksisDraftButton").click();
+        assert.equal(await page.locator("#ksisDraftSubject").inputValue(), "ALL");
         assert.equal(await page.locator("#reportTableWrap").isVisible(), false);
         await page.locator("#ksisDraftPreview").click();
         await page.locator("#ksisDraftRows table").waitFor();
         await page.waitForFunction(() => !document.getElementById("ksisDraftFill").disabled);
         assert.match(await page.locator("#ksisDraftRows").innerText(), /150 นาที.*71 คะแนน.*G4.*ผ่าน/);
+        assert.equal(await page.locator("#ksisDraftRows tbody tr").count(), 3);
+        assert.match(await page.locator("#ksisDraftSource").innerText(), /ทุกวิชา.*พร้อม 3 รายวิชา/);
         assert.equal(fills, 0);
         await page.screenshot({ path: path.join(os.tmpdir(), "kumondb-ksis-draft-preview.png"), fullPage: true });
         await page.locator("#ksisDraftFill").click();
         assert.equal(await page.locator("#ksisDraftDialog").isVisible(), true);
+        assert.match(await page.locator("#ksisDraftConfirmText").innerText(), /3 รายวิชา.*ทุกวิชา/);
         assert.equal(fills, 0);
         await page.locator("#ksisDraftConfirm").click();
         await page.waitForFunction(() => document.getElementById("ksisDraftSource").textContent.includes("กรอกแล้ว"));

@@ -1,6 +1,6 @@
 import { REPORT_SUBJECTS, subjectReportRows, reportPage, renderReportTable } from "./reportLayout.js?v=20261020-zun-position";
 import { setupKsisMatching } from "./reportKsisMatching.js";
-import { setupKsisDraft } from "./reportKsisDraft.js?v=20261020-at";
+import { setupKsisDraft } from "./reportKsisDraft.js?v=20261020-all-subjects";
 
 const els = {
   reportMonth: document.getElementById("reportMonth"),
