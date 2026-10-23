@@ -534,7 +534,8 @@
       categories: [],
       tableName: "",
       page: 1,
-      pageSize: DEFAULT_PAGE_SIZE
+      pageSize: DEFAULT_PAGE_SIZE,
+      tableRequest: 0
     };
 
     async function loadTables() {
@@ -621,6 +622,7 @@
     }
 
     async function loadTable(tableName, page = 1) {
+      const requestId = ++state.tableRequest;
       state.tableName = tableName;
       state.page = page;
       updateActiveTableButton();
@@ -635,6 +637,7 @@
           `/api/tables/${encodeURIComponent(tableName)}?${params.toString()}`
         );
         const data = await response.json();
+        if (requestId !== state.tableRequest) return;
 
         if (!response.ok || data.success === false) {
           throw new Error(data.error || "Cannot load table");
@@ -644,6 +647,7 @@
         state.pageSize = data.pageSize;
         renderTable(data);
       } catch (error) {
+        if (requestId !== state.tableRequest) return;
         renderError(tableName, error.message);
       }
     }
@@ -897,8 +901,9 @@
 
     loadTables();
   </script>
-  <script src="/js/authClient.js?v=20261023-local-update"></script>
-  <script src="/js/appMenu.js?v=20261023-static-menu"></script>
+  <script src="/js/appDialogs.js?v=20261023-all-actions"></script>
+  <script src="/js/authClient.js?v=20261023-all-actions"></script>
+  <script src="/js/appMenu.js?v=20261023-dialog-focus"></script>
   <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
 </body>
 </html>

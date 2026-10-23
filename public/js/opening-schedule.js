@@ -182,7 +182,7 @@ async function toggleSchedule(input) {
 async function deleteSchedule(button) {
   const scheduleId = button.dataset.deleteId;
 
-  if (!window.confirm("ลบเวลาเปิดนี้? (ยังไม่มี ID ผูกอยู่)")) {
+  if (!await confirmAction("ลบเวลาเปิดนี้? (ยังไม่มี ID ผูกอยู่)")) {
     return;
   }
 

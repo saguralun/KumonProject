@@ -726,6 +726,7 @@ function renderOrderSuggestionTable() {
 }
 
 async function loadOrderSuggestion() {
+  els.exportOrderButton.disabled = true;
   els.orderSuggestionTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
   els.orderCdSuggestionTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
 
@@ -739,6 +740,7 @@ async function loadOrderSuggestion() {
     // this button — reuse it so the order view opens on whichever subject
     // was showing, same tabs, same selection, no reset.
     renderOrderSuggestionTable();
+    els.exportOrderButton.disabled = false;
   } catch (error) {
     els.orderSuggestionTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.orderCdSuggestionTableWrap.innerHTML = "";
@@ -763,6 +765,7 @@ function renderExpectedStockTable() {
 }
 
 async function loadExpectedStock() {
+  els.exportExpectedStockButton.disabled = true;
   els.expectedStockTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
   els.expectedStockCdTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
 
@@ -779,6 +782,7 @@ async function loadExpectedStock() {
       : `stock ที่มีอยู่ − Forecast ที่จะใช้ + จำนวนที่แนะนำสั่ง = stock ที่เหลือ ถ้าสั่งตามนี้จริง`;
 
     renderExpectedStockTable();
+    els.exportExpectedStockButton.disabled = false;
   } catch (error) {
     els.expectedStockTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.expectedStockCdTableWrap.innerHTML = "";
@@ -787,6 +791,9 @@ async function loadExpectedStock() {
 
 async function generateForecast({ force = false } = {}) {
   const days = Number(els.forecastDays.value);
+  lastForecastData = null; lastOrderPlan = []; lastCdOrderPlan = [];
+  els.orderButton.disabled = els.expectedStockButton.disabled = true;
+  els.exportForecastButton.disabled = els.exportOrderButton.disabled = els.exportExpectedStockButton.disabled = true;
 
   els.forecastButton.disabled = true;
   els.recalculateForecastButton.disabled = true;
@@ -803,6 +810,7 @@ async function generateForecast({ force = false } = {}) {
     const data = await requestJson(`/api/forecast?${params.toString()}`);
 
     lastForecastData = data;
+    els.exportForecastButton.disabled = false;
 
     const subjects = getAvailableSubjects(data);
 
@@ -908,7 +916,7 @@ async function runExport(button, filename, sheets) {
   try {
     await downloadWorkbook(filename, sheets);
   } catch (error) {
-    alert(`Export ไม่สำเร็จ: ${error.message}`);
+    await showAppMessage(`Export ไม่สำเร็จ: ${error.message}`);
   } finally {
     button.disabled = false;
     button.textContent = originalText;

@@ -20,6 +20,7 @@ const state = {
   permissions: [], // permission_master rows, ordered by nav_group/sort_order
   grants: new Map() // role_code -> Set<permission_key>
 };
+const savingPermissionRoles = new Set();
 
 const NAV_GROUP_LABELS = {
   management: "จัดการ",
@@ -291,6 +292,7 @@ function renderPermissionMatrix() {
                     type="checkbox"
                     data-role-code="${escapeHtml(role.role_code)}"
                     data-permission-key="${escapeHtml(permission.permission_key)}"
+                    ${savingPermissionRoles.has(role.role_code) ? 'disabled' : ''}
                     ${state.grants.get(role.role_code)?.has(permission.permission_key) ? "checked" : ""}
                   >
                 </td>
@@ -314,6 +316,7 @@ async function handlePermissionToggle(checkbox) {
   const roleCode = checkbox.dataset.roleCode;
   const permissionKey = checkbox.dataset.permissionKey;
   const currentGrants = state.grants.get(roleCode) || new Set();
+  if (savingPermissionRoles.has(roleCode)) { checkbox.checked = currentGrants.has(permissionKey); return; }
   const nextGrants = new Set(currentGrants);
 
   if (checkbox.checked) {
@@ -322,7 +325,8 @@ async function handlePermissionToggle(checkbox) {
     nextGrants.delete(permissionKey);
   }
 
-  checkbox.disabled = true;
+  savingPermissionRoles.add(roleCode);
+  for (const input of els.matrixWrap.querySelectorAll('input[data-role-code]')) if (input.dataset.roleCode === roleCode) input.disabled = true;
 
   try {
     await requestJson(`/api/roles/${encodeURIComponent(roleCode)}/permissions`, {
@@ -336,14 +340,18 @@ async function handlePermissionToggle(checkbox) {
     checkbox.checked = !checkbox.checked; // revert
     setStatus(error.message, true);
   } finally {
-    checkbox.disabled = false;
+    savingPermissionRoles.delete(roleCode);
+    for (const input of els.matrixWrap.querySelectorAll('input[data-role-code]')) if (input.dataset.roleCode === roleCode) {
+      input.disabled = false;
+      input.checked = Boolean(state.grants.get(roleCode)?.has(input.dataset.permissionKey));
+    }
   }
 }
 
 async function handleDeleteRole(button) {
   const roleCode = button.dataset.roleCode;
 
-  if (!window.confirm(`ลบ role "${roleName(roleCode)}" ใช่ไหม?`)) {
+  if (!await confirmAction(`ลบ role "${roleName(roleCode)}" ใช่ไหม?`)) {
     return;
   }
 

@@ -17,6 +17,7 @@ const setStatus = createStatusSetter(els.statusLine);
 // Set once the first /api/backup/list response comes back — the import
 // confirm field is checked against this on every keystroke.
 let expectedDbName = null;
+let restoring = false, backingUp = false;
 
 function setExportMessage(text, isSuccess = false) {
   if (!text) {
@@ -108,6 +109,8 @@ function backupRetentionHint(count) {
 }
 
 els.runBackupButton.addEventListener("click", async () => {
+  if (restoring || backingUp) return;
+  backingUp = true; validateImportForm();
   els.runBackupButton.disabled = true;
   els.runBackupButton.textContent = "⏳ กำลัง backup...";
   setExportMessage("");
@@ -122,6 +125,7 @@ els.runBackupButton.addEventListener("click", async () => {
     setExportMessage(error.message);
     setStatus(error.message, "error");
   } finally {
+    backingUp = false; validateImportForm();
     els.runBackupButton.disabled = false;
     els.runBackupButton.textContent = "📤 Backup เดี๋ยวนี้";
   }
@@ -131,7 +135,7 @@ function validateImportForm() {
   const hasFile = els.importFile.files.length > 0;
   const textMatches = expectedDbName !== null && els.importConfirmText.value === expectedDbName;
 
-  els.importSubmit.disabled = !(hasFile && textMatches);
+  els.importSubmit.disabled = restoring || backingUp || !(hasFile && textMatches);
 }
 
 els.importFile.addEventListener("change", validateImportForm);
@@ -142,26 +146,29 @@ els.importForm.addEventListener("submit", async (event) => {
 
   const file = els.importFile.files[0];
 
-  if (!file) {
+  if (restoring || backingUp || !file || expectedDbName === null || els.importConfirmText.value !== expectedDbName) {
     return;
   }
 
-  const confirmed = window.confirm(
+  const dbName = expectedDbName;
+  const confirmed = await confirmAction(
     `ยืนยัน restore ทับข้อมูลปัจจุบันในฐาน "${expectedDbName}" ด้วยไฟล์ "${file.name}" ใช่ไหม?\n\n` +
     `ระบบจะสำรองข้อมูลปัจจุบันไว้ก่อนเสมอ แต่หลังจากนี้ข้อมูลที่เห็นอยู่ตอนนี้จะถูกแทนที่ทันที`
   );
 
-  if (!confirmed) {
+  if (!confirmed || restoring || backingUp || expectedDbName !== dbName) {
     return;
   }
 
   els.importSubmit.disabled = true;
+  restoring = true;
+  els.importFile.disabled = els.importConfirmText.disabled = els.runBackupButton.disabled = true;
   els.importSubmit.textContent = "⏳ กำลัง restore...";
   setImportMessage("");
 
   try {
     const response = await fetch(
-      `/api/backup/import?confirmDbName=${encodeURIComponent(expectedDbName)}`,
+      `/api/backup/import?confirmDbName=${encodeURIComponent(dbName)}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/octet-stream" },
@@ -185,6 +192,8 @@ els.importForm.addEventListener("submit", async (event) => {
     setImportMessage(error.message);
     setStatus(error.message, "error");
   } finally {
+    restoring = false;
+    els.importFile.disabled = els.importConfirmText.disabled = els.runBackupButton.disabled = false;
     els.importSubmit.textContent = "🗑️ Restore ทับข้อมูลปัจจุบัน";
     validateImportForm();
   }

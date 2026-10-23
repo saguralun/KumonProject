@@ -481,7 +481,7 @@ async function deleteSelectedStudent() {
         return;
     }
 
-    const ok = window.confirm(`ลบ student #${student.studentId} ${student.displayName} ใช่ไหม?`);
+    const ok = await confirmAction(`ลบ student #${student.studentId} ${student.displayName} ใช่ไหม?`);
 
     if (!ok) {
         return;
@@ -681,7 +681,7 @@ async function deleteSelectedEnrollment() {
         return;
     }
 
-    const ok = window.confirm(`ลบ ${enrollment.subjectCode} enrollment #${enrollment.enrollmentId} ใช่ไหม?`);
+    const ok = await confirmAction(`ลบ ${enrollment.subjectCode} enrollment #${enrollment.enrollmentId} ใช่ไหม?`);
 
     if (!ok) {
         return;
@@ -789,7 +789,7 @@ async function returnCd(button) {
     const cdUsedId = Number(button.dataset.returnCdId);
     const stockProcessed = button.dataset.stockProcessed === "true";
     const receivedCd = button.dataset.cpcd === "true";
-    if (!window.confirm(!receivedCd
+    if (!await confirmAction(!receivedCd
         ? "ยกเลิกรายการไม่ได้รับ CD นี้ใช่ไหม? สามารถกลับไปเลือกใหม่ได้ และสต็อกจะไม่เปลี่ยน"
         : stockProcessed
         ? "เอา CD คืนและยกเลิกรายการให้ CD นี้ใช่ไหม? ระบบจะคืนสต็อก 1 แผ่นด้วย"
@@ -815,7 +815,7 @@ async function cancelBilling(billingId) {
         return;
     }
 
-    if (!window.confirm(`ยกเลิกบิล #${billingId} ใช่ไหม? สถานะที่แก้ภายหลังจะไม่ถูกย้อนกลับ`)) {
+    if (!await confirmAction(`ยกเลิกบิล #${billingId} ใช่ไหม? สถานะที่แก้ภายหลังจะไม่ถูกย้อนกลับ`)) {
         return;
     }
 
@@ -840,7 +840,7 @@ async function deleteStatusHistoryEntry(enrollmentStatusId) {
         return;
     }
 
-    if (!window.confirm(
+    if (!await confirmAction(
         `ลบรายการประวัติสถานะนี้ใช่ไหม? ลบแค่ log นี้เท่านั้น — ถ้าสถานะปัจจุบันของ enrollment ต้องแก้ด้วย ให้กด Absent/OT/Resume/Complete เองอีกทีหลังจากนี้`
     )) {
         return;

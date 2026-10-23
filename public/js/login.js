@@ -87,7 +87,7 @@ els.updateButton.addEventListener('click', async () => {
 });
 
 async function updateProgram() {
-  if (!window.confirm('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
+  if (!await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
   updating = true;
   els.updateButton.disabled = els.adminSubmit.disabled = els.guestSubmit.disabled = true;
   try {

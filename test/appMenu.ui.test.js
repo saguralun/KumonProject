@@ -19,7 +19,7 @@ async function isolate(page, role='admin',permissions=['*']) {
     await page.route('https://fonts.**', route=>route.abort());
     await page.route('**/js/**', route=> {
         const pathname=new URL(route.request().url()).pathname;
-        return /\/(authClient|appMenu|navFlyout)\.js$/.test(pathname) ? route.continue() : route.fulfill({contentType:'application/javascript',body:''});
+        return /\/(authClient|appMenu|navFlyout|appDialogs)\.js$/.test(pathname) ? route.continue() : route.fulfill({contentType:'application/javascript',body:''});
     });
     await page.route('**/api/**',route=> {
         assert.equal(route.request().method(),'GET','Opening or closing menus must not mutate data');
@@ -126,6 +126,23 @@ test('Every workspace has one header menu, no edge handle, full-width content an
         await page.goto(`${testApp.origin}/login.html`);
         assert.equal(await page.locator('.app-menu-toggle').count(),0);
     } finally {await testApp.close();}
+});
+
+test('Confirmation opened from navigation owns Tab and Escape until dismissed, then returns focus to the menu', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 15000 }, async () => {
+    const testApp = await fixture();
+    try {
+        const page = await testApp.browser.newPage(); await isolate(page);
+        await page.goto(`${testApp.origin}/payment.html`); await page.locator('.app-menu-toggle').click();
+        await page.locator('.app-menu-close').focus();
+        await page.evaluate(() => { void confirmAction('Fixture update confirmation').then(value => { window.fixtureChoice = value; }); });
+        await page.locator('#appDialogCancel').waitFor(); await page.keyboard.press('Tab');
+        assert.equal(await page.locator('#appDialogConfirm').evaluate(element => element === document.activeElement), true);
+        await page.keyboard.press('Escape'); await page.locator('#appActionDialog').waitFor({ state: 'detached' });
+        assert.equal(await page.evaluate(() => window.fixtureChoice), false);
+        assert.equal(await page.locator('.app-menu-panel').isVisible(), true);
+        assert.equal(await page.locator('.app-menu-close').evaluate(element => element === document.activeElement), true);
+        await page.keyboard.press('Escape'); assert.equal(await page.locator('.app-menu-panel').isVisible(), false);
+    } finally { await testApp.close(); }
 });
 
 test('Flyouts support pointer gap crossing, one open group, keyboard return and viewport resizing',{

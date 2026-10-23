@@ -85,7 +85,7 @@
               <div class="panel-title">ผลลัพธ์ Forecast — WS</div>
               <div class="subtle" id="resultSubtitle">เลือกจำนวนวัน แล้วกด Forecast</div>
             </div>
-            <button type="button" class="secondary-button" id="exportForecastButton">📥 Export Excel</button>
+            <button type="button" class="secondary-button" id="exportForecastButton" disabled>📥 Export Excel</button>
           </div>
           <div class="forecast-summary" id="forecastSummary"></div>
           <div class="forecast-table-wrap" id="forecastTableWrap">
@@ -111,7 +111,7 @@
               <div class="panel-title">🛒 แนะนำสั่งซื้อ</div>
               <div class="subtle">ต้องมี = 5 (base) + เพดาน(รวม Forecast ของ zone ÷ 2.5) — order ปัดเป็นเลขลงท้าย 0/5 (หรือ 0/3/6/9 ถ้ารวม Forecast ของ zone &lt; 30)</div>
             </div>
-            <button type="button" class="secondary-button" id="exportOrderButton">📥 Export Excel</button>
+            <button type="button" class="secondary-button" id="exportOrderButton" disabled>📥 Export Excel</button>
           </div>
           <div class="forecast-table-wrap" id="orderSuggestionTableWrap">
             <div class="empty-state">ยังไม่มี Forecast</div>
@@ -136,7 +136,7 @@
               <div class="panel-title">📈 Expect Stock</div>
               <div class="subtle" id="expectedStockSubtitle">stock ที่มีอยู่ − Forecast ที่จะใช้ + จำนวนที่แนะนำสั่ง = stock ที่เหลือ ถ้าสั่งตามนี้จริง</div>
             </div>
-            <button type="button" class="secondary-button" id="exportExpectedStockButton">📥 Export Excel</button>
+            <button type="button" class="secondary-button" id="exportExpectedStockButton" disabled>📥 Export Excel</button>
           </div>
           <div class="forecast-table-wrap" id="expectedStockTableWrap">
             <div class="empty-state">ยังไม่มี Forecast</div>
@@ -172,12 +172,13 @@
     </div>
   </div>
 
-  <script src="/js/authClient.js?v=20261023-local-update"></script>
-  <script src="/js/appMenu.js?v=20261023-static-menu"></script>
+  <script src="/js/appDialogs.js?v=20261023-all-actions"></script>
+  <script src="/js/authClient.js?v=20261023-all-actions"></script>
+  <script src="/js/appMenu.js?v=20261023-dialog-focus"></script>
   <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/forecast.js?v=20260902-hide-cd-panel-for-me"></script>
+  <script src="/js/forecast.js?v=20261023-all-actions"></script>
 </body>
 </html>

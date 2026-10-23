@@ -48,7 +48,7 @@
       if (event.target.closest('a[href]')) setOpen(false, false);
     });
     document.addEventListener('keydown', (event) => {
-      if (!opened) return;
+      if (!opened || document.querySelector('dialog[open]')) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); }
       if (event.key === 'Tab') {
         const elements = focusable(), first = elements[0], last = elements.at(-1);

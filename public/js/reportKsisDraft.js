@@ -102,7 +102,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   window.addEventListener('pagehide', () => clearInterval(recoveryTimer), { once: true });
   inspect.addEventListener('click', inspectCurrent);
   reset.addEventListener('click', async () => {
-    if (busy || !window.confirm('ล้างรอบค้างและรีเฟรช KSIS ใช่ไหม? ค่าที่ยังไม่บันทึกใน Report B จะถูกยกเลิก โดยไม่กดบันทึก ข้อมูลที่เคยบันทึกแล้วจะไม่ถูกลบและต้องตรวจ WS ก่อนเริ่มใหม่')) return;
+    if (busy || !await confirmAction('ล้างรอบค้างและรีเฟรช KSIS ใช่ไหม? ค่าที่ยังไม่บันทึกใน Report B จะถูกยกเลิก โดยไม่กดบันทึก ข้อมูลที่เคยบันทึกแล้วจะไม่ถูกลบและต้องตรวจ WS ก่อนเริ่มใหม่')) return;
     busy = true; buttons();
     try {
       inspection = await call('reset', { confirmDiscard: true });
@@ -113,7 +113,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   });
   acknowledge.addEventListener("click", async () => {
     if (busy) return;
-    if (!window.confirm("ยืนยันว่าตรวจและบันทึก หรือยกเลิกข้อมูลค้างใน KSIS ด้วยตนเองเรียบร้อยแล้วใช่ไหม?")) return;
+    if (!await confirmAction("ยืนยันว่าตรวจและบันทึก หรือยกเลิกข้อมูลค้างใน KSIS ด้วยตนเองเรียบร้อยแล้วใช่ไหม?")) return;
     busy = true; buttons();
     try {
       inspection = await call("acknowledge", {}); pending = false;

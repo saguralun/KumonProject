@@ -20,7 +20,11 @@ const ITEM_TYPES = [
 const state = {
   selectedItemType: "ws",
   pendingDates: [],
-  selectedDate: null
+  selectedDate: null,
+  cutting: false,
+  pendingRequest: 0,
+  pendingLoaded: false,
+  detailRequest: 0
 };
 
 const setStatus = createStatusSetter(els.statusLine);
@@ -44,6 +48,7 @@ function renderTypeButtons() {
       type="button"
       class="subject-button ${type === state.selectedItemType ? "active" : ""}"
       data-item-type="${type}"
+      ${state.cutting ? 'disabled' : ''}
     >${escapeHtml(label)}</button>
   `).join("");
 }
@@ -51,11 +56,12 @@ function renderTypeButtons() {
 els.typeButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-item-type]");
 
-  if (!button || button.dataset.itemType === state.selectedItemType) {
+  if (!button || state.cutting || button.dataset.itemType === state.selectedItemType) {
     return;
   }
 
   state.selectedItemType = button.dataset.itemType;
+  closeDetail();
   renderTypeButtons();
   loadPendingDates();
 });
@@ -63,14 +69,18 @@ els.typeButtons.addEventListener("click", (event) => {
 // ---- Pending dates list ----
 
 async function loadPendingDates() {
+  const requestId = ++state.pendingRequest, type = state.selectedItemType;
+  state.pendingLoaded = false;
   els.pendingSubtitle.textContent = "กำลังโหลด...";
   els.cutAllButton.disabled = true;
   els.pendingTableWrap.innerHTML = `<div class="empty-state">กำลังโหลด...</div>`;
 
   try {
-    const data = await requestJson(`/api/stock-cut/pending-dates?type=${state.selectedItemType}`);
+    const data = await requestJson(`/api/stock-cut/pending-dates?type=${type}`);
+    if (requestId !== state.pendingRequest || type !== state.selectedItemType) return;
 
     state.pendingDates = data.rows || [];
+    state.pendingLoaded = true;
     renderPendingTable();
 
     if (!state.pendingDates.length) {
@@ -84,6 +94,7 @@ async function loadPendingDates() {
     els.pendingSubtitle.textContent = `${state.pendingDates.length} วัน • ${totalItems} รายการ • ${totalQuantity} แผ่น/ชุด`;
     els.cutAllButton.disabled = false;
   } catch (error) {
+    if (requestId !== state.pendingRequest || type !== state.selectedItemType) return;
     els.pendingTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     setStatus(error.message, "error");
   }
@@ -128,17 +139,22 @@ els.pendingTableWrap.addEventListener("click", (event) => {
 // ---- Detail modal ----
 
 async function openDetail(date) {
+  const requestId = ++state.detailRequest, type = state.selectedItemType;
   state.selectedDate = date;
   els.detailTitle.textContent = `รายละเอียดวันที่ ${formatDateDisplay(date)}`;
   els.detailSubtitle.textContent = state.selectedItemType.toUpperCase();
   els.detailBody.innerHTML = `<div class="empty-state">กำลังโหลด...</div>`;
   els.detailModal.classList.remove("hidden");
+  els.cutDayButton.disabled = true;
 
   try {
-    const data = await requestJson(`/api/stock-cut/pending-dates/${date}?type=${state.selectedItemType}`);
+    const data = await requestJson(`/api/stock-cut/pending-dates/${date}?type=${type}`);
+    if (requestId !== state.detailRequest || type !== state.selectedItemType || date !== state.selectedDate) return;
 
     renderDetail(data.items || []);
+    els.cutDayButton.disabled = state.cutting || !data.items?.length;
   } catch (error) {
+    if (requestId !== state.detailRequest || type !== state.selectedItemType || date !== state.selectedDate) return;
     els.detailBody.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
   }
 }
@@ -175,6 +191,7 @@ function renderDetail(items) {
 }
 
 function closeDetail() {
+  state.detailRequest++;
   els.detailModal.classList.add("hidden");
   state.selectedDate = null;
 }
@@ -188,11 +205,13 @@ els.detailModal.addEventListener("mousedown", (event) => {
 
 // ---- Cutting ----
 
-async function cutDates(dates) {
+async function cutDates(dates, type) {
+  if (state.cutting) return;
+  state.cutting = true; els.cutDayButton.disabled = els.cutAllButton.disabled = true; renderTypeButtons();
   try {
     const data = await requestJson("/api/stock-cut/process", {
       method: "POST",
-      body: JSON.stringify({ type: state.selectedItemType, dates })
+      body: JSON.stringify({ type, dates })
     });
 
     setStatus(`ตัด stock แล้ว ${data.itemsProcessed} รายการ (${data.recordsProcessed} record)`, "success");
@@ -200,35 +219,37 @@ async function cutDates(dates) {
     await loadPendingDates();
   } catch (error) {
     setStatus(error.message, "error");
+  } finally {
+    state.cutting = false; renderTypeButtons();
+    els.cutAllButton.disabled = !state.pendingLoaded || state.pendingDates.length === 0;
+    els.cutDayButton.disabled = !state.selectedDate;
   }
 }
 
-els.cutDayButton.addEventListener("click", () => {
-  if (!state.selectedDate) {
+els.cutDayButton.addEventListener("click", async () => {
+  if (state.cutting || !state.selectedDate) {
     return;
   }
 
-  if (!window.confirm(`ตัด stock ของวันที่ ${formatDateDisplay(state.selectedDate)} ใช่ไหม?`)) {
+  const date = state.selectedDate, type = state.selectedItemType;
+  if (!await confirmAction(`ตัด stock ของวันที่ ${formatDateDisplay(date)} ใช่ไหม?`)) {
     return;
   }
 
-  els.cutDayButton.disabled = true;
-  cutDates([state.selectedDate]).finally(() => {
-    els.cutDayButton.disabled = false;
-  });
+  await cutDates([date], type);
 });
 
-els.cutAllButton.addEventListener("click", () => {
-  if (!state.pendingDates.length) {
+els.cutAllButton.addEventListener("click", async () => {
+  if (state.cutting || !state.pendingDates.length) {
     return;
   }
 
-  if (!window.confirm(`ตัด stock ทั้งหมด ${state.pendingDates.length} วันใช่ไหม? รวม ${state.pendingDates.reduce((sum, row) => sum + row.totalQuantity, 0)} แผ่น/ชุด`)) {
+  const dates = state.pendingDates.map(row => row.date), type = state.selectedItemType;
+  if (!await confirmAction(`ตัด stock ทั้งหมด ${dates.length} วันใช่ไหม? รวม ${state.pendingDates.reduce((sum, row) => sum + row.totalQuantity, 0)} แผ่น/ชุด`)) {
     return;
   }
 
-  els.cutAllButton.disabled = true;
-  cutDates(state.pendingDates.map((row) => row.date));
+  await cutDates(dates, type);
 });
 
 // ---- Init ----

@@ -14,6 +14,7 @@ const els = {
 const SUBJECTS = ["ME", "EFL", "TRP"];
 let activeSubject = "ME";
 let dataCache = {};
+let chartRequest = 0;
 
 // null = no filter applied yet (show every grade) — set to a real Set the
 // first time the grade-filter checkboxes render for a subject, or by the
@@ -451,17 +452,19 @@ function attachTooltipHandlers(container, data) {
 // only change what's already-loaded data gets filtered down to, so
 // there's no reason to re-hit the API or show the loading spinner again.
 async function renderChart({ skipFetch = false } = {}) {
+  const requestId = ++chartRequest, subject = activeSubject, cache = dataCache;
   if (!skipFetch) {
     els.chartScroll.innerHTML = `<div class="empty-state"><div class="spinner"></div>กำลังโหลด...</div>`;
     setStatus("กำลังโหลด...");
   }
 
   try {
-    if (!dataCache[activeSubject]) {
-      dataCache[activeSubject] = await requestJson(`/api/progress-chart?subject=${encodeURIComponent(activeSubject)}`);
+    if (!cache[subject]) {
+      cache[subject] = await requestJson(`/api/progress-chart?subject=${encodeURIComponent(subject)}`);
     }
+    if (requestId !== chartRequest || cache !== dataCache || subject !== activeSubject) return;
 
-    const data = dataCache[activeSubject];
+    const data = cache[subject];
 
     renderGradeFilter(data);
 
@@ -485,6 +488,7 @@ async function renderChart({ skipFetch = false } = {}) {
     attachTooltipHandlers(els.chartScroll, filtered);
     setStatus(`โหลดแล้ว — ${filtered.students.length.toLocaleString("th-TH")} คน`);
   } catch (error) {
+    if (requestId !== chartRequest || cache !== dataCache || subject !== activeSubject) return;
     els.chartScroll.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.summaryCards.innerHTML = "";
     setStatus(error.message, "error");

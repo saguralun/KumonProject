@@ -20,7 +20,6 @@ test("Add Student KSIS Preview requires apply and never saves automatically", {
     try {
         const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
         page.on("pageerror", (error) => errors.push(error.message));
-        page.on("dialog", (dialog) => dialog.accept());
         const masters = {
             prefixes: [{ id: 1, name: "ด.ช." }, { id: 2, name: "ด.ญ." }],
             genders: [{ id: 1, name: "ชาย" }, { id: 2, name: "หญิง" }],
@@ -52,6 +51,10 @@ test("Add Student KSIS Preview requires apply and never saves automatically", {
         assert.equal(saved, false);
         await page.getByRole("radio", { name: "Email (บิดา)", exact: true }).check();
         await page.locator("#ksisApplyButton").click();
+        await page.locator('#appActionDialog').waitFor();
+        assert.equal(await page.locator('#addStudentForm [name="firstName"]').inputValue(), '');
+        assert.equal(saved, false);
+        await page.locator('#appDialogConfirm').click();
         await page.waitForFunction(() => document.querySelector('#addStudentForm [name="firstName"]').value === "ตัวอย่าง");
         assert.equal(await page.locator('#addStudentForm [name="genderId"]').inputValue(), "2");
         assert.equal(await page.locator('#addStudentForm [name="prefixId"]').inputValue(), "2");

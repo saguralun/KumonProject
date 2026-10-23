@@ -57,11 +57,10 @@ test('Clear stopped WS needs confirmation, removes stale error across reloads an
     const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
     try {
         const page = await browser.newPage();
-        page.on('dialog', (dialog) => confirm ? dialog.accept() : dialog.dismiss());
         await page.goto(`http://127.0.0.1:${server.address().port}/ksis.html`);
         await page.waitForFunction(() => document.getElementById('ksisDraftSource').textContent.includes('มีข้อมูลแก้ค้าง'));
-        await page.locator('#ksisDraftReset').click(); assert.equal(actions.includes('reset'), false);
-        confirm = true; await page.locator('#ksisDraftReset').click();
+        await page.locator('#ksisDraftReset').click(); await page.locator('#appDialogCancel').click(); assert.equal(actions.includes('reset'), false);
+        confirm = true; await page.locator('#ksisDraftReset').click(); await page.locator('#appDialogConfirm').click();
         await page.waitForFunction(() => !document.getElementById('ksisDraftPreview').disabled && document.getElementById('ksisDraftSource').textContent.includes('ล้างรอบค้างแล้ว'));
         const tool = readKsisWorkspace(userId).tools.draft;
         assert.equal(tool.result, null); assert.equal(tool.previousResult.savedCount, 10); assert.equal(tool.pending, false);

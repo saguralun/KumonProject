@@ -55,6 +55,7 @@ export function setupKsisDesktop({ setStatus }) {
   new ResizeObserver(update).observe(slot);
   new MutationObserver(update).observe(document.querySelector('.ksis-page'), { subtree: true, attributes: true, attributeFilter: ['class', 'open'] });
   window.addEventListener('resize', update); document.addEventListener('visibilitychange', update);
+  document.addEventListener('app:dialog-change', update);
   get('ksisOpenReportB').addEventListener('click', async () => {
     const button = get('ksisOpenReportB'); button.disabled = true;
     try { await requestJson('/api/ksis/desktop/report-b', { method: 'POST', body: '{}' }); }

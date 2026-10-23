@@ -19,6 +19,7 @@ import {
     worksheetInputCount
 } from "./worksheetInput.js";
 import { worksheetApi } from "./worksheetApi.js";
+let receivingCd = false;
 
 export function currentPattern() {
     return selectedPattern(state.patterns, state.patternCode);
@@ -742,7 +743,7 @@ export function updateSecondaryActions() {
     // place that ever adds "hidden" back — that's the real "nothing to
     // show text for at all" case and stays hidden there.
     els.receiveCd.classList.remove("hidden");
-    els.receiveCd.disabled = !shouldShowCdButton;
+    els.receiveCd.disabled = receivingCd || !shouldShowCdButton;
     setActionButton(
         els.receiveCd,
         "💿",
@@ -891,7 +892,7 @@ export async function refreshWorksheetMonthSummary() {
 }
 
 export async function receiveCd() {
-    if (!state.context) {
+    if (!state.context || receivingCd || state.isSaving || state.isLoadingContext) {
         return;
     }
 
@@ -900,23 +901,19 @@ export async function receiveCd() {
     if (!cdRequirement || cdRequirement.hasReceived) {
         return;
     }
-
-    const isTakingCd = window.confirm(`รับ CD ${cdRequirement.cdNo} สำหรับ level นี้ใช่ไหม?\nOK = รับ CD\nCancel = ไม่รับ CD`);
-
-    if (
-        !isTakingCd
-        && !window.confirm(`บันทึกว่าไม่รับ CD ${cdRequirement.cdNo} ใช่ไหม?`)
-    ) {
-        return;
-    }
-
+    const context = state.context, cdDate = els.receiveDate.value;
+    receivingCd = true; updateSecondaryActions();
     try {
+        const isTakingCd = await confirmAction(`รับ CD ${cdRequirement.cdNo} สำหรับ level นี้ใช่ไหม?`, { confirmText: 'รับ CD', cancelText: 'ไม่รับ CD' });
+        if (!isTakingCd && !await confirmAction(`บันทึกว่าไม่รับ CD ${cdRequirement.cdNo} ใช่ไหม?`)) return;
+        if (state.context !== context || els.receiveDate.value !== cdDate) { setStatus('นักเรียนหรือวันที่เปลี่ยน กรุณาตรวจแล้วกดรับ CD ใหม่', 'error'); return; }
         const result = await worksheetApi.receiveCd({
-            enrollmentId: state.context.enrollment.enrollmentId,
+            enrollmentId: context.enrollment.enrollmentId,
             cdMasterId: cdRequirement.cdMasterId,
-            cdDate: els.receiveDate.value,
+            cdDate,
             cpcd: isTakingCd
         });
+        if (state.context !== context) return;
 
         const receivedIds = state.context.cdState.receivedCdMasterIds || [];
 
@@ -932,7 +929,7 @@ export async function receiveCd() {
                 cdUsedId: result.cdUsedId,
                 cdMasterId: result.cdMasterId,
                 cdNo: result.cdNo,
-                cdDate: els.receiveDate.value,
+                cdDate,
                 cpcd: result.cpcd,
                 isStockProcessed: false
             }
@@ -947,6 +944,8 @@ export async function receiveCd() {
             "success"
         );
     } catch (error) {
-        setStatus(error.message, "error");
+        if (state.context === context) setStatus(error.message, "error");
+    } finally {
+        receivingCd = false; updateSecondaryActions();
     }
 }

@@ -2036,7 +2036,7 @@ async function previewStudent() {
 
 async function runDatabaseSetup() {
 
-    const confirmed = confirm(
+    const confirmed = await confirmAction(
         "จะรัน 001 -> 002 -> 003 ใหม่ทั้งหมด — ข้อมูลทั้งหมดในฐานข้อมูลปัจจุบันจะถูกลบถาวร แก้กลับไม่ได้\n\nยืนยันว่าจะดำเนินการต่อ?"
     );
 
@@ -3057,12 +3057,12 @@ async function importModule(moduleId) {
     }
 
     if (!canImportModule(moduleId)) {
-        alert(importRequirementText(moduleId));
+        await showAppMessage(importRequirementText(moduleId));
         updateImportButton(moduleId);
         return;
     }
 
-    if (!confirm(importConfirmationText(moduleId))) {
+    if (!await confirmAction(importConfirmationText(moduleId))) {
         return;
     }
 
@@ -3809,8 +3809,9 @@ if (document.readyState === "loading") {
 </script>
 
     </div>
-    <script src="/js/authClient.js?v=20261016-verified-restart"></script>
-    <script src="/js/appMenu.js?v=20261023-static-menu"></script>
+    <script src="/js/appDialogs.js?v=20261023-all-actions"></script>
+    <script src="/js/authClient.js?v=20261023-all-actions"></script>
+    <script src="/js/appMenu.js?v=20261023-dialog-focus"></script>
     <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
 </body>
 </html>

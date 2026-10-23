@@ -58,7 +58,7 @@ async function applyKsis() {
     if (!selected.length) return;
     const form = els.addStudentForm;
     const hasChanges = selected.some((row) => form.elements[row.field]?.value && String(form.elements[row.field].value) !== String(row.value));
-    if (hasChanges && !window.confirm("นำข้อมูล KSIS ที่เลือกมาแทนค่าในฟอร์มใช่ไหม? ยังไม่บันทึกนักเรียน")) return;
+    if (hasChanges && !await confirmAction("นำข้อมูล KSIS ที่เลือกมาแทนค่าในฟอร์มใช่ไหม? ยังไม่บันทึกนักเรียน")) return;
     const requestId = generation;
     for (const row of selected) {
         const field = form.elements[row.field];

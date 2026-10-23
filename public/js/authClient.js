@@ -109,7 +109,7 @@ function bindKsisDesktopLinks(role) {
         const response = await fetch("/api/ksis/desktop/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.success === false) throw new Error(data.error || "เปิด K-sis ในแอปไม่สำเร็จ");
-      } catch (error) { alert(error.message); window.location.href = link.href; }
+      } catch (error) { await showAppMessage(error.message); window.location.href = link.href; }
       finally { link.removeAttribute("aria-busy"); }
     });
   });
@@ -123,7 +123,7 @@ function bindUpdateButton() {
   }
 
   button.addEventListener("click", async () => {
-    if (button.disabled || !window.confirm('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
+    if (button.disabled || !await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
     button.disabled = true;
     button.textContent = "⏳ กำลังอัพเดท...";
 
@@ -143,7 +143,7 @@ function bindUpdateButton() {
       await waitForUpdatedServer(previousInstanceId);
       window.location.reload();
     } catch (error) {
-      alert(error.message);
+      await showAppMessage(error.message);
       button.disabled = false;
       button.textContent = "🔄 อัพเดท";
     }

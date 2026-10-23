@@ -63,6 +63,19 @@ test('Embedded Chromium keeps KSIS alive across tool tabs and local reload, with
         });
         assert.equal(view.visible, true, JSON.stringify({ view, visibility: await main.evaluate(() => document.visibilityState) }));
         assert.ok(Math.abs(view.bounds.x - layout.x) <= 1);
+        await main.evaluate(() => { void confirmAction('Fixture shared confirmation'); });
+        await main.locator('#appActionDialog').waitFor();
+        assert.equal(await application.evaluate(async ({ BrowserWindow }) => {
+            const child = BrowserWindow.getAllWindows()[0].contentView.children.at(-1);
+            for (let count = 0; count < 50 && child.getVisible(); count++) await new Promise(resolve => setTimeout(resolve, 20));
+            return child.getVisible();
+        }), false, 'The remote KSIS view cannot cover a shared confirmation');
+        await main.locator('#appDialogCancel').click();
+        assert.equal(await application.evaluate(async ({ BrowserWindow }) => {
+            const child = BrowserWindow.getAllWindows()[0].contentView.children.at(-1);
+            for (let count = 0; count < 50 && !child.getVisible(); count++) await new Promise(resolve => setTimeout(resolve, 20));
+            return child.getVisible();
+        }), true);
         await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ksis-embedded-remote-test.png') });
         await main.locator('#appMenuButton').click();
         assert.equal(await application.evaluate(async ({ BrowserWindow }) => {

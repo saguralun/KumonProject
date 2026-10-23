@@ -258,15 +258,17 @@ export async function completeWorksheetLevelWithoutAt() {
         return;
     }
 
-    const completion = state.context.completionState?.freeLevelCompletion;
+    const context = state.context;
+    const completion = context.completionState?.freeLevelCompletion;
 
     if (!completion?.canComplete) {
         return;
     }
 
-    if (!window.confirm(`จบ Level ${completion.currentLevelCode} และเลื่อนเป็น ${completion.nextLevelCode} ใช่ไหม?`)) {
+    if (!await confirmAction(`จบ Level ${completion.currentLevelCode} และเลื่อนเป็น ${completion.nextLevelCode} ใช่ไหม?`)) {
         return;
     }
+    if (state.context !== context || state.isCompletingLevel || state.isSaving) return;
 
     state.isCompletingLevel = true;
     updateSecondaryActions();
@@ -274,9 +276,10 @@ export async function completeWorksheetLevelWithoutAt() {
 
     try {
         const result = await worksheetApi.completeWorksheetLevel({
-            enrollmentId: state.context.enrollment.enrollmentId
+            enrollmentId: context.enrollment.enrollmentId
         });
 
+        if (state.context !== context) return;
         await loadEnrollmentContext(result.enrollmentId);
         setStatus(`จบ ${result.previousLevelCode} แล้ว และเปลี่ยนเป็น ${result.nextLevelCode}`, "success");
     } catch (error) {

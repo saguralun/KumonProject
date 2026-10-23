@@ -100,7 +100,7 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
     } finally { preview = null; busy = false; render(); }
   });
   get('ksisAtAcknowledge').addEventListener('click', async () => {
-    if (busy || !window.confirm('ยืนยันว่าบันทึกเองหรือยกเลิกข้อมูล AT ค้างบน KSIS แล้วใช่ไหม?')) return;
+    if (busy || !await confirmAction('ยืนยันว่าบันทึกเองหรือยกเลิกข้อมูล AT ค้างบน KSIS แล้วใช่ไหม?')) return;
     busy = true; controls();
     try { await call('acknowledge'); pending = false; source.textContent = 'จัดการข้อมูลค้างแล้ว กรุณาเตรียม AT ใหม่'; }
     catch (error) { source.textContent = error.message; setStatus(error.message, 'error'); }

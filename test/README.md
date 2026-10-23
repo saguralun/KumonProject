@@ -59,6 +59,11 @@ restart-helper test, not necessary for this suite's application regression check
 - Report calculations, KSIS identity matching, WS/AT previews and audits,
   guarded saves, pagination, shared embedded workspace and responsive layout
   using synthetic fixtures.
+- All 17 pages' declared button wiring and shared in-app confirmations, plus
+  browser/Electron workflow tests for Stock Receive/Cut, Opening Schedule,
+  Backup/Restore, permissions, table paging, Progress subject races, CD/history,
+  Forecast views and valid downloadable Report/Forecast Excel workbooks. The
+  page matrix and operational limits are in `CONTROLS-AUDIT-2026-10-23.md`.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

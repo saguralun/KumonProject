@@ -141,14 +141,16 @@ async function refreshHistory() {
         return;
     }
 
+    const context = state.context, date = els.receiveDate.value, limit = Number(els.historyLimit.value);
     try {
         const data = await worksheetApi.getHistory(
-            state.context.enrollment.enrollmentId,
-            Number(els.historyLimit.value),
+            context.enrollment.enrollmentId,
+            limit,
             {
-                billingDate: els.receiveDate.value
+                billingDate: date
             }
         );
+        if (state.context !== context || els.receiveDate.value !== date || Number(els.historyLimit.value) !== limit) return;
 
         state.history = data.history || [];
         state.worksheetMonthSummary = data.worksheetMonthSummary || state.worksheetMonthSummary;
@@ -157,7 +159,7 @@ async function refreshHistory() {
         renderWorksheetMonthSummary(state.worksheetMonthSummary);
         updateHistorySubtitle();
     } catch (error) {
-        setStatus(error.message, "error");
+        if (state.context === context && els.receiveDate.value === date) setStatus(error.message, "error");
     }
 }
 
@@ -275,6 +277,7 @@ async function deleteHistoryRecord(worksheetUsedId) {
         return;
     }
 
+    const context = state.context;
     const recordId = Number(worksheetUsedId);
     const row = state.history.find((item) =>
         Number(item.worksheetUsedId) === recordId
@@ -287,15 +290,17 @@ async function deleteHistoryRecord(worksheetUsedId) {
         return;
     }
 
-    if (!window.confirm("ลบ record นี้ใช่ไหม?")) {
+    if (!await confirmAction("ลบ record นี้ใช่ไหม?")) {
         return;
     }
+    if (state.context !== context || state.isSaving) return;
 
     try {
         const result = await worksheetApi.deleteEntry({
-            enrollmentId: state.context.enrollment.enrollmentId,
+            enrollmentId: context.enrollment.enrollmentId,
             worksheetUsedId: recordId
         });
+        if (state.context !== context) return;
 
         state.history = state.history.filter((item) =>
             Number(item.worksheetUsedId) !== recordId

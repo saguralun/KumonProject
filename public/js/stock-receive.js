@@ -39,6 +39,9 @@ const state = {
   // masterId -> quantity string, as typed into the grid
   quantities: new Map(),
   selectedDoId: null,
+  detailRequest: 0,
+  detailBusy: false,
+  savingDo: false,
   searchTimer: null,
   // Row count for the item grid, derived per-type from that type's own
   // largest level (e.g. 20 worksheets = 10 rows for WS; far fewer for CD)
@@ -334,7 +337,7 @@ function updateTotals() {
   const totalQty = entries.reduce((sum, [, value]) => sum + Number(value), 0);
 
   els.doTotal.textContent = `รวม ${entries.length} รายการ • ${totalQty} ชุด`;
-  els.saveDoButton.disabled = entries.length === 0;
+  els.saveDoButton.disabled = state.savingDo || entries.length === 0;
 }
 
 els.typeButtons.addEventListener("click", (event) => {
@@ -380,6 +383,7 @@ els.doItemsGrid.addEventListener("input", (event) => {
 
 els.doForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (state.savingDo) return;
 
   const formData = new FormData(els.doForm);
   const items = [...state.quantities.entries()]
@@ -392,6 +396,7 @@ els.doForm.addEventListener("submit", async (event) => {
   }
 
   els.saveDoButton.disabled = true;
+  state.savingDo = true; els.doFormPanel.inert = true;
   setStatus("กำลังบันทึก...");
 
   try {
@@ -422,6 +427,7 @@ els.doForm.addEventListener("submit", async (event) => {
   } catch (error) {
     setStatus(error.message, "error");
   } finally {
+    state.savingDo = false; els.doFormPanel.inert = false;
     updateTotals();
   }
 });
@@ -452,8 +458,9 @@ function setDefaultDates() {
   els.doForm.elements.receiveDate.value = today;
 }
 
-els.newDoButton.addEventListener("click", () => {
-  if (state.quantities.size > 0 && !window.confirm("ยังไม่ได้บันทึกรายการที่กรอกไว้ เริ่ม DO ใหม่เลยไหม?")) {
+els.newDoButton.addEventListener("click", async () => {
+  if (state.savingDo) return;
+  if (state.quantities.size > 0 && !await confirmAction("ยังไม่ได้บันทึกรายการที่กรอกไว้ เริ่ม DO ใหม่เลยไหม?")) {
     return;
   }
 
@@ -542,11 +549,12 @@ async function loadDeliveryOrders() {
   }
 }
 
-function quickFillDo(button) {
+async function quickFillDo(button) {
+  if (state.savingDo) return;
   const { doNo, outDate, receiveDate, type } = button.dataset;
   const form = els.doForm;
 
-  if (state.quantities.size > 0 && !window.confirm(`ยังไม่ได้บันทึกรายการที่กรอกไว้ เอาเลข DO '${doNo}' มาใส่แทนเลยไหม?`)) {
+  if (state.quantities.size > 0 && !await confirmAction(`ยังไม่ได้บันทึกรายการที่กรอกไว้ เอาเลข DO '${doNo}' มาใส่แทนเลยไหม?`)) {
     return;
   }
 
@@ -595,10 +603,12 @@ els.doSearch.addEventListener("input", () => {
 // ---- DO detail modal ----
 
 async function openDoDetail(doId) {
+  const requestId = ++state.detailRequest;
   state.selectedDoId = doId;
 
   try {
     const data = await requestJson(`/api/stock-receive/dos/${doId}`);
+    if (requestId !== state.detailRequest || state.selectedDoId !== doId) return;
     const deliveryOrder = data.deliveryOrder;
 
     els.doDetailTitle.textContent = `DO ${deliveryOrder.doNo}`;
@@ -665,13 +675,21 @@ async function openDoDetail(doId) {
     els.doDeleteButton.classList.toggle("hidden", deliveryOrder.isStockProcessed);
     els.doDetailModal.classList.remove("hidden");
   } catch (error) {
+    if (requestId !== state.detailRequest || state.selectedDoId !== doId) return;
     setStatus(error.message, "error");
   }
 }
 
 function closeDoDetail() {
+  state.detailRequest++;
   els.doDetailModal.classList.add("hidden");
   state.selectedDoId = null;
+}
+
+function setDetailBusy(busy) {
+  state.detailBusy = busy;
+  els.doProcessButton.disabled = els.doDeleteButton.disabled = busy;
+  els.doDetailBody.inert = busy;
 }
 
 els.doDetailClose.addEventListener("click", closeDoDetail);
@@ -684,26 +702,31 @@ els.doDetailModal.addEventListener("mousedown", (event) => {
 els.doDetailBody.addEventListener("click", async (event) => {
   const deleteButton = event.target.closest("[data-delete-receive-id]");
 
-  if (!deleteButton || !state.selectedDoId) {
+  if (!deleteButton || !state.selectedDoId || state.detailBusy) {
     return;
   }
+  const doId = state.selectedDoId;
 
-  if (!window.confirm("ลบรายการนี้ใช่ไหม?")) {
+  if (!await confirmAction("ลบรายการนี้ใช่ไหม?")) {
     return;
   }
+  if (state.selectedDoId !== doId || deleteButton.disabled || state.detailBusy) return;
 
   deleteButton.disabled = true;
+  setDetailBusy(true);
 
   try {
-    await requestJson(`/api/stock-receive/dos/${state.selectedDoId}/items/${deleteButton.dataset.deleteReceiveId}`, {
+    await requestJson(`/api/stock-receive/dos/${doId}/items/${deleteButton.dataset.deleteReceiveId}`, {
       method: "DELETE"
     });
     setStatus("ลบรายการแล้ว", "success");
-    await openDoDetail(state.selectedDoId);
+    if (state.selectedDoId === doId) await openDoDetail(doId);
     await loadDeliveryOrders();
   } catch (error) {
     setStatus(error.message, "error");
     deleteButton.disabled = false;
+  } finally {
+    setDetailBusy(false);
   }
 });
 
@@ -713,6 +736,8 @@ els.doDetailBody.addEventListener("change", async (event) => {
   if (!input || !state.selectedDoId) {
     return;
   }
+  if (state.detailBusy) { input.value = input.dataset.originalQuantity; return; }
+  const doId = state.selectedDoId;
 
   const newQuantity = Number(input.value);
   const originalQuantity = Number(input.dataset.originalQuantity);
@@ -728,66 +753,73 @@ els.doDetailBody.addEventListener("change", async (event) => {
   }
 
   input.disabled = true;
+  setDetailBusy(true);
 
   try {
-    await requestJson(`/api/stock-receive/dos/${state.selectedDoId}/items/${input.dataset.receiveId}`, {
+    await requestJson(`/api/stock-receive/dos/${doId}/items/${input.dataset.receiveId}`, {
       method: "PATCH",
       body: JSON.stringify({ quantity: newQuantity })
     });
     setStatus("แก้จำนวนแล้ว", "success");
-    await openDoDetail(state.selectedDoId);
+    if (state.selectedDoId === doId) await openDoDetail(doId);
     await loadDeliveryOrders();
   } catch (error) {
     setStatus(error.message, "error");
     input.value = originalQuantity;
     input.disabled = false;
+  } finally {
+    setDetailBusy(false);
   }
 });
 
 els.doProcessButton.addEventListener("click", async () => {
-  if (!state.selectedDoId) {
+  if (!state.selectedDoId || state.detailBusy) {
     return;
   }
+  const doId = state.selectedDoId;
 
-  if (!window.confirm("Process DO นี้เข้า stock จริงใช่ไหม? บวกจำนวนเข้า stock.quantity ทันที")) {
+  if (!await confirmAction("Process DO นี้เข้า stock จริงใช่ไหม? บวกจำนวนเข้า stock.quantity ทันที")) {
     return;
   }
+  if (state.selectedDoId !== doId || els.doProcessButton.disabled || state.detailBusy) return;
 
-  els.doProcessButton.disabled = true;
+  setDetailBusy(true);
 
   try {
-    const data = await requestJson(`/api/stock-receive/dos/${state.selectedDoId}/process`, { method: "POST" });
+    const data = await requestJson(`/api/stock-receive/dos/${doId}/process`, { method: "POST" });
 
     setStatus(`Process DO ${data.doNo} เข้า stock แล้ว (${data.itemsProcessed} รายการ)`, "success");
-    closeDoDetail();
+    if (state.selectedDoId === doId) closeDoDetail();
     await loadDeliveryOrders();
   } catch (error) {
     setStatus(error.message, "error");
   } finally {
-    els.doProcessButton.disabled = false;
+    setDetailBusy(false);
   }
 });
 
 els.doDeleteButton.addEventListener("click", async () => {
-  if (!state.selectedDoId) {
+  if (!state.selectedDoId || state.detailBusy) {
     return;
   }
+  const doId = state.selectedDoId;
 
-  if (!window.confirm("ลบ DO นี้ใช่ไหม? ลบได้เฉพาะ DO ที่ยังไม่ได้ Process")) {
+  if (!await confirmAction("ลบ DO นี้ใช่ไหม? ลบได้เฉพาะ DO ที่ยังไม่ได้ Process")) {
     return;
   }
+  if (state.selectedDoId !== doId || els.doDeleteButton.disabled || state.detailBusy) return;
 
-  els.doDeleteButton.disabled = true;
+  setDetailBusy(true);
 
   try {
-    await requestJson(`/api/stock-receive/dos/${state.selectedDoId}`, { method: "DELETE" });
+    await requestJson(`/api/stock-receive/dos/${doId}`, { method: "DELETE" });
     setStatus("ลบ DO แล้ว", "success");
-    closeDoDetail();
+    if (state.selectedDoId === doId) closeDoDetail();
     await loadDeliveryOrders();
   } catch (error) {
     setStatus(error.message, "error");
   } finally {
-    els.doDeleteButton.disabled = false;
+    setDetailBusy(false);
   }
 });
 

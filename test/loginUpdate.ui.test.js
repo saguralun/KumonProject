@@ -14,7 +14,6 @@ test('Login update requires confirmation but no credentials, recovers errors and
         const page = await browser.newPage({ viewport: { width: 390, height: 844 } }), updates = [], errors = [], logins = [];
         let updated = false, failUpdate = true, confirm = false, loads = 0;
         page.on('pageerror', (error) => errors.push(error.message));
-        page.on('dialog', (dialog) => confirm ? dialog.accept() : dialog.dismiss());
         await page.route('**/api/**', (route) => {
             const pathname = new URL(route.request().url()).pathname;
             let data = { success: true }, status = 200;
@@ -34,11 +33,12 @@ test('Login update requires confirmation but no credentials, recovers errors and
         await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-login-update-mobile.png'), fullPage: true });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
         await page.locator('#loginUpdateButton').click();
+        await page.locator('#appDialogCancel').click();
         assert.equal(updates.length, 0);
-        confirm = true; await page.locator('#loginUpdateButton').click();
+        confirm = true; await page.locator('#loginUpdateButton').click(); await page.locator('#appDialogConfirm').click();
         await page.waitForFunction(() => document.getElementById('loginMessage').textContent.includes('unavailable'));
         for (const id of ['loginUpdateButton', 'adminSubmit', 'guestSubmit']) assert.equal(await page.locator(`#${id}`).isEnabled(), true);
-        failUpdate = false; await page.locator('#loginUpdateButton').click();
+        failUpdate = false; await page.locator('#loginUpdateButton').click(); await page.locator('#appDialogConfirm').click();
         await page.waitForFunction(() => document.getElementById('loginMessage').textContent.includes('กำลังรอ'));
         assert.equal(await page.locator('#adminSubmit').isDisabled(), true); assert.equal(loads, 1);
         updated = true;
