@@ -1,4 +1,4 @@
-import { setupKsisDraft } from "./reportKsisDraft.js?v=20261023-ws-recovery";
+import { setupKsisDraft } from "./reportKsisDraft.js?v=20261023-ws-login-recovery";
 import { setupKsisMatching } from "./reportKsisMatching.js?v=20261022-workspace";
 import { setupKsisAudit } from "./ksisAudit.js?v=20261023-shared";
 import { setupKsisDesktop } from "./ksisDesktop.js?v=20261023-unified-app";

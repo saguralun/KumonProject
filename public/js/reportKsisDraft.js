@@ -4,6 +4,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   const inspect = get('ksisDraftInspect');
   const subject = get("ksisDraftSubject"), source = get("ksisDraftSource"), container = get("ksisDraftRows"), dialog = get("ksisDraftDialog");
   let preview = null, result = null, inspection = null, busy = false, pending = false, generation = 0;
+  let automaticallyChecked = null;
   const confirmedMatches = new Set();
   const eligibleRows = () => (preview?.rows || []).filter((row) => row.ready && (!row.requiresIdentityConfirmation || confirmedMatches.has(row.key)));
   const call = (action, data) => requestJson(`/api/ksis/draft/${action}`, { method: "POST", body: JSON.stringify(data) }).finally(() => { void shared?.refresh(true); });
@@ -28,6 +29,9 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
       <td>${text(row.before?.level.value || "—")} ${text(row.before?.worksheet.value)} → ${text(row.desired.level || "คงเดิม")} ${text(row.desired.worksheet ?? "")}</td>
       <td>${text(row.before?.used.value ?? "—")} → ${text(row.desired.used)}</td><td>${text(row.before?.status.value || "—")} → ${text(row.desired.status)}</td>
       <td><span class="match-state ${result ? outcomes[row.outcome]?.[1] || "match-review" : row.ready ? row.requiresIdentityConfirmation && !confirmedMatches.has(row.key) ? "match-review" : "match-exact" : "match-conflict"}">${result ? outcomes[row.outcome]?.[0] || "ยังไม่ได้กรอก" : row.ready ? row.requiresIdentityConfirmation && !confirmedMatches.has(row.key) ? "รอยืนยันคู่ชื่อและวันเกิด" : "พร้อมกรอก" : text(row.reason)}</span>${result && row.resultReason ? `<div class="draft-result-reason${["filled", "saved"].includes(row.outcome) ? " draft-result-notice" : ""}">${text(row.resultReason)}</div>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="empty-state">${preview && !preview.rows.length ? "ไม่มีรายการใน Report ของเดือนและวิชาที่เลือก (รายชื่อมาจากบิลหรือประวัติสถานะของเดือนนั้น)" : preview?.rows.some((row) => row.before && row.skipped) ? "ข้ามรายการสถานะ A ในหน้านี้ ให้จัดการสถานะเองบน KSIS" : "ไม่มีข้อมูลตรงกับหน้า KSIS ปัจจุบัน"}</div>`;
+    if (result && inspection?.previousResultUnverified) {
+      container.innerHTML = `<details class="draft-previous-result"><summary>ผลรอบก่อน • บันทึกยืนยันแล้ว ${text(result.savedCount || 0)} รายวิชา • รายการที่เหลือต้องตรวจ WS หลังเข้าสู่ระบบ</summary>${container.innerHTML}</details>`;
+    }
     buttons();
   }
   get("ksisDraftButton").addEventListener("click", open);
@@ -80,7 +84,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     }
     finally { busy = false; preview = null; render(); }
   });
-  inspect.addEventListener('click', async () => {
+  const inspectCurrent = async () => {
     if (busy) return;
     busy = true; buttons();
     try {
@@ -88,7 +92,8 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
       source.textContent = inspection.message; setStatus(inspection.message, pending ? 'error' : 'neutral');
     } catch (error) { source.textContent = error.message; setStatus(error.message, 'error'); }
     finally { busy = false; render(); }
-  });
+  };
+  inspect.addEventListener('click', inspectCurrent);
   acknowledge.addEventListener("click", async () => {
     if (busy) return;
     if (!window.confirm("ยืนยันว่าตรวจและบันทึก หรือยกเลิกข้อมูลค้างใน KSIS ด้วยตนเองเรียบร้อยแล้วใช่ไหม?")) return;
@@ -110,5 +115,10 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : inspection?.message || (state.requiresLogin ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่' : result ? `${result.error || ''} • บันทึกแล้ว ${result.savedCount || 0} รายวิชา • หน้า ${result.page}` : 'ยังไม่ได้เตรียมข้อมูล'));
     if (workspace.active) setStatus(source.textContent, state.error || pending ? 'error' : 'neutral');
     render();
+    const attempt = result?.attemptId || JSON.stringify([result?.error, result?.page, result?.savedCount, result?.rows?.map((row) => row.key)]);
+    if (workspace.active && pending && !busy && result && automaticallyChecked !== attempt) {
+      automaticallyChecked = attempt;
+      void inspectCurrent();
+    }
   });
 }

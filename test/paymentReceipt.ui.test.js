@@ -13,11 +13,16 @@ for (const embedded of [false, true]) test(`Choosing two of three subjects, canc
     const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
     let browser, desktop, root;
     try {
-        const paid = new Set(), payments = [], errors = []; let rejectNext = true;
+        const paid = new Set(), payments = [], errors = []; let rejectNext = true, prepares = 0;
         const handler = (route) => {
             const pathname = new URL(route.request().url()).pathname;
             let data = { success: true };
             if (pathname === '/api/auth/me') data = { user: { role: 'admin' }, permissions: ['*'] };
+            if (pathname === '/api/system/database/status') data = { success: true, ready: false, required: true };
+            if (pathname === '/api/system/database/prepare') {
+                assert.equal(route.request().postDataJSON().confirm, true); prepares++;
+                data = { success: true, ready: true, applied: true, backup: 'fixture-before-upgrade.backup' };
+            }
             if (pathname === '/api/payment/printer-status') data = { success: true, supported: false };
             if (pathname === '/api/payment/status') data = { success: true, billingMonth: 10, billingYear: 2026,
                 summary: {}, rows: [{ studentId: 1, studentName: 'Test Student', sourceEnrollmentId: 103, subjects: 'ME, EFL, TRP', isPaid: false, isPartial: paid.size > 0, expectedNetAmount: 5100, unpaidNetAmount: 1700 }] };
@@ -50,12 +55,19 @@ for (const embedded of [false, true]) test(`Choosing two of three subjects, canc
             await page.goto(`${origin}/payment.html`);
         }
         page.on('pageerror', (error) => errors.push(error.message));
+        if (!embedded) await page.setViewportSize({ width: 390, height: 844 });
         await page.locator('[data-receipt-row-index]').click();
+        await page.locator('#receiptPrepareDatabase').click();
+        assert.equal(prepares, 0); assert.equal(payments.length, 0);
+        await page.locator('#receiptConfirmAccept').click();
+        await page.waitForFunction(() => document.getElementById('receiptMessage').textContent.includes('ฐานข้อมูลพร้อมแล้ว'));
+        assert.equal(prepares, 1); assert.equal(payments.length, 0);
         await page.locator('[data-receipt-enrollment][value="103"]').uncheck();
         assert.equal(await page.locator('[data-receipt-enrollment]:checked').count(), 2);
         assert.match(await page.locator('#receiptPaper .receipt-total').innerText(), /3,400/);
         await page.locator('#receiptReceivePayment').click();
         assert.match(await page.locator('#receiptConfirmMessage').innerText(), /จำนวนวิชา: 2/);
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
         assert.equal(payments.length, 0);
         await page.screenshot({ path: path.join(os.tmpdir(), `kumondb-partial-payment-confirm-${embedded}.png`), fullPage: true });
         await page.evaluate(() => {

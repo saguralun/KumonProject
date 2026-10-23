@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { openSync, closeSync } from "fs";
 import { randomUUID } from "crypto";
 import { httpError } from "./httpError.js";
+import { preparePaymentDatabase } from './databaseUpgradeService.js';
 
 const execFileAsync = promisify(execFile);
 const REPO_DIR = process.cwd();
@@ -156,6 +157,7 @@ async function performUpdate() {
         );
     }
 
+    await preparePaymentDatabase();
     const { stdout: newHead } = await runGit(["rev-parse", "HEAD"]);
     await scheduleAppRestart();
 

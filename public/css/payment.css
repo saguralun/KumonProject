@@ -726,6 +726,9 @@ html[data-role="instructor"] .payment-unpaid-label { display: none; }
   color: var(--text);
 }
 
+.receipt-message.is-neutral { border-color: var(--line); background: var(--surface-soft); color: var(--text); }
+.receipt-message.is-success { border-color: #a7e3cd; background: var(--green-soft); color: var(--green); }
+
 .receipt-confirm-dialog::backdrop { background: #0f172a80; }
 .receipt-confirm-dialog h2 { margin: 0 0 12px; font-size: 18px; }
 .receipt-confirm-dialog p { white-space: pre-line; overflow-wrap: anywhere; }

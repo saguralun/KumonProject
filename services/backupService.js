@@ -148,7 +148,7 @@ export async function runBackupNow() {
         await execFileAsync(
             "powershell.exe",
             ["-ExecutionPolicy", "Bypass", "-NoProfile", "-File", BACKUP_SCRIPT],
-            { cwd: PROJECT_DIR, timeout: 5 * 60 * 1000 }
+            { cwd: PROJECT_DIR, timeout: 5 * 60 * 1000, windowsHide: true }
         );
     } catch (error) {
         throw httpError(500, `รัน backup ไม่สำเร็จ: ${String(error.stderr || error.message || error).trim()}`);

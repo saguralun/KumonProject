@@ -13,6 +13,7 @@ import { saveWorksheetEntries } from '../services/worksheetService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
 import { applyEnrollmentStatusAction } from '../services/studentService.js';
+import { preparePaymentDatabase, paymentDatabaseStatus } from '../services/databaseUpgradeService.js';
 
 const run = promisify(execFile);
 const enabled = process.platform === 'win32' && process.env.TEST_ISOLATED_PG === '1';
@@ -53,6 +54,27 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             await database.query(migration); await database.query(migration);
             const columns = await database.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='kumon' AND table_name='billing_detail' AND column_name IN ('inserted_status_history_id','payment_status_updated_at')`);
             assert.equal(columns.rows.length, 2);
+        });
+        await t.test('Admin schema preparation refuses failed backups, saves a real disposable dump before DDL and is idempotent', async () => {
+            await database.query('ALTER TABLE kumon.billing_detail DROP COLUMN inserted_status_history_id, DROP COLUMN payment_status_updated_at');
+            await assert.rejects(preparePaymentDatabase({ database, backup: async () => { throw new Error('fixture backup failed'); } }), /fixture backup failed/);
+            assert.equal((await paymentDatabaseStatus(database)).ready, false);
+            await assert.rejects(preparePaymentDatabase({ database, backup: async () => ({ filename: 'empty.backup', sizeBytes: 0 }) }), { statusCode: 500 });
+            assert.equal((await paymentDatabaseStatus(database)).ready, false);
+            let backups = 0;
+            const snapshot = path.join(root, 'before-payment-upgrade.backup');
+            const backup = async () => {
+                backups++;
+                assert.equal((await paymentDatabaseStatus(database)).ready, false);
+                await run(path.join(bin, 'pg_dump.exe'), ['-h', '127.0.0.1', '-p', String(port), '-U', username, '-d', 'postgres', '-Fc', '-f', snapshot], { env: environment, windowsHide: true, timeout: 30000 });
+                return { filename: path.basename(snapshot), sizeBytes: (await fs.stat(snapshot)).size };
+            };
+            const result = await preparePaymentDatabase({ database, backup });
+            assert.equal(result.ready, true); assert.equal(result.applied, true); assert.equal(backups, 1);
+            const listing = await run(path.join(bin, 'pg_restore.exe'), ['--list', snapshot], { env: environment, windowsHide: true, timeout: 10000 });
+            assert.match(listing.stdout, /TABLE DATA kumon billing_detail/);
+            assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.billing')).rows[0].n, 0);
+            assert.equal((await preparePaymentDatabase({ database, backup })).applied, false); assert.equal(backups, 1);
         });
         const statuses = new Map((await database.query('SELECT status_code,status_id FROM kumon.status_master')).rows.map((row) => [row.status_code, row.status_id]));
         const ws = (await database.query(`SELECT wm.worksheet_master_id,wm.worksheet_no,wm.level_master_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id WHERE lm.subject_id=1 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1`)).rows[0];

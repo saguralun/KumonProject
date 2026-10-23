@@ -10,7 +10,7 @@ const document = () => ({ context: "ชื่อศูนย์ TEST ประ�
         level: field("C", ["C", "D"]), worksheet: field("80", ["80", "90", "100"]), used: field("0"), status: field("C", ["C", "A", "R", "OT"]) }] });
 const period = { month: 10, year: 2026 };
 
-test('WS recovery only reads the current page and preserves pending edits, login and unresolved saves', async () => {
+test('WS recovery reads only the current page and unlocks logout without mistaking old results for saved data', async () => {
     for (const mode of ['dirty', 'modal', 'loading', 'login', 'other', 'saving', 'clean']) {
         let releases = 0, reads = 0;
         const doc = document();
@@ -22,19 +22,21 @@ test('WS recovery only reads the current page and preserves pending edits, login
             evaluate: async () => { reads++; return doc; } };
         const result = await inspectKsisWsDraft(page, session);
         assert.equal(result.readOnly, true); assert.equal(result.refreshed, false);
-        assert.equal(releases, 1); assert.equal(result.recovered, mode === 'clean');
-        assert.equal(session.pendingDraft, mode !== 'clean');
-        assert.equal(result.pendingDraft, mode !== 'clean');
+        const recovered = ['clean', 'login'].includes(mode);
+        assert.equal(releases, 1); assert.equal(result.recovered, recovered);
+        assert.equal(session.pendingDraft, !recovered);
+        assert.equal(result.pendingDraft, !recovered);
         assert.equal(result.requiresLogin, mode === 'login');
         assert.equal(reads, ['login', 'other', 'saving'].includes(mode) ? 0 : 1);
         if (mode === 'clean') { assert.equal(session.draftGuard, null); assert.equal(result.saved, undefined); }
     }
 });
 
-test('Only explicit acknowledgement may dismiss a logged-out WS job, never an unresolved save', async () => {
+test('Logout releases only WS editing locks, keeps the prior result unverified and never dismisses an unresolved save', async () => {
     const page = { url: () => 'https://kao.ksis.kumon.com/kth/#/login' };
     const session = { pendingDraft: true };
-    assert.equal((await inspectKsisWsDraft(page, session)).recovered, false);
+    const inspected = await inspectKsisWsDraft(page, session);
+    assert.equal(inspected.recovered, true); assert.equal(inspected.previousResultUnverified, true);
     const result = await inspectKsisWsDraft(page, session, { acknowledge: true });
     assert.equal(result.acknowledged, true); assert.equal(session.pendingDraft, false);
     assert.equal(result.saved, undefined); assert.equal(result.requiresLogin, true);

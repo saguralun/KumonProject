@@ -492,7 +492,7 @@ export async function applyKsisReportDraft({ userId, previewId, saveAfterFill = 
         // A stopped WS job must not intercept the user's corrections or the next login.
         finally { await guard.release(); if (!session.pendingDraft) guard.dispose(); }
         result.rows = result.rows.map((row) => progress.savedKeys.includes(row.key) ? { ...row, outcome: "saved" } : row);
-        return { ...result, savedCount: progress.savedKeys.length, studentsSaved: new Set(result.rows.filter((row) => row.outcome === "saved").map(ksisDraftStudentKey)).size,
+        return { ...result, attemptId: previewId, savedCount: progress.savedKeys.length, studentsSaved: new Set(result.rows.filter((row) => row.outcome === "saved").map(ksisDraftStudentKey)).size,
             batchesSaved: progress.batchesSaved, saveRequests: guard.saveResults().length, page: document.page, pendingDraft: session.pendingDraft };
     });
 }
@@ -503,7 +503,6 @@ export async function inspectKsisWsDraft(page, session, { acknowledge = false } 
     if (session.draftGuard?.pendingSaveCount()) return { ...state, message: 'KSIS ยังไม่ตอบกลับการบันทึก กรุณารอและตรวจผลก่อน ไม่ส่งซ้ำ' };
     const url = new URL(page.url());
     const login = url.origin === new URL(REPORT_URL).origin && /^#\/login(?:[/?]|$)/.test(url.hash);
-    if (login && !acknowledge) return { ...state, requiresLogin: true, message: 'KSIS ออกจากระบบแล้ว กรุณาเข้าสู่ระบบและเปิด Report B แล้วกดตรวจสถานะอีกครั้ง ยังไม่ยืนยันว่ารอบเดิมบันทึกสำเร็จ' };
     if (!login) {
         if (page.url() !== REPORT_URL) return { ...state, message: 'กรุณาเปิดหน้า Report B ที่ต้องการตรวจ โปรแกรมจะไม่เปลี่ยนหน้าหรือรีเฟรชให้' };
         const document = await page.evaluate(readKsisDraftDocument);
@@ -514,8 +513,8 @@ export async function inspectKsisWsDraft(page, session, { acknowledge = false } 
     if (session.draftGuard?.pendingSaveCount()) return { ...state, message: 'KSIS ยังไม่ตอบกลับการบันทึก กรุณารอและตรวจผลก่อน ไม่ส่งซ้ำ' };
     session.draftGuard?.dispose?.();
     session.pendingDraft = false; session.draftGuard = null;
-    return { ...state, requiresLogin: login, recovered: true, pendingDraft: false, acknowledged: acknowledge,
-        message: login ? 'รับทราบว่ายกเลิกงานค้างแล้ว กรุณาเข้าสู่ระบบและเตรียมข้อมูลใหม่ ผลบันทึกรอบเดิมยังไม่ยืนยัน'
+    return { ...state, requiresLogin: login, recovered: true, pendingDraft: false, acknowledged: acknowledge, previousResultUnverified: login,
+        message: login ? 'KSIS ออกจากระบบแล้ว ปลดล็อกงานเดิมแล้ว กรุณาเข้าสู่ระบบและเตรียมข้อมูลใหม่ ผลบันทึกรอบเดิมยังไม่ยืนยัน'
             : 'ไม่พบข้อมูลแก้ค้างในหน้านี้ ปลดล็อกแล้ว กรุณาเตรียมข้อมูลใหม่หรือตรวจ WS เพื่อยืนยันผลบันทึกเดิม' };
 }
 
