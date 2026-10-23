@@ -311,10 +311,13 @@ export async function fillKsisReportRows(page, rows, guard, { includeSupplementa
         if (selected?.trim() !== String(label)) await locator.selectOption({ label: String(label) }, { timeout: 8000 });
     };
     const fillNumber = async (container, value, field) => {
-        const input = container.locator("input:visible");
-        // Kendo swaps its formatted input for the editable input on focus.
+        const widgetInput = container.locator('input[data-role="numerictextbox"]:not([readonly]):not([disabled])');
+        const hasWidget = await widgetInput.count() === 1;
         step = `เปิดช่อง ${field}`;
-        await input.click({ timeout: 8000 });
+        // Some Kendo versions leave the readonly display visible beside the editor.
+        if (hasWidget && await widgetInput.isVisible()) await widgetInput.click({ timeout: 8000 });
+        else await container.locator('input:visible').first().click({ timeout: 8000 });
+        const input = hasWidget ? widgetInput : container.locator('input:visible:not([readonly]):not([disabled])');
         step = `กรอก ${field}`;
         await input.fill(String(value), { timeout: 8000 });
         step = `ยืนยันค่า ${field}`;
@@ -519,11 +522,47 @@ export async function inspectKsisWsDraft(page, session, { acknowledge = false } 
 }
 
 export async function inspectKsisReportDraft({ userId, acknowledge = false }) {
-    return withKsisPage({ sourceUrl: REPORT_URL, userId, allowPendingDraft: true, navigate: false }, (page, session) => inspectKsisWsDraft(page, session, { acknowledge }));
+    return withKsisPage({ sourceUrl: REPORT_URL, userId, allowPendingDraft: true, navigate: false, focus: false }, (page, session) => inspectKsisWsDraft(page, session, { acknowledge }));
 }
 
 export async function acknowledgeKsisReportDraft({ userId }) {
     const result = await inspectKsisReportDraft({ userId, acknowledge: true });
     if (!result.recovered) throw httpError(409, result.message);
     return result;
+}
+
+export async function resetKsisWsDraft(page, session, { confirmDiscard = false } = {}) {
+    if (confirmDiscard !== true) throw httpError(400, 'กรุณายืนยันยกเลิกค่าที่ยังไม่บันทึกก่อนล้างรอบค้าง');
+    if (session.pendingAt) throw httpError(409, 'มี AT ค้างอยู่ กรุณาจัดการในแท็บ AT ก่อน');
+    await session.draftGuard?.release();
+    if (session.draftGuard?.pendingSaveCount()) throw httpError(409, 'KSIS ยังไม่ตอบกลับการบันทึก ต้องตรวจผลก่อนล้างรอบค้าง');
+    const url = new URL(page.url());
+    const login = url.origin === new URL(REPORT_URL).origin && /^#\/login(?:[/?]|$)/.test(url.hash);
+    let refreshed = false;
+    if (!login) {
+        if (page.url() !== REPORT_URL) throw httpError(409, 'กรุณาเปิด Report B ก่อนล้างรอบค้าง ไม่เปลี่ยนหน้าอื่นให้');
+        const document = await page.evaluate(readKsisDraftDocument);
+        if (document.modalOpen) throw httpError(409, 'กรุณาปิดหน้าต่างย่อย KSIS ก่อนล้างรอบ WS');
+        // Reload must discard edits, never trigger an unload-time autosave.
+        const blockWrites = (route) => isKsisDraftReadRequest(route.request().method(), route.request().url(), route.request().resourceType())
+            ? route.fallback() : route.abort('blockedbyclient');
+        await page.route('**/*', blockWrites);
+        try {
+            if (session.draftGuard?.pendingSaveCount()) throw httpError(409, 'KSIS ยังไม่ตอบกลับการบันทึก ต้องตรวจผลก่อนล้างรอบค้าง');
+            await page.reload({ waitUntil: 'domcontentloaded', timeout: 25000 });
+            await loadedDocument(page);
+            refreshed = true;
+        } finally { await page.unroute('**/*', blockWrites); }
+    }
+    session.draftGuard?.dispose?.(); session.draftGuard = null; session.pendingDraft = false;
+    return { reset: true, recovered: true, pendingDraft: false, requiresLogin: login || page.url().includes('#/login'), refreshed, previousResultUnverified: true,
+        message: 'ล้างรอบค้างแล้ว ไม่ได้กรอกหรือบันทึกเพิ่ม กรุณาตรวจ WS ที่เคยบันทึก และเตรียมข้อมูลใหม่ก่อนเริ่มรอบถัดไป' };
+}
+
+export async function resetKsisReportDraft({ userId, confirmDiscard }) {
+    return withKsisPage({ sourceUrl: REPORT_URL, userId, allowPendingDraft: true, navigate: false, focus: false }, async (page, session) => {
+        const result = await resetKsisWsDraft(page, session, { confirmDiscard });
+        for (const [id, preview] of previews) if (preview.userId === Number(userId)) previews.delete(id);
+        return result;
+    });
 }

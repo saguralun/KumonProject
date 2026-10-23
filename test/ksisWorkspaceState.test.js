@@ -44,12 +44,25 @@ test('Pending AT keeps the saved result and blocks new jobs while permitting rea
     await assert.rejects(runKsisWorkspace(910005, 'at', 'preview', input, async () => assert.fail()), { statusCode: 409 });
     await assert.rejects(runKsisWorkspace(910005, 'draft', 'preview', input, async () => assert.fail()), { statusCode: 409 });
     await assert.rejects(runKsisWorkspace(910005, 'atAudit', 'read', input, async () => assert.fail()), { statusCode: 409 });
+    await assert.rejects(runKsisWorkspace(910005, 'draft', 'reset', { confirmDiscard: true }, async () => assert.fail('Never reset AT through WS')), { statusCode: 409 });
     await runKsisWorkspace(910005, 'at', 'inspect', input, async () => ({ readOnly: true, refreshed: false }));
     const state = readKsisWorkspace(910005);
     assert.equal(state.tools.at.pending, true); assert.deepEqual(state.tools.at.result, result);
     assert.equal(state.tools.at.inspection.readOnly, true); assert.equal(state.busy, false);
     await assert.rejects(runKsisWorkspace(910005, 'at', 'inspect', input, async () => { throw Object.assign(new Error('read failed'), { statusCode: 409 }); }), /read failed/);
     assert.equal(readKsisWorkspace(910005).tools.at.pending, true);
+});
+
+test('Reset cannot clear a running workspace and failed resets keep the prior pending result', async () => {
+    const user = 910009, result = { pendingDraft: true, savedCount: 10, error: 'old timeout' };
+    await runKsisWorkspace(user, 'draft', 'fill', {}, async () => result);
+    await assert.rejects(runKsisWorkspace(user, 'draft', 'reset', {}, async () => ({ reset: false, pendingDraft: true })), { statusCode: 409 });
+    assert.equal(readKsisWorkspace(user).tools.draft.pending, true);
+    assert.deepEqual(readKsisWorkspace(user).tools.draft.result, result);
+    let release; const wait = new Promise((resolve) => { release = resolve; });
+    const operation = runKsisWorkspace(user, 'draft', 'inspect', {}, async () => { await wait; return { readOnly: true }; });
+    await assert.rejects(runKsisWorkspace(user, 'draft', 'reset', {}, async () => assert.fail('Must not interrupt work')), { statusCode: 409 });
+    release(); await operation;
 });
 
 test('AT audit results use the same per-account workspace without consuming a fill preview', async () => {

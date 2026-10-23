@@ -2,9 +2,11 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   const get = (id) => document.getElementById(id);
   const read = get("ksisDraftPreview"), fill = get("ksisDraftFill"), acknowledge = get("ksisDraftAcknowledge");
   const inspect = get('ksisDraftInspect');
+  const reset = get('ksisDraftReset');
   const subject = get("ksisDraftSubject"), source = get("ksisDraftSource"), container = get("ksisDraftRows"), dialog = get("ksisDraftDialog");
   let preview = null, result = null, inspection = null, busy = false, pending = false, generation = 0;
   let automaticallyChecked = null;
+  let active = false;
   const confirmedMatches = new Set();
   const eligibleRows = () => (preview?.rows || []).filter((row) => row.ready && (!row.requiresIdentityConfirmation || confirmedMatches.has(row.key)));
   const call = (action, data) => requestJson(`/api/ksis/draft/${action}`, { method: "POST", body: JSON.stringify(data) }).finally(() => { void shared?.refresh(true); });
@@ -15,6 +17,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     fill.disabled = busy || pending || !eligibleRows().length;
     acknowledge.classList.toggle("hidden", !pending); acknowledge.disabled = busy;
     inspect.classList.toggle('hidden', !pending); inspect.disabled = busy;
+    reset.classList.toggle('hidden', !pending && !result?.stopped && !result?.error); reset.disabled = busy;
     onStateChange({ busy, pending });
   }
   function render() {
@@ -93,7 +96,21 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     } catch (error) { source.textContent = error.message; setStatus(error.message, 'error'); }
     finally { busy = false; render(); }
   };
+  const recoveryTimer = setInterval(() => {
+    if (active && pending && !busy && !document.hidden) void inspectCurrent();
+  }, 5000);
+  window.addEventListener('pagehide', () => clearInterval(recoveryTimer), { once: true });
   inspect.addEventListener('click', inspectCurrent);
+  reset.addEventListener('click', async () => {
+    if (busy || !window.confirm('ล้างรอบค้างและรีเฟรช KSIS ใช่ไหม? ค่าที่ยังไม่บันทึกใน Report B จะถูกยกเลิก โดยไม่กดบันทึก ข้อมูลที่เคยบันทึกแล้วจะไม่ถูกลบและต้องตรวจ WS ก่อนเริ่มใหม่')) return;
+    busy = true; buttons();
+    try {
+      inspection = await call('reset', { confirmDiscard: true });
+      pending = false; preview = null; result = null; confirmedMatches.clear(); automaticallyChecked = null;
+      source.textContent = inspection.message; setStatus(inspection.message);
+    } catch (error) { source.textContent = error.message; setStatus(error.message, 'error'); }
+    finally { busy = false; render(); }
+  });
   acknowledge.addEventListener("click", async () => {
     if (busy) return;
     if (!window.confirm("ยืนยันว่าตรวจและบันทึก หรือยกเลิกข้อมูลค้างใน KSIS ด้วยตนเองเรียบร้อยแล้วใช่ไหม?")) return;
@@ -106,6 +123,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     finally { busy = false; buttons(); }
   });
   shared?.subscribe('draft', (state, workspace) => {
+    active = workspace.active && workspace.connection?.pendingWork !== 'AT';
     const changed = preview?.previewId !== state.preview?.previewId;
     preview = state.preview; result = state.result; inspection = state.inspection; busy = workspace.busy;
     pending = state.pending || (workspace.connection?.pendingDraft === true && workspace.connection?.pendingWork === 'WS');
@@ -116,7 +134,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     if (workspace.active) setStatus(source.textContent, state.error || pending ? 'error' : 'neutral');
     render();
     const attempt = result?.attemptId || JSON.stringify([result?.error, result?.page, result?.savedCount, result?.rows?.map((row) => row.key)]);
-    if (workspace.active && pending && !busy && result && automaticallyChecked !== attempt) {
+    if (active && pending && !busy && automaticallyChecked !== attempt) {
       automaticallyChecked = attempt;
       void inspectCurrent();
     }

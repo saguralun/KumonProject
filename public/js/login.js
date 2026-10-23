@@ -10,7 +10,10 @@ const els = {
   updateBannerMessage: document.getElementById("updateBannerMessage"),
   updateButton: document.getElementById('loginUpdateButton')
 };
-let updateRequested = false, updating = false;
+let updating = false;
+const localUpdate = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+els.updateButton.disabled = !localUpdate;
+if (!localUpdate) els.updateButton.title = 'กรุณาอัปเดตจากเครื่องที่เปิดโปรแกรม KumonDB';
 
 async function loadLanInfo() {
   try {
@@ -67,8 +70,6 @@ function setMessage(text) {
 
 function setTab(tab) {
   if (updating) return;
-  updateRequested = false;
-  els.adminSubmit.textContent = 'เข้าสู่ระบบ';
   setMessage("");
 
   els.tabs.querySelectorAll(".login-tab").forEach((button) => {
@@ -79,15 +80,13 @@ function setTab(tab) {
   els.guestForm.classList.toggle("hidden", tab !== "guest");
 }
 
-els.updateButton.addEventListener('click', () => {
-  if (updating) return;
-  setTab('admin'); updateRequested = true;
-  els.adminSubmit.textContent = 'เข้าสู่ระบบและอัปเดต';
-  setMessage('กรุณาเข้าสู่ระบบด้วยบัญชี Admin เพื่ออัปเดตโปรแกรม');
-  els.adminForm.elements.username.focus();
+els.updateButton.addEventListener('click', async () => {
+  if (updating || !localUpdate) return;
+  try { await updateProgram(); }
+  catch (error) { setMessage(error.message); }
 });
 
-async function updateAfterLogin() {
+async function updateProgram() {
   if (!window.confirm('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
   updating = true;
   els.updateButton.disabled = els.adminSubmit.disabled = els.guestSubmit.disabled = true;
@@ -96,16 +95,17 @@ async function updateAfterLogin() {
     const { getRuntimeInstanceId, waitForUpdatedServer } = await import('./updateRestart.js?v=20261016-verified-restart');
     let previousInstanceId = await getRuntimeInstanceId();
     try {
-      const data = await requestJson('/api/system/update-apply', { method: 'POST' });
+      const data = await requestJson('/api/system/update-apply', { method: 'POST', body: JSON.stringify({ confirm: true }) });
       previousInstanceId = data.previousInstanceId || previousInstanceId;
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
     }
     setMessage('กำลังรอโปรแกรมเปิดใหม่...');
     await waitForUpdatedServer(previousInstanceId);
+    window.location.reload();
   } finally {
     updating = false;
-    els.updateButton.disabled = els.guestSubmit.disabled = false;
+    els.updateButton.disabled = els.adminSubmit.disabled = els.guestSubmit.disabled = false;
   }
 }
 
@@ -151,10 +151,6 @@ els.adminForm.addEventListener("submit", async (event) => {
       })
     });
 
-    if (updateRequested) {
-      if (data.user.role !== 'admin') throw new Error('บัญชีนี้ไม่มีสิทธิ์อัปเดต กรุณาใช้บัญชี Admin');
-      await updateAfterLogin();
-    }
     redirectForRole(data.user.role);
   } catch (error) {
     setMessage(error.message);
@@ -164,6 +160,7 @@ els.adminForm.addEventListener("submit", async (event) => {
 
 els.guestForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (updating) return;
   setMessage("");
   els.guestSubmit.disabled = true;
 

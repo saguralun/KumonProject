@@ -1,12 +1,12 @@
 export function createKsisSharedWorkspace({ applyContext, setStatus }) {
   const listeners = new Map();
   let revision = -1, instance = '', snapshot = null, fetching = false, ready = false;
+  const toolState = (view) => snapshot.tools[view] || { preview: null, result: null, inspection: null, confirmed: [], pending: false, error: '' };
   const notify = () => {
     if (!snapshot) return;
     applyContext(snapshot);
     for (const [view, listener] of listeners) {
-      const tool = snapshot.tools[view];
-      if (tool) listener(tool, { busy: snapshot.busy, active: snapshot.activeView === view, connection: snapshot.connection });
+      listener(toolState(view), { busy: snapshot.busy, active: snapshot.activeView === view, connection: snapshot.connection });
     }
   };
   async function refresh(force = false) {
@@ -32,7 +32,7 @@ export function createKsisSharedWorkspace({ applyContext, setStatus }) {
   window.addEventListener('pagehide', () => clearInterval(timer), { once: true });
   window.addEventListener('focus', () => { void refresh(true); });
   return { refresh,
-    subscribe(view, listener) { listeners.set(view, listener); if (snapshot?.tools[view]) listener(snapshot.tools[view], { busy: snapshot.busy, active: snapshot.activeView === view, connection: snapshot.connection }); },
+    subscribe(view, listener) { listeners.set(view, listener); if (snapshot) listener(toolState(view), { busy: snapshot.busy, active: snapshot.activeView === view, connection: snapshot.connection }); },
     async confirm(view, previewId, confirmed) {
       if (!ready) return;
       try { await requestJson('/api/ksis/workspace/confirm', { method: 'POST', body: JSON.stringify({ view, previewId, confirmed }) }); }

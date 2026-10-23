@@ -19,7 +19,8 @@ export async function runKsisWorkspace(userId, view, action, input, execute) {
     if (state.busy) throw httpError(409, 'มีหน้าต่างอื่นกำลังทำงานกับ KSIS กรุณารอ');
     if (!['at', 'draft', 'audit', 'atAudit'].includes(view)) throw httpError(400, 'งาน KSIS ไม่ถูกต้อง');
     const tool = state.tools[view] ||= { preview: null, result: null, confirmed: [], pending: false, error: '' };
-    if (Object.values(state.tools).some((item) => item.pending) && !['inspect', 'acknowledge'].includes(action)) throw httpError(409, 'มีข้อมูล KSIS ค้างอยู่ กรุณาตรวจโดยไม่เริ่มงานใหม่');
+    if (Object.values(state.tools).some((item) => item.pending) && !['inspect', 'acknowledge', 'reset'].includes(action)) throw httpError(409, 'มีข้อมูล KSIS ค้างอยู่ กรุณาตรวจโดยไม่เริ่มงานใหม่');
+    if (action === 'reset' && (view !== 'draft' || Object.entries(state.tools).some(([key, item]) => key !== view && item.pending))) throw httpError(409, 'มีงานอื่นค้างอยู่ ไม่ล้างข้ามงาน');
     if (action === 'fill' && tool.preview && tool.preview.previewId !== input.previewId) throw httpError(409, 'หน้าต่างอื่นเตรียม Preview ใหม่แล้ว กรุณาตรวจ Preview ล่าสุด');
     state.activeView = view; state.busy = true; tool.action = action; tool.error = ''; state.revision++;
     if (action === 'preview' || action === 'read') {
@@ -29,7 +30,12 @@ export async function runKsisWorkspace(userId, view, action, input, execute) {
     if (action === 'fill') tool.inspection = null;
     try {
         const result = await execute();
-        if (action === 'preview') tool.preview = result.requiresLogin ? null : result;
+        if (action === 'reset') {
+            if (result.reset !== true || result.pendingDraft !== false) throw httpError(409, 'ยังล้างรอบค้างไม่สำเร็จ');
+            tool.previousResult = tool.result || tool.previousResult || null;
+            tool.result = null; tool.preview = null; tool.confirmed = []; tool.pending = false; tool.inspection = result;
+        }
+        else if (action === 'preview') tool.preview = result.requiresLogin ? null : result;
         else if (action === 'inspect') {
             tool.inspection = result;
             if (view === 'draft' && result.readOnly === true && result.recovered === true && result.pendingDraft === false) {

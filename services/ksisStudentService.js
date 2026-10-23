@@ -65,7 +65,7 @@ export function withKsisWorkspacePage(options, action) {
     return withKsisPage({ ...options, requireEmbedded: true }, action);
 }
 
-export async function withKsisPage({ sourceUrl, userId, allowPendingDraft = false, requireCurrentPage = false, requireEmbedded = false, navigate = true }, action) {
+export async function withKsisPage({ sourceUrl, userId, allowPendingDraft = false, requireCurrentPage = false, requireEmbedded = false, navigate = true, focus = true }, action) {
     const key = Number(userId);
     const session = sessionFor(userId);
     if (requireEmbedded && !session.desktop) throw httpError(409, 'กรุณาเปิด K-sis ในแอปก่อน งานกรอกและตรวจใช้เว็บในหน้าต่างแอปเดียวกันเท่านั้น');
@@ -90,8 +90,10 @@ export async function withKsisPage({ sourceUrl, userId, allowPendingDraft = fals
         if (session.desktop && (!session.page || session.page !== session.desktop.page || session.page.isClosed())) throw httpError(409, 'เว็บ KSIS ในแอปปิดแล้ว กรุณาเปิด K-sis ใหม่ ไม่เปิดเว็บหรือหน้าต่างอื่นแทน');
         if (!session.page || session.page.isClosed()) session.page = session.context.pages()[0] || await session.context.newPage();
         const page = session.page;
-        if (session.desktop) await session.desktop.focus();
-        else await page.bringToFront();
+        if (focus) {
+            if (session.desktop) await session.desktop.focus();
+            else await page.bringToFront();
+        }
         if (navigate && page.url() !== sourceUrl) {
             if (requireCurrentPage) throw httpError(409, 'หน้า KSIS เปลี่ยนหลัง Preview กรุณาเปิดหน้าที่ต้องการและเตรียมข้อมูลใหม่');
             // KSIS autosaves when leaving an entry grid. Never navigate away from untracked edits.

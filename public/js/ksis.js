@@ -1,9 +1,9 @@
-import { setupKsisDraft } from "./reportKsisDraft.js?v=20261023-ws-login-recovery";
+import { setupKsisDraft } from "./reportKsisDraft.js?v=20261023-ws-editor-recovery";
 import { setupKsisMatching } from "./reportKsisMatching.js?v=20261022-workspace";
 import { setupKsisAudit } from "./ksisAudit.js?v=20261023-shared";
 import { setupKsisDesktop } from "./ksisDesktop.js?v=20261023-unified-app";
 import { setupKsisAt } from './ksisAt.js?v=20261023-shared';
-import { createKsisSharedWorkspace } from './ksisSharedWorkspace.js?v=20261023-ws-recovery';
+import { createKsisSharedWorkspace } from './ksisSharedWorkspace.js?v=20261023-empty-state-recovery';
 import { setupKsisAtAudit } from './ksisAtAudit.js?v=20261023-at-audit';
 
 const get = (id) => document.getElementById(id);
@@ -40,6 +40,7 @@ const shared = createKsisSharedWorkspace({ setStatus, applyContext: (state) => {
     month.value = String(tool.period.month); year.value = String(tool.period.year); periodLabel();
   }
   if (state.activeView) open(state.activeView, true);
+  else if (!state.busy && !state.connection?.pendingDraft) setStatus('พร้อมใช้งาน');
   lock('shared', state.busy || state.connection?.pendingDraft === true);
 } });
 setupKsisDraft({ shared, open: () => open("draft"), setStatus, getPeriod, onStateChange: ({ busy, pending }) => lock("draft", busy || pending) });

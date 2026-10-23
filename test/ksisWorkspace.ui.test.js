@@ -8,6 +8,73 @@ import os from 'node:os';
 import { readKsisWorkspace, runKsisWorkspace, confirmKsisWorkspace } from '../services/ksisWorkspaceState.js';
 import { inspectKsisWsDraft } from '../services/ksisReportDraft.js';
 
+test('A new empty server workspace clears old browser WS errors without ignoring a still-pending KSIS connection', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
+    const userId = 920007, actions = []; let restarted = false, connectionPending = true;
+    await runKsisWorkspace(userId, 'draft', 'fill', {}, async () => ({ pendingDraft: true, error: 'Fixture stale WS timeout', rows: [] }));
+    const app = express(); app.use(express.json());
+    app.get('/api/auth/me', (_req, res) => res.json({ user: { role: 'admin' }, permissions: ['*'] }));
+    app.get('/api/ksis/workspace', (_req, res) => res.json({ success: true,
+        ...(restarted ? { instanceId: 'fixture-new-server', revision: 0, activeView: null, busy: false, tools: {} } : readKsisWorkspace(userId)),
+        connection: { pendingDraft: connectionPending, pendingWork: connectionPending ? 'WS' : null } }));
+    app.post('/api/ksis/draft/:action', async (req, res) => {
+        actions.push(req.params.action); assert.equal(req.params.action, 'inspect');
+        res.json({ success: true, ...(await runKsisWorkspace(userId, 'draft', 'inspect', {}, async () => ({ readOnly: true, pendingDraft: true, message: 'Fixture stale WS timeout' }))) });
+    });
+    app.use('/api', (_req, res) => res.json({ success: true })); app.use(express.static('public'));
+    const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage(); await page.goto(`http://127.0.0.1:${server.address().port}/ksis.html`);
+        await page.waitForFunction(() => document.getElementById('ksisDraftSource').textContent.includes('stale'));
+        restarted = true;
+        await page.waitForFunction(() => !document.getElementById('ksisDraftSource').textContent.includes('stale'));
+        assert.equal(await page.locator('#ksisDraftPreview').isDisabled(), true);
+        connectionPending = false;
+        await page.waitForFunction(() => !document.getElementById('ksisDraftPreview').disabled);
+        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
+        assert.equal(await page.locator('#statusLine').innerText(), 'พร้อมใช้งาน');
+        assert.ok(actions.every((action) => action === 'inspect'));
+    } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
+});
+
+test('Clear stopped WS needs confirmation, removes stale error across reloads and retains prior save history', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
+    const userId = 920006, actions = []; let pending = true, confirm = false;
+    await runKsisWorkspace(userId, 'draft', 'fill', {}, async () => ({ pendingDraft: true, stopped: true, savedCount: 10, page: 1, error: 'Fixture old timeout', rows: [] }));
+    const app = express(); app.use(express.json());
+    app.get('/api/auth/me', (_req, res) => res.json({ user: { role: 'admin' }, permissions: ['*'] }));
+    app.get('/api/ksis/workspace', (_req, res) => res.json({ success: true, ...readKsisWorkspace(userId), connection: { pendingDraft: pending, pendingWork: pending ? 'WS' : null } }));
+    app.post('/api/ksis/draft/:action', async (req, res) => {
+        actions.push(req.params.action);
+        const data = await runKsisWorkspace(userId, 'draft', req.params.action, req.body, async () => {
+            if (req.params.action === 'inspect') return { readOnly: true, pendingDraft: true, message: 'มีข้อมูลแก้ค้าง' };
+            assert.equal(req.params.action, 'reset'); assert.equal(req.body.confirmDiscard, true); pending = false;
+            return { reset: true, recovered: true, pendingDraft: false, previousResultUnverified: true, message: 'ล้างรอบค้างแล้ว ไม่ได้บันทึกเพิ่ม' };
+        });
+        res.json({ success: true, ...data });
+    });
+    app.use('/api', (_req, res) => res.json({ success: true })); app.use(express.static('public'));
+    const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage();
+        page.on('dialog', (dialog) => confirm ? dialog.accept() : dialog.dismiss());
+        await page.goto(`http://127.0.0.1:${server.address().port}/ksis.html`);
+        await page.waitForFunction(() => document.getElementById('ksisDraftSource').textContent.includes('มีข้อมูลแก้ค้าง'));
+        await page.locator('#ksisDraftReset').click(); assert.equal(actions.includes('reset'), false);
+        confirm = true; await page.locator('#ksisDraftReset').click();
+        await page.waitForFunction(() => !document.getElementById('ksisDraftPreview').disabled && document.getElementById('ksisDraftSource').textContent.includes('ล้างรอบค้างแล้ว'));
+        const tool = readKsisWorkspace(userId).tools.draft;
+        assert.equal(tool.result, null); assert.equal(tool.previousResult.savedCount, 10); assert.equal(tool.pending, false);
+        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
+        assert.equal(await page.locator('#ksisDraftReset').isVisible(), false);
+        await page.reload();
+        await page.waitForFunction(() => document.getElementById('ksisDraftSource').textContent.includes('ล้างรอบค้างแล้ว'));
+        assert.equal(await page.locator('#ksisDraftPreview').isEnabled(), true);
+        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ws-reset-clean.png'), fullPage: true });
+        assert.ok(actions.every((action) => ['inspect', 'reset'].includes(action)));
+    } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
+});
+
 test('Opening KSIS automatically recovers a logged-out WS job and collapses its old unverified result without filling or saving', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
     const userId = 920004, actions = [], session = { pendingDraft: true };
     const row = { key: 'old', name: 'Old fixture', subject: 'ME', before: { level: { value: 'A' }, worksheet: { value: '10' }, used: { value: '0' }, status: { value: 'C' } }, desired: { level: 'A', worksheet: 20, used: 3, status: 'C' }, outcome: 'failed' };
@@ -88,7 +155,38 @@ test('WS recovery remains usable after manual fixes or logout, keeps prior save 
         await page.setViewportSize({ width: 390, height: 844 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
         await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ws-recovery-mobile.png'), fullPage: true });
-        assert.deepEqual(errors, []); assert.deepEqual(actions, ['inspect', 'inspect', 'inspect']);
+        assert.deepEqual(errors, []); assert.ok(actions.length >= 3); assert.ok(actions.every((action) => action === 'inspect'));
+    } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
+});
+
+test('Pending WS automatically unlocks after manual correction on the same KSIS page without another click or save', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
+    const userId = 920005, actions = [], session = { pendingDraft: true }; let dirty = true;
+    const row = { key: 'old', name: 'Fixture', subject: 'ME', before: { level: { value: 'A' }, worksheet: { value: '10' }, used: { value: '0' }, status: { value: 'C' } }, desired: { level: 'A', worksheet: 20, used: 3, status: 'C' }, outcome: 'failed' };
+    await runKsisWorkspace(userId, 'draft', 'fill', {}, async () => ({ attemptId: 'pending-attempt', pendingDraft: true, error: 'WS timeout', savedCount: 10, page: 1, rows: [row] }));
+    const app = express(); app.use(express.json());
+    app.get('/api/auth/me', (_req, res) => res.json({ user: { role: 'admin' }, permissions: ['*'] }));
+    app.get('/api/ksis/workspace', (_req, res) => res.json({ success: true, ...readKsisWorkspace(userId), connection: { pendingDraft: session.pendingDraft, pendingWork: session.pendingDraft ? 'WS' : null } }));
+    app.post('/api/ksis/draft/:action', async (req, res) => {
+        actions.push(req.params.action); assert.equal(req.params.action, 'inspect');
+        const data = await runKsisWorkspace(userId, 'draft', 'inspect', req.body, () => inspectKsisWsDraft({
+            url: () => 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid',
+            evaluate: async () => ({ context: 'ชื่อศูนย์ TEST ประจำเดือน Oct - 2026', page: 1, modalOpen: false, rows: [{ dirty }] })
+        }, session));
+        res.json({ success: true, ...data });
+    });
+    app.use('/api', (_req, res) => res.json({ success: true })); app.use(express.static('public'));
+    const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage();
+        await page.goto(`http://127.0.0.1:${server.address().port}/ksis.html`);
+        await page.waitForFunction(() => document.getElementById('ksisDraftSource').textContent.includes('ยังมีข้อมูลแก้ค้าง'));
+        assert.equal(await page.locator('#ksisDraftPreview').isDisabled(), true);
+        dirty = false;
+        await page.waitForFunction(() => !document.getElementById('ksisDraftPreview').disabled, {}, { timeout: 10000 });
+        assert.equal(readKsisWorkspace(userId).tools.draft.result.savedCount, 10);
+        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
+        assert.ok(actions.length >= 2); assert.ok(actions.every((action) => action === 'inspect'));
     } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 });
 

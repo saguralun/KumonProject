@@ -5,11 +5,11 @@ import os from "node:os";
 import path from "node:path";
 import express from "express";
 import { once } from "node:events";
-import { readKsisDraftDocument, planKsisReportDraft, installKsisDraftGuard, fillKsisReportRows, summarizeKsisDraft, fillAndSaveKsisWsBatches, saveKsisWsPage, selectConfirmedKsisDraftRows, inspectKsisWsDraft } from "../services/ksisReportDraft.js";
+import { readKsisDraftDocument, planKsisReportDraft, installKsisDraftGuard, fillKsisReportRows, summarizeKsisDraft, fillAndSaveKsisWsBatches, saveKsisWsPage, selectConfirmedKsisDraftRows, inspectKsisWsDraft, resetKsisWsDraft } from "../services/ksisReportDraft.js";
 
-function fixture(autoSave = false, { wrongAt = false, clampTime = false, kendoNumbers = false, zunReadPost = false, wsBatchSave = false } = {}) {
+function fixture(autoSave = false, { wrongAt = false, clampTime = false, kendoNumbers = false, persistentDisplay = false, editorInitiallyVisible = false, zunReadPost = false, wsBatchSave = false } = {}) {
     const number = (value, id, change = "") => kendoNumbers
-        ? `<span class="k-numeric-wrap"><input class="k-formatted-value" value="${value}" onfocus="activateNumber(this)"><input ${id ? `id="${id}"` : ""} data-role="numerictextbox" role="spinbutton" style="display:none" value="${value}" onchange="${change}" onblur="commitNumber(this)"></span>`
+        ? `<span class="k-numeric-wrap"><input class="k-formatted-value" ${persistentDisplay ? 'readonly' : ''} value="${value}" onfocus="activateNumber(this)"><input ${id ? `id="${id}"` : ""} data-role="numerictextbox" role="spinbutton" style="display:${editorInitiallyVisible ? 'inline-block' : 'none'}" value="${value}" onchange="${change}" onblur="commitNumber(this)"></span>`
         : `<input ${id ? `id="${id}"` : ""} value="${value}" onchange="${change}">`;
     return `<meta charset="utf-8"><style>table{border-collapse:collapse}td{border:1px solid #ccc;padding:6px}.modal{position:fixed;inset:50px;background:white;border:1px solid #aaa;padding:20px}select,input{width:100px}</style>
     <div class="container-header"><span>ชื่อศูนย์ TEST</span><span> ประจำเดือน Oct - 2026</span></div>
@@ -35,7 +35,7 @@ function fixture(autoSave = false, { wrongAt = false, clampTime = false, kendoNu
     <button ng-click="vm.ok()" onclick="saveAT()">ตกลง</button><button ng-click="vm.cancel()" onclick="document.getElementById('atModal').style.display='none'">ยกเลิก</button></div>
     <script>let z=[];function dirty(){document.querySelector('[data-ng-show]').style.display='inline'}
     async function saveWs(){const response=await fetch('/kth/api/reportb/SaveReportBDetailEntryEditItemBatch',{method:'POST',body:'test-save'});const result=await response.json();if(response.ok&&result.success!==false){document.querySelectorAll('[data-ng-show]').forEach(e=>e.style.display='none')}}
-    function activateNumber(display){const raw=display.nextElementSibling;display.style.display='none';raw.style.display='inline-block';raw.focus()}
+    function activateNumber(display){const raw=display.nextElementSibling;${persistentDisplay ? '' : "display.style.display='none';"}raw.style.display='inline-block';raw.focus()}
     function commitNumber(raw){const display=raw.previousElementSibling;display.value=raw.value;raw.style.display='none';display.style.display='inline-block'}
     function openZ(){${zunReadPost ? "fetch('/kth/api/levelz/GetLevelZListByStudent',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({studentId:'student-me'})}).then(response=>{if(!response.ok)throw new Error('read failed');return response.json()}).then(showZ).catch(()=>{document.body.dataset.zReadFailed='yes'})" : "showZ()"}}
     function showZ(){document.getElementById('zModal').style.display='block';document.body.dataset.zOpens=Number(document.body.dataset.zOpens||0)+1}
@@ -44,6 +44,32 @@ function fixture(autoSave = false, { wrongAt = false, clampTime = false, kendoNu
     function saveAT(){const m=document.getElementById('atModal');at.push([m.querySelector('#testDate').value,m.querySelector('#testCd').value,m.querySelector('#testTime').parentElement.querySelector('${kendoNumbers ? "[data-role=numerictextbox]" : "input"}').value,m.querySelector('#testScore').parentElement.querySelector('${kendoNumbers ? "[data-role=numerictextbox]" : "input"}').value,m.querySelector('#atGroup').value,m.querySelector('#testResultFlg').checked].join(':'));document.getElementById('atEntries').textContent=at.join('|');m.style.display='none';dirty()}
     </script>`;
 }
+
+test('WS fills the editable Kendo input when the readonly display stays visible, without clicking or filling the display', {
+    skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000
+}, async () => {
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage(); let writes = 0, initiallyVisible = false;
+        await page.route('**/*', (route) => {
+            if (route.request().method() === 'POST') { writes++; return route.fulfill({ body: '{}' }); }
+            return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixture(false, { kendoNumbers: true, persistentDisplay: true, editorInitiallyVisible: initiallyVisible }) });
+        });
+        for (const visible of [false, true]) {
+            initiallyVisible = visible;
+            await page.goto('https://kao.ksis.kumon.com/kth/#/reportbeditgrid');
+            if (visible) await page.reload();
+            const doc = await page.evaluate(readKsisDraftDocument);
+            const rows = planKsisReportDraft([{ ID: 1, Subject: 'ME', 'รหัสคุมอง': '7642650000001', CurrentLevel: 'C90', WksUsed: 18, Status1: 'C' }], doc, { month: 10, year: 2026 }, 'ME', { includeZun: false });
+            const guard = await installKsisDraftGuard(page);
+            await fillKsisReportRows(page, rows, guard);
+            const actual = (await page.evaluate(readKsisDraftDocument)).rows[0];
+            assert.equal(actual.used.value, '18'); assert.equal(actual.worksheet.value, '90');
+            assert.equal(writes, 0); assert.equal(guard.blocked(), 0);
+            await guard.release(); guard.dispose();
+        }
+    } finally { await browser.close(); }
+});
 
 test('Visible fixed R/IT/N/EO statuses override hidden selects and allow only confirmed WS fills, retaining recognized old warnings', {
     skip: process.env.TEST_BROWSER_UI !== '1', timeout: 25000
@@ -636,6 +662,38 @@ test('WS recovery waits for a manual save response even when the dirty marker is
         await guard.waitForSaves();
         assert.equal((await inspectKsisWsDraft(page, session)).recovered, true);
         assert.equal(writes, 1); assert.equal(guard.pendingSaveCount(), 0);
+    } finally { await browser.close(); }
+});
+
+test('WS reset discards only unsaved fields on the current grid, never saves and refuses an outstanding save', {
+    skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000
+}, async () => {
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage(); let writes = 0, reloads = 0;
+        await page.route('**/*', (route) => {
+            if (route.request().method() === 'POST') { writes++; return route.fulfill({ body: '{}' }); }
+            reloads++;
+            return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixture(false) });
+        });
+        await page.goto('https://kao.ksis.kumon.com/kth/#/reportbeditgrid');
+        const guard = await installKsisDraftGuard(page);
+        const session = { pendingDraft: true, draftGuard: guard };
+        await assert.rejects(resetKsisWsDraft(page, session), { statusCode: 400 });
+        assert.equal(session.pendingDraft, true); assert.equal(reloads, 1);
+        const input = page.locator('tr[data-clrowid="student-me"] td').nth(7).locator('input');
+        await guard.release(); await input.fill('18'); await input.press('Tab');
+        assert.equal((await page.evaluate(readKsisDraftDocument)).rows[0].dirty, true);
+        const result = await resetKsisWsDraft(page, session, { confirmDiscard: true });
+        assert.equal(result.reset, true); assert.equal(result.refreshed, true); assert.equal(result.previousResultUnverified, true);
+        assert.equal(session.pendingDraft, false); assert.equal(session.draftGuard, null); assert.equal(writes, 0);
+        assert.equal((await page.evaluate(readKsisDraftDocument)).rows[0].used.value, '0');
+        assert.equal(page.url(), 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid');
+        const pendingSession = { pendingDraft: true, draftGuard: { release: async () => {}, pendingSaveCount: () => 1 } };
+        const before = reloads;
+        await assert.rejects(resetKsisWsDraft(page, pendingSession, { confirmDiscard: true }), { statusCode: 409 });
+        assert.equal(reloads, before); assert.equal(pendingSession.pendingDraft, true);
+        await assert.rejects(resetKsisWsDraft(page, { pendingAt: {} }, { confirmDiscard: true }), { statusCode: 409 });
     } finally { await browser.close(); }
 });
 

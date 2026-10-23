@@ -173,3 +173,11 @@ test('Read-only WS recovery observes a logged-out page without navigating, refre
     await withKsisPage(options, async (current, session) => { assert.match(current.url(), /login/); assert.equal(session.pendingDraft, true); session.pendingAt = {}; });
     await assert.rejects(withKsisPage(options, async () => assert.fail('Must not inspect AT as WS')), { statusCode: 409 });
 });
+
+test('Passive WS inspection does not bring the desktop forward or navigate the visible page', async (t) => {
+    const page = { isClosed: () => false, url: () => 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid',
+        bringToFront: async () => assert.fail('Must not steal focus'), goto: async () => assert.fail('Must not navigate') };
+    t.mock.method(chromium, 'launchPersistentContext', async () => ({ pages: () => [page], on() {} }));
+    const options = { sourceUrl: page.url(), userId: 987658, navigate: false, focus: false };
+    await withKsisPage(options, async (current) => assert.equal(current, page));
+});

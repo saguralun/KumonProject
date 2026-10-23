@@ -2,6 +2,7 @@ import express from "express";
 import { createSendError } from "./routeErrorHandler.js";
 import { applyUpdate, checkForUpdate, getRuntimeStatus } from "../services/updateService.js";
 import { requireAdmin, requirePermission } from "../middleware/auth.js";
+import { requireUpdateAccess } from '../middleware/updateAccess.js';
 import { mainDesktop } from '../services/appDesktop.js';
 import { paymentDatabaseStatus, preparePaymentDatabase } from '../services/databaseUpgradeService.js';
 import {
@@ -47,7 +48,7 @@ router.post('/desktop/show', async (req, res) => {
     catch (error) { sendError(res, error); }
 });
 
-router.post("/update-apply", requireAdmin, async (req, res) => {
+router.post("/update-apply", requireUpdateAccess, async (req, res) => {
     try {
         res.json({
             success: true,

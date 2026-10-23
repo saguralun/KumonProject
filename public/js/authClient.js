@@ -74,8 +74,8 @@ function renderAuthBar(user) {
   // CSS/JS edit every time someone adds one.
   const roleLabels = { admin: "Admin", instructor: "Instructor", staff: "Staff", guest: "Guest" };
   const roleLabel = roleLabels[user.role] || user.role;
-  // Updating restarts the server for the whole LAN and is Admin-only.
-  const updateButtonHtml = user.role !== "admin"
+  const localUpdate = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
+  const updateButtonHtml = !localUpdate && user.role !== "admin"
     ? ""
     : `<button type="button" class="auth-update-button hidden" id="authUpdateButton">🔄 อัพเดท</button>`;
 
@@ -123,6 +123,7 @@ function bindUpdateButton() {
   }
 
   button.addEventListener("click", async () => {
+    if (button.disabled || !window.confirm('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
     button.disabled = true;
     button.textContent = "⏳ กำลังอัพเดท...";
 
@@ -130,7 +131,7 @@ function bindUpdateButton() {
       const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261016-verified-restart");
       let previousInstanceId = await getRuntimeInstanceId();
       try {
-        const response = await fetch("/api/system/update-apply", { method: "POST" });
+        const response = await fetch("/api/system/update-apply", { method: "POST", headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.success === false) throw new Error(data.error || "อัพเดทไม่สำเร็จ");
         previousInstanceId = data.previousInstanceId || previousInstanceId;

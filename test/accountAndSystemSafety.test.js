@@ -7,6 +7,7 @@ import pool from '../config/db.js';
 import { refreshAccountSession, requireAdmin, requireStaff } from '../middleware/auth.js';
 import systemRoutes from '../routes/systemRoutes.js';
 import { restoreBackupFile } from '../services/backupService.js';
+import { requireUpdateAccess } from '../middleware/updateAccess.js';
 
 test('Existing sessions immediately lose access after account deactivation or role reduction, including uppercase URLs', async (t) => {
     let active = true, role = 'admin', unavailable = false;
@@ -40,7 +41,7 @@ test('Existing sessions immediately lose access after account deactivation or ro
     } finally { await new Promise((resolve) => server.close(resolve)); }
 });
 
-test('Updates require Admin; Opening Schedule endpoints honor the configured permission rather than an Admin-only gate', async (t) => {
+test('Local updates need confirmation but not a login; Opening Schedule honors its configured permission', async (t) => {
     let executedUpdates = 0;
     // Replace only the final action: this test must never pull code or spawn a restart.
     const update = systemRoutes.stack.find((layer) => layer.route?.path === '/update-apply').route;
@@ -52,21 +53,44 @@ test('Updates require Admin; Opening Schedule endpoints honor the configured per
         assert.match(sql, /FROM role_permission/);
         return { rows: [{ role_code: 'scheduler', permission_key: 'page:opening-schedule' }] };
     });
-    const app = express(); app.use((req, _res, next) => { const role = req.get('x-test-role'); if (role) req.session = { user: { role } }; next(); });
+    const app = express(); app.use(express.json()); app.use((req, _res, next) => { const role = req.get('x-test-role'); if (role) req.session = { user: { role } }; next(); });
     app.use('/api/system', systemRoutes);
     const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
     try {
-        const request = (path, method, role) => fetch(`http://127.0.0.1:${server.address().port}/api/system${path}`, { method, headers: role ? { 'x-test-role': role } : {} });
-        assert.equal((await request('/update-apply', 'POST')).status, 401);
-        for (const role of ['guest', 'staff', 'instructor', 'scheduler']) assert.equal((await request('/update-apply', 'POST', role)).status, 403);
+        const request = (path, method, role, extra = {}) => fetch(`http://127.0.0.1:${server.address().port}/api/system${path}`, { method, ...extra, headers: { ...(role ? { 'x-test-role': role } : {}), ...extra.headers } });
+        const confirmed = { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) };
+        assert.equal((await request('/update-apply', 'POST')).status, 400);
+        assert.equal((await request('/update-apply', 'POST', undefined, { ...confirmed, body: '{}' })).status, 400);
+        assert.equal((await request('/update-apply', 'POST', undefined, { ...confirmed, headers: { ...confirmed.headers, Origin: 'https://foreign.example' } })).status, 403);
         assert.equal(executedUpdates, 0);
-        assert.equal((await request('/update-apply', 'POST', 'admin')).status, 200); assert.equal(executedUpdates, 1);
+        for (const role of [undefined, 'guest', 'staff', 'instructor', 'scheduler', 'admin']) assert.equal((await request('/update-apply', 'POST', role, confirmed)).status, 200);
+        assert.equal(executedUpdates, 6);
         for (const [path, method] of [['/opening-schedules', 'GET'], ['/opening-schedules', 'POST'], ['/opening-schedules/1/active', 'POST'], ['/opening-schedules/1', 'DELETE']]) {
             assert.equal((await request(path, method, 'scheduler')).status, 200);
             assert.equal((await request(path, method, 'staff')).status, 403);
             assert.equal((await request(path, method)).status, 401);
         }
     } finally { await new Promise((resolve) => server.close(resolve)); }
+});
+
+test('Update access rejects remote non-admins, cross-origin calls and rebinding hosts', () => {
+    function check({ address = '127.0.0.1', role, host = '127.0.0.1:3000', origin, site, type = 'application/json', confirm = true } = {}) {
+        let status = 200, allowed = false;
+        const headers = { host, origin, 'sec-fetch-site': site };
+        const req = { socket: { remoteAddress: address, localPort: 3000 }, protocol: 'http', session: { user: { role } }, get: (key) => headers[key], is: (value) => value === type, body: { confirm } };
+        const res = { status(value) { status = value; return this; }, json() {} };
+        requireUpdateAccess(req, res, () => { allowed = true; });
+        return { status, allowed };
+    }
+    for (const address of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) assert.equal(check({ address }).allowed, true);
+    for (const role of [undefined, 'guest', 'staff', 'instructor']) assert.equal(check({ address: '192.168.1.10', role }).status, 403);
+    assert.equal(check({ address: '192.168.1.10', role: 'admin', host: '192.168.1.2:3000', origin: 'http://192.168.1.2:3000' }).allowed, true);
+    assert.equal(check({ host: 'rebound.example:3000', origin: 'http://rebound.example:3000' }).status, 403);
+    assert.equal(check({ origin: 'null' }).status, 403);
+    assert.equal(check({ site: 'cross-site' }).status, 403);
+    assert.equal(check({ type: 'text/plain' }).status, 400);
+    assert.equal(check({ confirm: 'true' }).status, 400);
+    assert.equal(check({ confirm: false }).status, 400);
 });
 
 test('Restore invokes one atomic transaction and aborts on the first error, without running a real restore', async () => {
