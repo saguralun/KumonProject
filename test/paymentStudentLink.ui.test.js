@@ -93,9 +93,10 @@ test("Unpaid status pill navigates the same tab to the exact student and subject
         assert.equal(await student.locator("#enrollmentAbsentButton").getAttribute("class").then((value) => value.includes("payment-absent-target")), true);
         assert.deepEqual(f.writes, []);
         assert.ok(f.profiles.every((url) => url === "/api/students/999"));
-        student.on("dialog", (dialog) => dialog.dismiss());
         await student.locator("#enrollmentAbsentButton").click();
+        await student.locator('#enrollmentResumeDialog').waitFor();
         assert.deepEqual(f.writes, []);
+        await student.locator('#enrollmentResumeCancel').click();
         await student.screenshot({ path: path.join(os.tmpdir(), "kumondb-student-absent-focused.png"), fullPage: true });
         await student.locator('[data-enrollment-id="101"]').click();
         assert.equal(await student.locator(".payment-absent-target").count(), 0);

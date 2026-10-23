@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/student-manager.css?v=20261022-payment-absent-link">
+  <link rel="stylesheet" href="/css/student-manager.css?v=20261023-resume-dialog">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-static-menu">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
@@ -535,6 +535,22 @@
       </div>
     </div>
   </div>
+
+  <dialog class="resume-dialog" id="enrollmentResumeDialog" aria-labelledby="enrollmentResumeTitle">
+    <form id="enrollmentResumeForm">
+      <h2 id="enrollmentResumeTitle">กลับมาเรียน (Resume)</h2>
+      <p id="enrollmentResumeStudent"></p>
+      <div id="enrollmentResumeDateField">
+        <label for="enrollmentResumeDate"><span>วันที่กลับมาเรียน</span></label>
+        <input type="date" id="enrollmentResumeDate" name="resumeDate" required min="1900-01-01" max="9999-12-31">
+      </div>
+      <p class="resume-error hidden" id="enrollmentResumeError" role="alert"></p>
+      <div class="resume-actions">
+        <button type="button" class="secondary-button" id="enrollmentResumeCancel">ยกเลิก</button>
+        <button type="submit" class="primary-button" id="enrollmentResumeSave">บันทึกกลับมาเรียน</button>
+      </div>
+    </form>
+  </dialog>
 
   <script src="/js/authClient.js?v=20261023-local-update"></script>
   <script src="/js/appMenu.js?v=20261023-static-menu"></script>

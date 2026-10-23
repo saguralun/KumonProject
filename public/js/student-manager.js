@@ -69,6 +69,15 @@ export const els = {
     enrollmentActionBar: document.getElementById("enrollmentActionBar"),
     enrollmentAbsentButton: document.getElementById("enrollmentAbsentButton"),
     enrollmentResumeButton: document.getElementById("enrollmentResumeButton"),
+    enrollmentResumeDialog: document.getElementById('enrollmentResumeDialog'),
+    enrollmentResumeForm: document.getElementById('enrollmentResumeForm'),
+    enrollmentResumeDate: document.getElementById('enrollmentResumeDate'),
+    enrollmentResumeDateField: document.getElementById('enrollmentResumeDateField'),
+    enrollmentResumeTitle: document.getElementById('enrollmentResumeTitle'),
+    enrollmentResumeStudent: document.getElementById('enrollmentResumeStudent'),
+    enrollmentResumeError: document.getElementById('enrollmentResumeError'),
+    enrollmentResumeCancel: document.getElementById('enrollmentResumeCancel'),
+    enrollmentResumeSave: document.getElementById('enrollmentResumeSave'),
     enrollmentCompleterButton: document.getElementById("enrollmentCompleterButton"),
     enrollmentOtButton: document.getElementById("enrollmentOtButton"),
     deleteEnrollmentButton: document.getElementById("deleteEnrollmentButton"),
@@ -128,6 +137,8 @@ export const state = {
     addStudentDuplicateTimer: null,
     copyAddressResults: []
 };
+
+let resumeTarget = null, resumeBusy = false;
 
 function renderStudentList() {
     if (!state.students.length) {
@@ -584,7 +595,13 @@ function todayIsoDate() {
     return `${year}-${month}-${day}`;
 }
 
-async function runEnrollmentStatusAction(action) {
+const enrollmentActionLabels = { absent: 'Absent', outgoingTransfer: 'OT', completer: 'Completer', resume: 'Resume' };
+
+function runEnrollmentStatusAction(action) { openEnrollmentStatusDialog(action); }
+
+function runEnrollmentResumeAction() { openEnrollmentStatusDialog('resume'); }
+
+function openEnrollmentStatusDialog(action) {
     const enrollment = selectedEnrollment();
 
     if (!state.selectedStudentId || !enrollment) {
@@ -592,75 +609,67 @@ async function runEnrollmentStatusAction(action) {
         return;
     }
 
-    const labels = {
-        absent: "Absent",
-        outgoingTransfer: "OT",
-        completer: "Completer"
-    };
-
-    if (!window.confirm(`${labels[action] || action} enrollment #${enrollment.enrollmentId} ใช่ไหม?`)) {
-        return;
-    }
-
-    setStatus(`กำลังบันทึก ${labels[action] || action}...`);
-
-    try {
-        const data = await requestJson(
-            `/api/students/${encodeURIComponent(state.selectedStudentId)}/enrollments/${encodeURIComponent(enrollment.enrollmentId)}/status-action`,
-            {
-                method: "POST",
-                body: JSON.stringify({ action })
-            }
-        );
-        state.profile = data.profile;
-        state.selectedEnrollmentId = data.enrollmentId;
-        renderProfile();
-        await loadStudents();
-        await loadHistory();
-        setStatus(data.message || `บันทึก ${labels[action] || action} แล้ว`);
-    } catch (error) {
-        setStatus(error.message, "error");
-    }
+    if (resumeBusy || els.enrollmentResumeDialog.open) return;
+    if (!enrollmentActionLabels[action]) return;
+    resumeTarget = { studentId: state.selectedStudentId, enrollmentId: enrollment.enrollmentId, action };
+    const resume = action === 'resume';
+    els.enrollmentResumeTitle.textContent = resume ? 'กลับมาเรียน (Resume)' : `ยืนยัน ${enrollmentActionLabels[action]}`;
+    els.enrollmentResumeSave.textContent = resume ? 'บันทึกกลับมาเรียน' : `ยืนยัน ${enrollmentActionLabels[action]}`;
+    els.enrollmentResumeDateField.classList.toggle('hidden', !resume);
+    els.enrollmentResumeDate.required = resume;
+    els.enrollmentResumeDate.disabled = !resume;
+    els.enrollmentResumeStudent.textContent = `${state.profile.student.displayName} • ${enrollment.subjectCode} #${enrollment.enrollmentId}`;
+    els.enrollmentResumeDate.value = todayIsoDate();
+    els.enrollmentResumeError.textContent = '';
+    els.enrollmentResumeError.classList.add('hidden');
+    els.enrollmentResumeDialog.showModal();
+    if (resume) els.enrollmentResumeDate.focus(); else els.enrollmentResumeCancel.focus();
 }
 
-async function runEnrollmentResumeAction() {
-    const enrollment = selectedEnrollment();
-
-    if (!state.selectedStudentId || !enrollment) {
-        setStatus("กรุณาเลือก enrollment ก่อน", "error");
+async function saveEnrollmentStatusAction(event) {
+    event.preventDefault();
+    if (resumeBusy || !resumeTarget || !els.enrollmentResumeForm.reportValidity()) return;
+    if (Number(state.selectedStudentId) !== Number(resumeTarget.studentId) || Number(state.selectedEnrollmentId) !== Number(resumeTarget.enrollmentId)) {
+        els.enrollmentResumeError.textContent = 'นักเรียนหรือวิชาที่เลือกเปลี่ยนแล้ว กรุณายกเลิกและเปิดรายการใหม่';
+        els.enrollmentResumeError.classList.remove('hidden');
         return;
     }
-
-    const resumeDate = window.prompt(
-        `กลับมาเรียนวันที่เท่าไหร่? (YYYY-MM-DD)`,
-        todayIsoDate()
-    );
-
-    if (!resumeDate) {
-        return;
-    }
-
-    setStatus("กำลังบันทึก Resume...");
-
+    const { studentId, enrollmentId, action } = resumeTarget;
+    const label = enrollmentActionLabels[action];
+    const resumeDate = els.enrollmentResumeDate.value;
+    resumeBusy = true;
+    els.enrollmentResumeSave.disabled = els.enrollmentResumeCancel.disabled = els.enrollmentResumeDate.disabled = true;
+    els.enrollmentResumeError.classList.add('hidden');
+    setStatus(`กำลังบันทึก ${label}...`);
+    let saved = false;
     try {
         const data = await requestJson(
-            `/api/students/${encodeURIComponent(state.selectedStudentId)}/enrollments/${encodeURIComponent(enrollment.enrollmentId)}/status-action`,
+            `/api/students/${encodeURIComponent(studentId)}/enrollments/${encodeURIComponent(enrollmentId)}/status-action`,
             {
                 method: "POST",
                 body: JSON.stringify({
-                    action: "resume",
-                    resumeDate
+                    action,
+                    ...(action === 'resume' ? { resumeDate } : {})
                 })
             }
         );
+        saved = true;
+        els.enrollmentResumeDialog.close(); resumeTarget = null;
         state.profile = data.profile;
         state.selectedEnrollmentId = data.enrollmentId;
         renderProfile();
         await loadStudents();
         await loadHistory();
-        setStatus(data.message || "บันทึก Resume แล้ว");
+        setStatus(data.message || `บันทึก ${label} แล้ว`);
     } catch (error) {
-        setStatus(error.message, "error");
+        const message = saved ? `บันทึก ${label} แล้ว แต่โหลดข้อมูลล่าสุดไม่ครบ: ${error.message}` : error.message;
+        els.enrollmentResumeError.textContent = message;
+        els.enrollmentResumeError.classList.toggle('hidden', saved);
+        setStatus(message, "error");
+    } finally {
+        resumeBusy = false;
+        els.enrollmentResumeSave.disabled = els.enrollmentResumeCancel.disabled = false;
+        els.enrollmentResumeDate.disabled = action !== 'resume';
     }
 }
 
@@ -1050,6 +1059,9 @@ function bindEvents() {
     els.newEnrollmentButton.addEventListener("click", startNewEnrollment);
     els.enrollmentAbsentButton.addEventListener("click", () => runEnrollmentStatusAction("absent"));
     els.enrollmentResumeButton.addEventListener("click", runEnrollmentResumeAction);
+    els.enrollmentResumeForm.addEventListener('submit', saveEnrollmentStatusAction);
+    els.enrollmentResumeCancel.addEventListener('click', () => { if (!resumeBusy) { els.enrollmentResumeDialog.close(); resumeTarget = null; } });
+    els.enrollmentResumeDialog.addEventListener('cancel', (event) => { if (resumeBusy) event.preventDefault(); else resumeTarget = null; });
     els.enrollmentCompleterButton.addEventListener("click", () => runEnrollmentStatusAction("completer"));
     els.enrollmentOtButton.addEventListener("click", () => runEnrollmentStatusAction("outgoingTransfer"));
     els.deleteEnrollmentButton.addEventListener("click", deleteSelectedEnrollment);
