@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { chromium } from "playwright-core";
 import vm from "node:vm";
 import { normalizeKsisStudentUrl, normalizeKsisBirthDate, normalizeKsisStudentData, readKsisStudentDocument } from "../services/ksisStudentData.js";
-import { previewKsisStudent, ksisProfileDirectory } from "../services/ksisStudentService.js";
+import { previewKsisStudent, ksisProfileDirectory, withKsisPage } from "../services/ksisStudentService.js";
 import { ksisPreviewFields, splitKsisStreet, ksisPrefixName } from "../public/js/ksisStudentMapping.js";
 
 const url = "https://kao.ksis.kumon.com/kth/#/student/11111111-1111-4111-8111-111111111111";
@@ -125,7 +125,7 @@ test("preview asks for manual login and reuses the isolated session afterward", 
     const page = {
         isClosed: () => false, bringToFront: async () => {}, url: () => currentUrl,
         goto: async (target) => { currentUrl = target === url && !loggedIn ? target.replace("#/student/", "#/login/student/") : target; },
-        waitForFunction: async () => {}, evaluate: async () => raw
+        waitForFunction: async () => {}, evaluate: async (reader) => reader.name === 'readKsisStudentDocument' ? raw : false
     };
     t.mock.method(chromium, "launchPersistentContext", async (profile, options) => {
         launches++;
@@ -140,4 +140,27 @@ test("preview asks for manual login and reuses the isolated session afterward", 
     assert.equal(result.requiresLogin, false);
     assert.equal(result.student.birthDate, "2023-06-29");
     assert.equal(launches, 1);
+});
+
+test('Changing KSIS routes never navigates through about:blank or launches another browser session', async (t) => {
+    let currentUrl = 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid';
+    const visits = []; let launches = 0;
+    const page = { isClosed: () => false, bringToFront: async () => {}, url: () => currentUrl, evaluate: async () => false, goto: async (target) => { visits.push(target); currentUrl = target; } };
+    t.mock.method(chromium, 'launchPersistentContext', async () => { launches++; return { pages: () => [page], on() {} }; });
+    for (const sourceUrl of [currentUrl, url, 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid']) await withKsisPage({ sourceUrl, userId: 987655 }, async () => {});
+    assert.deepEqual(visits, [url, 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid']);
+    assert.equal(launches, 1);
+});
+
+test('KSIS navigation refuses untracked dirty edits and never navigates a consumed preview to another page', async (t) => {
+    let dirty = true;
+    const visits = [];
+    const page = { isClosed: () => false, bringToFront: async () => {}, url: () => 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid',
+        evaluate: async () => dirty, goto: async (target) => visits.push(target) };
+    t.mock.method(chromium, 'launchPersistentContext', async () => ({ pages: () => [page], on() {} }));
+    const options = { sourceUrl: 'https://kao.ksis.kumon.com/kth/#/atestentrygrid', userId: 987656 };
+    await assert.rejects(withKsisPage(options, async () => assert.fail('Must not navigate')), { statusCode: 409 });
+    dirty = false;
+    await assert.rejects(withKsisPage({ ...options, requireCurrentPage: true }, async () => assert.fail('Must not navigate')), { statusCode: 409 });
+    assert.deepEqual(visits, []);
 });

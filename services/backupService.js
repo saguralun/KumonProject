@@ -19,6 +19,12 @@ const execFileAsync = promisify(execFile);
 const PROJECT_DIR = process.cwd();
 const BACKUP_SCRIPT = path.join(PROJECT_DIR, "scripts", "backup-database.ps1");
 
+export async function restoreBackupFile({ executable, host, port, user, dbName, tempFile, env }, run = execFileAsync) {
+    return run(executable, ['-h', host, '-p', String(port || 5432), '-U', user, '-d', dbName,
+        '--clean', '--if-exists', '--single-transaction', '--exit-on-error', tempFile],
+    { env, timeout: 10 * 60 * 1000, windowsHide: true });
+}
+
 function escapeRegExp(value) {
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -199,19 +205,8 @@ export async function importBackup(buffer, { confirmDbName } = {}) {
         const pgRestore = resolvePgBinary("pg_restore", "PG_RESTORE_PATH");
         const env = { ...process.env, PGPASSWORD: process.env.DB_PASSWORD || "" };
 
-        await execFileAsync(
-            pgRestore,
-            [
-                "-h", process.env.DB_HOST,
-                "-p", String(process.env.DB_PORT || 5432),
-                "-U", process.env.DB_USER,
-                "-d", dbName,
-                "--clean",
-                "--if-exists",
-                tempFile
-            ],
-            { env, timeout: 10 * 60 * 1000 }
-        );
+        await restoreBackupFile({ executable: pgRestore, host: process.env.DB_HOST, port: process.env.DB_PORT,
+            user: process.env.DB_USER, dbName, tempFile, env });
     } catch (error) {
         throw httpError(
             500,

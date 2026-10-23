@@ -7,8 +7,7 @@ const els = {
   guestSubmit: document.getElementById("guestSubmit"),
   lanInfo: document.getElementById("loginLanInfo"),
   updateBanner: document.getElementById("updateBanner"),
-  updateBannerMessage: document.getElementById("updateBannerMessage"),
-  updateBannerButton: document.getElementById("updateBannerButton")
+  updateBannerMessage: document.getElementById("updateBannerMessage")
 };
 
 async function loadLanInfo() {
@@ -52,30 +51,6 @@ async function checkUpdateStatus() {
 }
 
 checkUpdateStatus();
-
-els.updateBannerButton.addEventListener("click", async () => {
-  els.updateBannerButton.disabled = true;
-  els.updateBannerButton.textContent = "กำลังอัพเดท...";
-
-  try {
-    const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261016-verified-restart");
-    let previousInstanceId = await getRuntimeInstanceId();
-    try {
-      const data = await requestJson("/api/system/update-apply", { method: "POST" });
-      previousInstanceId = data.previousInstanceId || previousInstanceId;
-    } catch (error) {
-      if (!(error instanceof TypeError)) throw error;
-    }
-    els.updateBannerMessage.textContent = "กำลังรอโปรแกรมเปิดใหม่...";
-    els.updateBannerButton.textContent = "กำลังเปิดใหม่";
-    await waitForUpdatedServer(previousInstanceId);
-    window.location.reload();
-  } catch (error) {
-    els.updateBannerMessage.textContent = error.message;
-    els.updateBannerButton.disabled = false;
-    els.updateBannerButton.textContent = "อัพเดทตอนนี้";
-  }
-});
 
 function setMessage(text) {
   if (!text) {

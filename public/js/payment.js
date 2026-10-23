@@ -302,6 +302,19 @@ function receiptButtonText(row) {
     return row.isPartial ? "💵 รับเงินเพิ่ม" : "💵 รับเงิน";
 }
 
+function renderPaymentStatus(row) {
+    const pill = `<span class="status-pill is-${escapeHtml(row.paymentState || (row.isPaid ? "paid" : "unpaid"))}">${paymentStateText(row)}</span>`;
+    const studentId = Number(row.studentId);
+    if (row.isPaid || row.isPartial || (row.paymentState && row.paymentState !== "unpaid")
+        || !Number.isSafeInteger(studentId) || studentId <= 0) return pill;
+    const params = new URLSearchParams({ studentId: String(studentId), focus: "absent" });
+    const enrollmentId = Number(row.sourceEnrollmentId);
+    if (Number.isSafeInteger(enrollmentId) && enrollmentId > 0) params.set("enrollmentId", String(enrollmentId));
+    return `<a class="status-pill is-unpaid payment-unpaid-shortcut" href="/student-manager.html?${escapeHtml(params.toString())}"
+        title="เปิด Student ของ ${escapeHtml(row.studentName)} เพื่อไปยังปุ่ม Absent โดยยังไม่เปลี่ยนสถานะ">ยังไม่จ่าย</a>
+        <span class="status-pill is-unpaid payment-unpaid-label">ยังไม่จ่าย</span>`;
+}
+
 function renderSubjectBadges(subjects) {
     const values = String(subjects || "")
         .split(",")
@@ -378,9 +391,7 @@ function renderRows(rows) {
                 ${rows.map((row, index) => `
                     <tr class="is-${escapeHtml(row.paymentState || (row.isPaid ? "paid" : "unpaid"))}">
                         <td>
-                            <span class="status-pill is-${escapeHtml(row.paymentState || (row.isPaid ? "paid" : "unpaid"))}">
-                                ${paymentStateText(row)}
-                            </span>
+                            ${renderPaymentStatus(row)}
                         </td>
                         <td>
                             <div class="payment-student-name">
@@ -770,7 +781,7 @@ async function cancelPayment() {
         `ใบเสร็จ: ${state.receipt.receiptBook}/${state.receipt.receiptNo}`,
         `นักเรียน: ${state.receipt.studentName}`,
         `ค่าเรียน: ${monthName(state.receipt.billingMonth)} ${state.receipt.billingYear}`,
-        "ระบบจะลบใบเสร็จนี้, ลบ history status ของรอบนี้ และคืน status enrollment กลับ"
+        "ยกเลิกใบเสร็จและประวัติที่บิลนี้สร้าง โดยไม่ย้อนสถานะที่แก้ภายหลัง"
     ].join("\n");
 
     if (!window.confirm(confirmMessage)) {
@@ -788,9 +799,9 @@ async function cancelPayment() {
             })
         });
 
-        setStatus(`ยกเลิกใบเสร็จ ${data.receiptBook}/${data.receiptNo} แล้ว`);
         closeReceipt();
         await loadPaymentStatus();
+        setStatus(`ยกเลิกใบเสร็จ ${data.receiptBook}/${data.receiptNo} แล้ว${data.warning ? ' • ' + data.warning : ''}`);
     } catch (error) {
         setStatus(error.message, "error");
     } finally {
@@ -976,7 +987,7 @@ async function checkPrinterStatus() {
     }
 }
 
-function printUnpaidList() {
+async function printUnpaidList() {
     const rows = currentRowsForExport();
 
     if (!rows.length) {
@@ -985,14 +996,7 @@ function printUnpaidList() {
     }
 
     const period = selectedPeriod();
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-
-    if (!printWindow) {
-        setStatus("Browser บล็อกหน้าต่าง print", "error");
-        return;
-    }
-
-    printWindow.document.write(`
+    const html = `
         <!doctype html>
         <html lang="th">
         <head>
@@ -1035,7 +1039,17 @@ function printUnpaidList() {
             </table>
         </body>
         </html>
-    `);
+    `;
+    if (window.kumonDesktop?.printHtml) {
+        try {
+            const result = await window.kumonDesktop.printHtml(html);
+            setStatus(result.printed ? `พิมพ์รายชื่อค้างจ่าย ${rows.length} รายการแล้ว` : 'ยกเลิกการพิมพ์');
+        } catch (error) { setStatus(error.message, 'error'); }
+        return;
+    }
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) { setStatus("Browser บล็อกหน้าต่าง print", "error"); return; }
+    printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();

@@ -1,0 +1,73 @@
+@media screen {
+  :root .app-menu-layout { display: grid !important; grid-template-columns: minmax(0, 1fr) !important; }
+  :root .app-menu-layout > aside.app-menu-panel {
+    position: fixed !important; inset: 12px auto 12px 12px !important;
+    display: flex !important; flex-direction: column !important;
+    width: 304px !important; max-width: calc(100vw - 24px) !important;
+    height: calc(100dvh - 24px) !important; max-height: calc(100dvh - 24px) !important; min-height: 0 !important;
+    padding: 12px !important; gap: 12px !important; box-sizing: border-box;
+    border: 1px solid #d6dfe4; border-radius: 8px; background: #fff !important; color: #22343b !important;
+    box-shadow: 0 12px 40px #122c3826; z-index: 100; overflow: auto !important; transform: none !important;
+    visibility: hidden; opacity: 0; pointer-events: none;
+  }
+  :root .app-menu-layout.app-menu-open > aside.app-menu-panel { visibility: visible; opacity: 1; pointer-events: auto; }
+  .app-menu-heading { position: sticky; top: 0; z-index: 60; background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 0 10px; border-bottom: 1px solid #e4eaed; flex: 0 0 auto; }
+  .app-menu-heading strong { font-size: 15px; line-height: 1.4; letter-spacing: 0; }
+  :root .app-menu-icon-button {
+    position: relative; display: inline-flex !important; align-items: center; justify-content: center;
+    width: 40px; height: 40px; min-width: 40px; min-height: 40px !important; flex: 0 0 40px;
+    padding: 0 !important; border: 1px solid #cbd8df; border-radius: 8px;
+    background: #fff; color: #22343b; box-shadow: 0 1px 2px #14333e0a; cursor: pointer;
+    transform: none !important; transition: background-color 120ms, border-color 120ms, box-shadow 120ms;
+  }
+  :root .app-menu-icon-button img { display: block; width: 20px; height: 20px; pointer-events: none; }
+  :root .app-menu-icon-button:hover { background: #f0f6f5; border-color: #84a89f; box-shadow: 0 2px 6px #14333e12; transform: none !important; }
+  :root .app-menu-icon-button:focus-visible { outline: 3px solid #52a38d; outline-offset: 3px; }
+  :root .app-menu-icon-button[aria-expanded="true"] { background: #edf6f2; border-color: #6a9d8d; }
+  .app-menu-icon-button::after {
+    content: attr(data-tooltip); position: absolute; top: calc(100% + 7px); left: 0;
+    padding: 5px 8px; border: 1px solid #d6dfe4; border-radius: 4px; background: #fff; color: #22343b;
+    box-shadow: 0 2px 8px #14333e12; font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap;
+    visibility: hidden; pointer-events: none; z-index: 110;
+  }
+  .app-menu-icon-button:hover::after, .app-menu-icon-button:focus-visible::after { visibility: visible; }
+  .app-menu-close::after { left: auto; right: 0; }
+  :root .app-menu-backdrop { display: none; }
+  :root .app-menu-open > .app-menu-backdrop {
+    display: block; position: fixed; inset: 0; width: 100%; height: 100%; z-index: 90;
+    border: 0; border-radius: 0; padding: 0; background: #132f3a52; box-shadow: none; cursor: default; transform: none !important;
+  }
+  :root .app-menu-layout .topbar { display: flex; flex-direction: row; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .app-menu-layout .topbar > .app-menu-toggle + div { flex: 1 1 160px; min-width: 0; }
+  .app-menu-layout .topbar .status-line { min-width: 0 !important; max-width: 100%; overflow-wrap: anywhere; }
+  :root .app-menu-panel .side-nav, :root .app-menu-panel .rail-nav { display: grid; gap: 6px !important; margin: 0 !important; flex: 0 0 auto; z-index: auto; }
+  :root .app-menu-panel .home-link {
+    display: flex; align-items: center; width: 100%; min-height: 36px !important; box-sizing: border-box;
+    padding: 8px 10px !important; border: 1px solid transparent !important; border-radius: 6px;
+    background: transparent !important; color: #334b57 !important;
+    font: 600 13px/1.4 'Inter', 'Sarabun', 'Segoe UI', sans-serif !important;
+    text-align: left; text-decoration: none; box-shadow: none !important; white-space: normal; overflow-wrap: anywhere; transform: none !important;
+  }
+  :root .app-menu-panel .home-link:hover { background: #f0f5f7 !important; border-color: #d9e4e8 !important; }
+  :root .app-menu-panel .home-link:focus-visible { outline: 2px solid #52a38d; outline-offset: 1px; }
+  :root .app-menu-panel .home-link.current-page { background: #eaf4f0 !important; border-color: #cce1d8 !important; color: #185440 !important; pointer-events: none; }
+  :root .app-menu-panel .nav-flyout-trigger { justify-content: space-between; cursor: pointer; }
+  :root .app-menu-panel .nav-flyout-trigger::after { content: ''; width: 18px; height: 18px; flex: 0 0 18px; margin-left: 10px; background: url('/icons/lucide/chevron-right.svg') center / 18px no-repeat; }
+  :root .app-menu-panel .nav-flyout-open > .nav-flyout-trigger { background: #eaf4f0 !important; border-color: #cce1d8 !important; color: #185440 !important; }
+  :root .app-menu-panel .nav-flyout-menu { display: none; position: fixed; z-index: 120; width: 240px; min-width: 0; max-width: calc(100vw - 24px); max-height: calc(100dvh - 24px); box-sizing: border-box; overflow: auto; overscroll-behavior: contain; padding: 6px; margin: 0; border: 1px solid #d6dfe4; border-radius: 8px; background: #fff; box-shadow: 0 8px 24px #122c3826; }
+  :root .app-menu-panel .nav-flyout-open > .nav-flyout-menu { display: grid; gap: 2px; }
+  :root .app-menu-panel .nav-flyout-empty { display: none !important; }
+  :root .app-menu-panel .auth-bar { margin-top: auto !important; padding-top: 12px; border-top: 1px solid #e4eaed; color: #334b57; }
+  .app-menu-panel .auth-user { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+  .app-menu-panel .auth-name { color: #334b57; overflow-wrap: anywhere; }
+  .app-menu-panel .auth-role { padding: 3px 6px; border-radius: 4px; background: #eaf4f0; color: #185440; font-size: 11px; }
+  .app-menu-panel .auth-logout { margin-top: 8px; padding: 7px 10px; border: 1px solid #d6dfe4; border-radius: 6px; background: #f6f9fa; color: #334b57; cursor: pointer; }
+  :root .app-menu-panel .auth-logout:hover:not(:disabled) { color: #185440; background: #edf5f1; border-color: #84a89f; }
+  :root .app-menu-panel .auth-update-button, :root .app-menu-panel .auth-update-button:hover:not(:disabled) { color: #244b68; background: #e7eef3; border-color: #bbcfdc; }
+  .app-menu-panel .hidden { display: none !important; }
+  .app-menu-panel [data-requires-permission]:not(.is-granted), :root:not([data-role="admin"]) .app-menu-panel [data-admin-only] { display: none !important; }
+  .migration-shell .migration-workspace { min-width: 0; max-width: none; width: 100%; margin: 0; padding: 16px; }
+  .migration-shell .header { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .migration-shell .header > .app-menu-toggle + div { flex: 1 1 180px; }
+}
+@media print { .app-menu-panel, .app-menu-toggle, .app-menu-backdrop { display: none !important; } }

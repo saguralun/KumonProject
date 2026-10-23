@@ -9,10 +9,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/statistics.css?v=20260904-sidebar-scroll-fix">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
+  <link rel="stylesheet" href="/css/app-menu.css?v=20261023-static-menu">
+  <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
 </head>
 <body>
-  <main class="statistics-page">
-    <aside class="statistics-sidebar">
+  <main class="statistics-page app-menu-layout">
+    <aside class="app-menu-panel" id="appNavigation" role="dialog" aria-label="เมนูหลัก" aria-modal="true" aria-hidden="true" inert>
       <nav class="side-nav" aria-label="Main navigation">
         <a class="home-link active current-page" href="/statistics.html" data-requires-permission="page:statistics">🧮 Statistics</a>
         <div class="nav-flyout">
@@ -27,6 +29,7 @@
             <a class="home-link" href="/student-manager.html">👤 Students</a>
             <a class="home-link" href="/payment.html" data-requires-permission="page:payment">💰 Payment</a>
             <a class="home-link" href="/report.html" data-requires-permission="page:report">📊 Report</a>
+            <a class="home-link" href="/ksis.html" data-ksis-link data-requires-permission="page:report">🌐 K-sis</a>
             <a class="home-link" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
             <a class="home-link" href="/statistics.html" data-requires-permission="page:statistics">🧮 Statistics</a>
           </div>
@@ -52,37 +55,24 @@
         </div>
       </nav>
 
-      <div class="side-header">
-        <h1>Statistics</h1>
-        <div class="subtle">เด็กเข้า-ออก รายเดือน เทียบ 3 ปีล่าสุด</div>
-      </div>
-
-      <div class="sidebar-scroll">
-        <div class="stats-legend">
-          <div class="stats-legend-title">สถานะ (เรียงตามที่ขึ้นในกราฟ: ออก / เข้า / เรียนต่อ)</div>
-          <div class="stats-legend-group">ออก</div>
-          <div id="legendOut"></div>
-          <div class="stats-legend-group">เข้า</div>
-          <div id="legendIn"></div>
-          <div class="stats-legend-group">เรียนต่อ</div>
-          <div id="legendCurrent"></div>
-          <div class="stats-legend-note">
-            แต่ละเดือนแบ่ง 3 zone [ออก][เข้า][เรียนต่อ] แต่ละ zone มี 3 แท่งติดกัน — หัวกราฟบอก "ปีล่าสุด" ของเดือนนั้น (เดือนที่ยังไม่ถึงในปีนี้ จะเลื่อนย้อนไป 1 ปี เช่น ปีล่าสุด 2025 แทน 2026 เพื่อให้มี 3 แท่งข้อมูลจริงครบเสมอ) • เดือนปัจจุบัน (กรอบสีฟ้า) แท่งขอบเส้นประ = ข้อมูลยังนับไม่ครบเดือน • สเกลแกน Y แยกกันคนละ zone (เรียนต่อตัวเลขสูงกว่ามาก เทียบกับสเกลเดียวกันไม่ได้) • "เรียนต่อ" นับจากบิลเดือนนั้นที่ไม่มี status อื่นพ่วง ไม่ใช่ enrollment_status
-          </div>
-        </div>
-      </div>
-
       <div class="auth-bar" id="authBar"></div>
     </aside>
 
     <section class="statistics-workspace">
       <header class="topbar">
+        <button type="button" class="app-menu-icon-button app-menu-toggle" id="appMenuButton" aria-label="เปิดเมนู" title="เปิดเมนู" data-tooltip="เปิดเมนู" aria-haspopup="dialog" aria-controls="appNavigation" aria-expanded="false"><img src="/icons/lucide/menu.svg" alt="" width="20" height="20"></button>
         <div>
           <div class="page-title">Enrollment Statistics</div>
           <div class="subtle" id="pageSubtitle">นับจากเหตุการณ์เปลี่ยนสถานะจริง (enrollment_status) ไม่ใช่การนับซ้ำจากยอด active</div>
         </div>
         <div class="status-line" id="statusLine" role="status">พร้อมใช้งาน</div>
       </header>
+
+      <div class="stats-legend workspace-stats-legend" aria-label="สถานะในกราฟ">
+        <div class="workspace-filter-group"><div class="stats-legend-group">ออก</div><div id="legendOut"></div></div>
+        <div class="workspace-filter-group"><div class="stats-legend-group">เข้า</div><div id="legendIn"></div></div>
+        <div class="workspace-filter-group"><div class="stats-legend-group">เรียนต่อ</div><div id="legendCurrent"></div></div>
+      </div>
 
       <section class="panel stats-grid-panel">
         <div class="stats-grid" id="statsGrid">
@@ -98,8 +88,8 @@
   <div class="chart-tooltip hidden" id="chartTooltip"></div>
 
   <script src="/js/authClient.js?v=20261016-verified-restart"></script>
-  <script src="/js/sidebarDrawer.js?v=20260902-drawer-resizeobserver"></script>
-  <script src="/js/navFlyout.js?v=20260905-hover-intent-flyout"></script>
+  <script src="/js/appMenu.js?v=20261023-static-menu"></script>
+  <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>

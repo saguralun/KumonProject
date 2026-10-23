@@ -182,6 +182,8 @@ function normalizeWorksheetProgress(progress, context, kind) {
 }
 
 export function renderWorksheetProgress() {
+    const subject = String(state.context?.enrollment?.subjectCode || "ME").toUpperCase();
+    els.worksheetProgressRing.closest(".worksheet-page").dataset.wsSubject = ["ME", "EFL", "TRP"].includes(subject) ? subject : "ME";
     const zunLevelMasterId = Number(state.context?.enrollment?.currentZunLevelMasterId || 0);
     const hasZunProgress = Number.isInteger(zunLevelMasterId) && zunLevelMasterId > 0;
 
@@ -548,6 +550,7 @@ export function updatePreview() {
     const canSave = Boolean(
         state.context
         && !state.isSaving
+        && !state.isLoadingContext
         && els.receiveDate.value
         && mainReady
         && cdReady
@@ -869,18 +872,21 @@ export async function refreshWorksheetMonthSummary() {
         return;
     }
 
+    const context = state.context;
+    const receiveDate = els.receiveDate.value;
     try {
         const data = await worksheetApi.getWorksheetSummary(
-            state.context.enrollment.enrollmentId,
+            context.enrollment.enrollmentId,
             {
-                billingDate: els.receiveDate.value
+                billingDate: receiveDate
             }
         );
 
+        if (state.context !== context || els.receiveDate.value !== receiveDate) return;
         state.worksheetMonthSummary = data.worksheetMonthSummary || null;
         renderWorksheetMonthSummary(state.worksheetMonthSummary);
     } catch (error) {
-        setStatus(error.message, "error");
+        if (state.context === context && els.receiveDate.value === receiveDate) setStatus(error.message, "error");
     }
 }
 

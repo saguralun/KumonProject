@@ -256,6 +256,10 @@ function buildSvg(data) {
   const EDGE_MONTHS = { "0": 0, "6M": 6, "2Y": 24, "3Y": 36, "5Y": 60, "7Y": 84 };
 
   function interpolate(x, points, getX, getY) {
+    // Several upper award lines can share the curriculum ceiling. Keep the
+    // first month at that position so extrapolation never divides by zero.
+    points = points.filter((point, index) => index === 0 || getX(point) > getX(points[index - 1]));
+    if (points.length < 2) return points.length ? getY(points[0]) : 0;
     // points are ascending in getX. Pick the segment x actually falls
     // in, or the first/last segment to extrapolate past either end.
     let a = points[0];
@@ -283,7 +287,7 @@ function buildSvg(data) {
     return data.referenceLines.map((line) => ({
       months: EDGE_MONTHS[line.code],
       levelPosition: line.points[gradeIndex].levelPosition
-    }));
+    })).sort((a, b) => a.months - b.months);
   }
 
   function snapLevelPosition(levelPosition, edges) {
@@ -326,15 +330,7 @@ function buildSvg(data) {
     parts.push(`<text class="axis-label" x="${x}" y="${y}" text-anchor="end" transform="rotate(-40 ${x} ${y})">${escapeHtml(gradeLabel)}</text>`);
   });
 
-  // Reference lines (0 / 6M / 2Y / 3Y / 5Y / 7Y) — a real-time staircase,
-  // each grade's segment computed with the exact same formula
-  // computeGradeSyncStatus() uses for that same student's own status
-  // (see progressChartService.js), so a dot's status color is always
-  // consistent with which side of these lines its real position falls
-  // on: both derive from the identical "expectedMonths = grade*12 +
-  // schoolYearFraction(today)*12" baseline, and now that dots plot at
-  // their exact continuous position instead of a snapped grid cell,
-  // that consistency no longer needs any extra clamping to hold.
+  const referenceLabels = [];
   data.referenceLines.forEach((line) => {
     const color = STATUS_COLORS[line.code] || "#94a3b8";
     const stepPoints = line.points.flatMap((point, index) => {
@@ -347,7 +343,29 @@ function buildSvg(data) {
 
     const lastPoint = line.points[line.points.length - 1];
 
-    parts.push(`<text class="ref-line-label" x="${xScale(data.grades.length) + 4}" y="${yScale(lastPoint.levelPosition) + 3}" fill="${color}">${escapeHtml(line.code)}</text>`);
+    referenceLabels.push({ code: line.code, color, sourceY: yScale(lastPoint.levelPosition) });
+  });
+
+  // Place labels in a separate rail: curriculum ceilings can collapse several
+  // threshold endpoints onto the same pixel without changing their meaning.
+  const labelGap = 20;
+  const labelTop = marginTop + 8;
+  const labelBottom = marginTop + chartHeight - 8;
+  const chartRight = xScale(numGrades);
+  const labelX = chartRight + 44;
+  referenceLabels.sort((a, b) => a.sourceY - b.sourceY || EDGE_MONTHS[b.code] - EDGE_MONTHS[a.code]);
+  referenceLabels.forEach((label, index) => {
+    label.y = Math.max(labelTop, label.sourceY, index ? referenceLabels[index - 1].y + labelGap : labelTop);
+  });
+  for (let index = referenceLabels.length - 1; index >= 0; index -= 1) {
+    referenceLabels[index].y = Math.min(referenceLabels[index].y,
+      index === referenceLabels.length - 1 ? labelBottom : referenceLabels[index + 1].y - labelGap);
+  }
+  referenceLabels.forEach(({ code, color, sourceY, y }) => {
+    parts.push(`<g class="ref-label" data-code="${escapeHtml(code)}" style="--ref-color:${color}">
+      <path class="ref-label-connector" d="M ${chartRight} ${sourceY} H ${chartRight + 10} L ${labelX - 12} ${y} H ${labelX - 5}" />
+      <text class="ref-line-label" x="${labelX}" y="${y}" dominant-baseline="middle">${escapeHtml(code)}</text>
+    </g>`);
   });
 
   // Student dots — snapped onto that fixed 6-month slot grid instead of
@@ -452,7 +470,7 @@ async function renderChart({ skipFetch = false } = {}) {
     renderSummary(filtered);
 
     if (!filtered.grades.length) {
-      els.chartScroll.innerHTML = `<div class="empty-state">ยังไม่ได้เลือกชั้นเรียนเลย — เลือกอย่างน้อย 1 ชั้นทางซ้าย</div>`;
+      els.chartScroll.innerHTML = `<div class="empty-state">ยังไม่ได้เลือกชั้นเรียน</div>`;
       setStatus("ยังไม่ได้เลือกชั้นเรียน");
       return;
     }

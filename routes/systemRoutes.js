@@ -1,7 +1,8 @@
 import express from "express";
 import { createSendError } from "./routeErrorHandler.js";
 import { applyUpdate, checkForUpdate, getRuntimeStatus } from "../services/updateService.js";
-import { requireAdmin } from "../middleware/auth.js";
+import { requireAdmin, requirePermission } from "../middleware/auth.js";
+import { mainDesktop } from '../services/appDesktop.js';
 import {
     createOpeningSchedule,
     deleteOpeningSchedule,
@@ -36,7 +37,16 @@ router.get("/update-check", async (req, res) => {
     }
 });
 
-router.post("/update-apply", async (req, res) => {
+// The Windows shortcut may focus the login window before a user has signed in.
+router.post('/desktop/show', async (req, res) => {
+    if (!['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress) || !req.is('application/json')) return res.sendStatus(403);
+    const origin = `http://localhost:${req.socket.localPort}`;
+    if (req.get('origin') && !['localhost', '127.0.0.1', '[::1]'].some((host) => req.get('origin') === new URL(`http://${host}:${req.socket.localPort}`).origin)) return res.sendStatus(403);
+    try { const desktop = await mainDesktop.open({ origin }); await desktop.focus(); res.json({ success: true }); }
+    catch (error) { sendError(res, error); }
+});
+
+router.post("/update-apply", requireAdmin, async (req, res) => {
     try {
         res.json({
             success: true,
@@ -47,7 +57,7 @@ router.post("/update-apply", async (req, res) => {
     }
 });
 
-router.get("/opening-schedules", requireAdmin, async (req, res) => {
+router.get("/opening-schedules", requirePermission('page:opening-schedule'), async (req, res) => {
     try {
         res.json({
             success: true,
@@ -58,7 +68,7 @@ router.get("/opening-schedules", requireAdmin, async (req, res) => {
     }
 });
 
-router.post("/opening-schedules", requireAdmin, async (req, res) => {
+router.post("/opening-schedules", requirePermission('page:opening-schedule'), async (req, res) => {
     try {
         res.json({
             success: true,
@@ -69,7 +79,7 @@ router.post("/opening-schedules", requireAdmin, async (req, res) => {
     }
 });
 
-router.post("/opening-schedules/:scheduleId/active", requireAdmin, async (req, res) => {
+router.post("/opening-schedules/:scheduleId/active", requirePermission('page:opening-schedule'), async (req, res) => {
     try {
         res.json({
             success: true,
@@ -80,7 +90,7 @@ router.post("/opening-schedules/:scheduleId/active", requireAdmin, async (req, r
     }
 });
 
-router.delete("/opening-schedules/:scheduleId", requireAdmin, async (req, res) => {
+router.delete("/opening-schedules/:scheduleId", requirePermission('page:opening-schedule'), async (req, res) => {
     try {
         res.json({
             success: true,

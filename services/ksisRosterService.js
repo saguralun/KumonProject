@@ -1,4 +1,4 @@
-import { withKsisPage } from "./ksisStudentService.js";
+import { withKsisWorkspacePage as withKsisPage } from "./ksisStudentService.js";
 import { httpError } from "./httpError.js";
 import { normalizeKsisBirthDate } from "./ksisStudentData.js";
 

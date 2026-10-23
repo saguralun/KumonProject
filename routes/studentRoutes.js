@@ -8,7 +8,6 @@ import {
     deleteEnrollmentStatusEntry,
     deleteStudentIfNoEnrollment,
     findStudentDuplicate,
-    getStudentHistory,
     getStudentHistoryRows,
     getStudentMasters,
     getStudentProfile,

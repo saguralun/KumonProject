@@ -1466,20 +1466,6 @@ const AT_COLUMNS = [
     { key: "created_at", label: "Created At", defaultValue: "DB default" }
 ];
 
-function baseValidationItems(counts) {
-    return [
-        validationItem("Enrollment FK", 0, counts.warningCounts.enrollment),
-        validationItem("Master Lookup", 0, counts.warningCounts.master),
-        validationItem("Date", counts.errorCounts.date),
-        validationItem("Required ID", counts.errorCounts.required),
-        validationItem("Number Fields", counts.errorCounts.number),
-        validationItem("Boolean Fields", counts.errorCounts.boolean),
-        validationItem("Existing Target Rows", 0, counts.warningCounts.existing),
-        validationItem("Exact Duplicate", 0, counts.warningCounts.duplicate),
-        validationItem("Audit Fields", 0, counts.warningCounts.audit)
-    ];
-}
-
 function cdSummaryDetails(counts, masters) {
     return [
         { label: "Missing Enrollment", value: counts.infoCounts.missingEnrollment },

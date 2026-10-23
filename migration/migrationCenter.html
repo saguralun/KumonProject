@@ -582,29 +582,6 @@
           flex-wrap: wrap;
       }
 
-      .preview-filter {
-          display: inline-flex;
-          gap: 4px;
-          padding: 3px;
-          border: 1px solid var(--line);
-          border-radius: 9px;
-          background: #f8fafc;
-      }
-
-      .preview-filter-button {
-          padding: 6px 9px;
-          border-radius: 7px;
-          background: transparent;
-          color: #475569;
-          font-size: 12px;
-      }
-
-      .preview-filter-button.active {
-          background: #ffffff;
-          color: var(--blue);
-          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-      }
-
       .preview-note {
           color: var(--muted);
           font-size: 13px;
@@ -689,24 +666,64 @@
 
       }
     </style>
+    <link rel="stylesheet" href="/css/app-menu.css?v=20261023-static-menu">
 </head>
 
 <body>
 
-<div class="container">
+<div class="migration-shell app-menu-layout">
+    <aside class="app-menu-panel" id="appNavigation" role="dialog" aria-label="เมนูหลัก" aria-modal="true" aria-hidden="true" inert>
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="home-link active current-page" href="/migration.html">📥 Migration</a>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/worksheet.html">📝 WS Input</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/student-manager.html">👤 Students</a>
+            <a class="home-link" href="/payment.html" data-requires-permission="page:payment">💰 Payment</a>
+            <a class="home-link" href="/report.html" data-requires-permission="page:report">📊 Report</a>
+            <a class="home-link" href="/ksis.html" data-ksis-link data-requires-permission="page:report">🌐 K-sis</a>
+            <a class="home-link" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
+            <a class="home-link" href="/statistics.html" data-requires-permission="page:statistics">🧮 Statistics</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/stock.html" data-requires-permission="page:stock">📊 Stock</a>
+            <a class="home-link" href="/stock-receive.html" data-requires-permission="page:stock-receive">📦 Stock Receive</a>
+            <a class="home-link" href="/stock-cut.html" data-requires-permission="page:stock-cut">✂️ Stock Cut</a>
+            <a class="home-link" href="/forecast.html" data-requires-permission="page:forecast">🔮 Forecast & Order</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/" data-requires-permission="page:tables">🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-requires-permission="page:opening-schedule">🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+            <a class="home-link" href="/migration.html" data-admin-only>📥 Migration</a>
+            <a class="home-link" href="/backup.html" data-admin-only>💾 Backup</a>
+          </div>
+        </div>
+      </nav>
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+<div class="container migration-workspace">
 
     <!-- =====================================
          HEADER
     ====================================== -->
 
     <header class="header">
+        <button type="button" class="app-menu-icon-button app-menu-toggle" id="appMenuButton" aria-label="เปิดเมนู" title="เปิดเมนู" data-tooltip="เปิดเมนู" aria-haspopup="dialog" aria-controls="appNavigation" aria-expanded="false"><img src="/icons/lucide/menu.svg" alt="" width="20" height="20"></button>
 
         <div>
-            <a
-                href="/"
-                style="display:inline-block;margin-bottom:10px;color:var(--blue);text-decoration:none;font-weight:600;font-size:14px;"
-            >← กลับหน้าหลัก</a>
-
             <h1>Migration Center</h1>
 
             <div class="subtitle">
@@ -2605,34 +2622,6 @@ function getVisiblePreviewRows(data) {
     );
 }
 
-function renderPreviewRowFilter(data) {
-    if (!supportsPreviewRowFilter(data)) {
-        return "";
-    }
-
-    const filterMode = getPreviewRowFilter(data);
-
-    return `
-        <div
-            class="preview-filter"
-            aria-label="Preview row filter"
-        >
-            <button
-                class="preview-filter-button ${filterMode === "new" ? "active" : ""}"
-                onclick="setPreviewRowFilter('${data.module}', 'new')"
-            >
-                New only
-            </button>
-            <button
-                class="preview-filter-button ${filterMode === "all" ? "active" : ""}"
-                onclick="setPreviewRowFilter('${data.module}', 'all')"
-            >
-                All rows
-            </button>
-        </div>
-    `;
-}
-
 function renderPreviewValidation(validation) {
     if (!Array.isArray(validation) || validation.length === 0) {
         return previewCheck({
@@ -2936,20 +2925,6 @@ function setPreviewTablePageSize(moduleId, tableId, pageSize) {
     previewState.tablePageSizeByModule[key] =
         normalizePageSize(pageSize, table.pagination?.pageSizeOptions);
     previewState.tablePageByModule[key] = 1;
-
-    renderPreview(data);
-}
-
-function setPreviewRowFilter(moduleId, filterMode) {
-    const data = previewState[moduleId];
-
-    if (!data) {
-        return;
-    }
-
-    previewState.rowFilterByModule[moduleId] =
-        filterMode === "all" ? "all" : "new";
-    previewState.pageByModule[moduleId] = 1;
 
     renderPreview(data);
 }
@@ -3822,7 +3797,6 @@ window.setPreviewPage = setPreviewPage;
 window.setPreviewPageSize = setPreviewPageSize;
 window.setPreviewTablePage = setPreviewTablePage;
 window.setPreviewTablePageSize = setPreviewTablePageSize;
-window.setPreviewRowFilter = setPreviewRowFilter;
 
 if (document.readyState === "loading") {
     document.addEventListener(
@@ -3834,5 +3808,9 @@ if (document.readyState === "loading") {
 }
 </script>
 
+    </div>
+    <script src="/js/authClient.js?v=20261016-verified-restart"></script>
+    <script src="/js/appMenu.js?v=20261023-static-menu"></script>
+    <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
 </body>
 </html>

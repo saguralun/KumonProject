@@ -26,6 +26,23 @@
 //                role_permission, can't be granted more.
 
 import { roleHasPermission } from "../services/roleService.js";
+import { getActiveSessionAccount } from '../services/authService.js';
+
+export async function refreshAccountSession(req, res, next) {
+    const user = req.session?.user;
+    if (!user || user.role === 'guest') return next();
+    // Static assets do not need account queries; every page/API decision does.
+    const requestPath = req.path.toLowerCase();
+    if (requestPath !== '/' && requestPath !== '/api' && !requestPath.startsWith('/api/') && !requestPath.endsWith('.html')) return next();
+    try {
+        const account = await getActiveSessionAccount(user.userId);
+        if (!account) return req.session.regenerate((error) => error ? next(error) : next());
+        req.session.user = account;
+        next();
+    } catch {
+        res.status(503).json({ success: false, error: 'ตรวจสอบบัญชีไม่สำเร็จ กรุณาลองใหม่' });
+    }
+}
 
 export function requireAuth(req, res, next) {
     if (req.session?.user) {

@@ -480,7 +480,19 @@ function formatBillingPeriod({
     return `${billingMonth}/${billingYear}`;
 }
 
-async function insertPaymentEnrollmentStatusHistory(client, receipt) {
+async function assertPaymentTracking(client) {
+    const result = await client.query(`SELECT column_name FROM information_schema.columns
+        WHERE table_schema = $1 AND table_name = 'billing_detail'
+          AND column_name = ANY($2::text[])`, [TABLE_SCHEMA, ['inserted_status_history_id', 'payment_status_updated_at']]);
+    if (result.rows.length !== 2) throw httpError(409, 'กรุณาอัปเดตฐานข้อมูลด้วย database/004_payment_status_provenance.sql ก่อนรับเงินหรือยกเลิกใบเสร็จ');
+}
+
+async function lockReceiptLedger(client) {
+    // Receipt books are global, so allocating numbers and cancelling receipts share one transaction lock.
+    await client.query('SELECT pg_advisory_xact_lock(76401, 1)');
+}
+
+async function insertPaymentEnrollmentStatusHistory(client, receipt, billingId) {
     let inserted = 0;
 
     const paymentDetails = receipt.receiptDetails || receipt.details;
@@ -518,13 +530,16 @@ async function insertPaymentEnrollmentStatusHistory(client, receipt) {
 
         if (result.rows[0]) {
             inserted += 1;
+            await client.query(`UPDATE ${TABLE_SCHEMA}.billing_detail
+                SET inserted_status_history_id = $1 WHERE billing_id = $2 AND enrollment_id = $3`,
+            [result.rows[0].enrollment_status_id, billingId, detail.enrollmentId]);
         }
     }
 
     return inserted;
 }
 
-async function normalizeEnrollmentStatusesAfterPayment(client, receipt) {
+async function normalizeEnrollmentStatusesAfterPayment(client, receipt, billingId) {
     const paymentDetails = receipt.receiptDetails || receipt.details;
     const enrollmentIds = [
         ...new Set(paymentDetails.map((detail) => Number(detail.enrollmentId)).filter(Number.isInteger))
@@ -567,6 +582,10 @@ async function normalizeEnrollmentStatusesAfterPayment(client, receipt) {
         continueStatusId
     ]);
 
+    await client.query(`UPDATE ${TABLE_SCHEMA}.billing_detail detail
+        SET payment_status_updated_at = enrollment.updated_at
+        FROM ${TABLE_SCHEMA}.enrollment enrollment
+        WHERE detail.billing_id = $1 AND detail.enrollment_id = enrollment.enrollment_id`, [billingId]);
     return result.rowCount;
 }
 
@@ -678,7 +697,7 @@ async function buildReceiptPreview({
         billingMonth,
         billingYear
     });
-    const currentEnrollment = await getEnrollmentRow(normalizedEnrollmentId);
+    const currentEnrollment = await getEnrollmentRow(normalizedEnrollmentId, { client });
 
     if (!currentEnrollment) {
         throw httpError(404, "ไม่พบ enrollment ที่ยังใช้งานอยู่");
@@ -1022,10 +1041,17 @@ export async function previewReceipt(payload) {
 }
 
 export async function receiveReceiptPayment(payload) {
+    const enrollmentId = Number(payload?.enrollmentId);
+    if (!Number.isInteger(enrollmentId) || enrollmentId < 1) throw httpError(400, 'Enrollment ID ไม่ถูกต้อง');
     const client = await pool.connect();
 
     try {
         await client.query("BEGIN");
+        await assertPaymentTracking(client);
+        await lockReceiptLedger(client);
+        await client.query(`SELECT enrollment_id FROM ${TABLE_SCHEMA}.enrollment
+            WHERE student_id = (SELECT student_id FROM ${TABLE_SCHEMA}.enrollment WHERE enrollment_id = $1)
+            ORDER BY enrollment_id FOR UPDATE`, [enrollmentId]);
 
         const receipt = await buildReceiptPreview({
             enrollmentId: payload?.enrollmentId,
@@ -1102,8 +1128,8 @@ export async function receiveReceiptPayment(payload) {
                 detail.netAmount
             ]);
         }
-        const enrollmentStatusHistoryInserted = await insertPaymentEnrollmentStatusHistory(client, receipt);
-        const enrollmentStatusesUpdated = await normalizeEnrollmentStatusesAfterPayment(client, receipt);
+        const enrollmentStatusHistoryInserted = await insertPaymentEnrollmentStatusHistory(client, receipt, billingId);
+        const enrollmentStatusesUpdated = await normalizeEnrollmentStatusesAfterPayment(client, receipt, billingId);
 
         await client.query("COMMIT");
 
@@ -1136,6 +1162,8 @@ export async function cancelReceiptPayment(payload) {
 
     try {
         await client.query("BEGIN");
+        await assertPaymentTracking(client);
+        await lockReceiptLedger(client);
 
         const billingResult = await client.query(`
             SELECT
@@ -1161,6 +1189,8 @@ export async function cancelReceiptPayment(payload) {
                 detail.enrollment_id,
                 detail.status_group1_id,
                 detail.status_group2_id,
+                detail.inserted_status_history_id,
+                detail.payment_status_updated_at,
                 status1.status_code AS status_group1_code,
                 status1.status_name AS status_group1_name,
                 status2.status_code AS status_group2_code,
@@ -1180,23 +1210,43 @@ export async function cancelReceiptPayment(payload) {
             throw httpError(409, "ใบเสร็จนี้ไม่มีรายละเอียดให้ยกเลิก");
         }
 
-        let deletedStatusHistory = 0;
+        let deletedStatusHistory = 0, restoredEnrollments = 0, preservedEnrollments = 0;
 
         for (const detail of details) {
-            const deleteHistoryResult = await client.query(`
+            const current = await client.query(`SELECT enrollment.enrollment_id,
+                    enrollment.updated_at = detail.payment_status_updated_at AS payment_unchanged,
+                    status.status_code
+                FROM ${TABLE_SCHEMA}.enrollment enrollment
+                JOIN ${TABLE_SCHEMA}.billing_detail detail ON detail.enrollment_id = enrollment.enrollment_id
+                JOIN ${TABLE_SCHEMA}.status_master status ON status.status_id = enrollment.current_status_group1_id
+                WHERE enrollment.enrollment_id = $1 AND detail.billing_detail_id = $2 FOR UPDATE OF enrollment`,
+            [detail.enrollment_id, detail.billing_detail_id]);
+            const canRestore = detail.payment_status_updated_at != null && current.rows[0]?.payment_unchanged === true
+                && current.rows[0]?.status_code === 'C';
+            // Legacy receipts have no ownership metadata: retain history rather than guessing its origin.
+            const deleteHistoryResult = detail.inserted_status_history_id ? await client.query(`
                 DELETE FROM ${TABLE_SCHEMA}.enrollment_status
-                WHERE enrollment_id = $1
-                  AND status_month = $2
-                  AND status_year = $3
+                WHERE enrollment_status_id = $1 AND enrollment_id = $2 AND status_id = $3
+                  AND status_month = $4 AND status_year = $5
+                  AND NOT EXISTS (
+                    SELECT 1 FROM ${TABLE_SCHEMA}.billing_detail other
+                    JOIN ${TABLE_SCHEMA}.billing bill ON bill.billing_id = other.billing_id
+                    WHERE other.enrollment_id = $2 AND other.status_group1_id = $3
+                      AND bill.billing_month = $4 AND bill.billing_year = $5 AND bill.billing_id <> $6
+                  )
             `, [
+                detail.inserted_status_history_id,
                 detail.enrollment_id,
+                detail.status_group1_id,
                 billing.billing_month,
-                billing.billing_year
-            ]);
+                billing.billing_year,
+                billingId
+            ]) : { rowCount: 0 };
 
             deletedStatusHistory += deleteHistoryResult.rowCount;
 
-            await client.query(`
+            if (canRestore) {
+                await client.query(`
                 UPDATE ${TABLE_SCHEMA}.enrollment
                 SET current_status_group1_id = $1,
                     current_status_group2_id = $2,
@@ -1207,6 +1257,8 @@ export async function cancelReceiptPayment(payload) {
                 detail.status_group2_id,
                 detail.enrollment_id
             ]);
+                restoredEnrollments++;
+            } else preservedEnrollments++;
         }
 
         await client.query(`
@@ -1227,8 +1279,10 @@ export async function cancelReceiptPayment(payload) {
             receiptNo: billing.receipt_no,
             billingMonth: billing.billing_month,
             billingYear: billing.billing_year,
-            restoredEnrollments: details.length,
-            deletedStatusHistory
+            restoredEnrollments,
+            preservedEnrollments,
+            deletedStatusHistory,
+            warning: preservedEnrollments ? `คงสถานะปัจจุบัน ${preservedEnrollments} รายวิชาไว้ เพราะมีการแก้หลังรับเงินหรือเป็นบิลเดิมที่ไม่มีข้อมูลติดตาม` : ''
         };
     } catch (error) {
         await client.query("ROLLBACK");

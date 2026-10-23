@@ -56,64 +56,16 @@ button:disabled {
 
 .forecast-page {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
 }
 
-.forecast-sidebar {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  overflow: auto;
-  border-right: 1px solid var(--line);
-  background: #132033;
-  color: #e5edf7;
-  padding: 10px;
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.home-link {
-  display: block;
-  min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: #dbeafe;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.home-link.active,
-.home-link:hover {
-  border-color: #dbeafe;
-  background: #eaf2ff;
-  color: var(--blue);
-}
-
-.side-header h1 {
-  margin: 0;
-  font-size: 24px;
-}
-
 .subtle {
   color: var(--muted);
   font-size: 13px;
-}
-
-.forecast-sidebar .subtle {
-  color: #a9b8cc;
 }
 
 .filter-panel {

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KumonDB K-sis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/report.css?v=20261022-validation-review">
+  <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
+  <link rel="stylesheet" href="/css/ksis.css?v=20261023-single-workspace">
+  <link rel="stylesheet" href="/css/app-menu.css?v=20261023-static-menu">
+  <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
+</head>
+<body>
+  <main class="report-page ksis-page app-menu-layout">
+    <aside class="app-menu-panel" id="appNavigation" role="dialog" aria-label="เมนูหลัก" aria-modal="true" aria-hidden="true" inert>
+      <nav class="side-nav" aria-label="Main navigation">
+        <span class="home-link active current-page">🌐 K-sis</span>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">งานประจำ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/worksheet.html">📝 WS Input</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">จัดการ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/student-manager.html">👤 Students</a>
+            <a class="home-link" href="/payment.html" data-requires-permission="page:payment">💰 Payment</a>
+            <a class="home-link" href="/report.html" data-requires-permission="page:report">📊 Report</a>
+            <a class="home-link current-page" href="/ksis.html" data-ksis-link data-requires-permission="page:report">🌐 K-sis</a>
+            <a class="home-link" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
+            <a class="home-link" href="/statistics.html" data-requires-permission="page:statistics">🧮 Statistics</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">คลัง</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/stock.html" data-requires-permission="page:stock">📊 Stock</a>
+            <a class="home-link" href="/stock-receive.html" data-requires-permission="page:stock-receive">📦 Stock Receive</a>
+            <a class="home-link" href="/stock-cut.html" data-requires-permission="page:stock-cut">✂️ Stock Cut</a>
+            <a class="home-link" href="/forecast.html" data-requires-permission="page:forecast">🔮 Forecast & Order</a>
+          </div>
+        </div>
+        <div class="nav-flyout">
+          <button type="button" class="home-link nav-flyout-trigger">ระบบ</button>
+          <div class="nav-flyout-menu">
+            <a class="home-link" href="/" data-requires-permission="page:tables">🗂️ Tables</a>
+            <a class="home-link" href="/opening-schedule.html" data-requires-permission="page:opening-schedule">🕒 Opening Schedule</a>
+            <a class="home-link" href="/users.html" data-admin-only>👥 Users</a>
+            <a class="home-link" href="/migration.html" data-admin-only>📥 Migration</a>
+            <a class="home-link" href="/backup.html" data-admin-only>💾 Backup</a>
+          </div>
+        </div>
+      </nav>
+
+      <div class="auth-bar" id="authBar"></div>
+    </aside>
+
+    <section class="report-workspace">
+      <header class="topbar">
+        <button type="button" class="app-menu-icon-button app-menu-toggle" id="appMenuButton" aria-label="เปิดเมนู" title="เปิดเมนู" data-tooltip="เปิดเมนู" aria-haspopup="dialog" aria-controls="appNavigation" aria-expanded="false"><img src="/icons/lucide/menu.svg" alt="" width="20" height="20"></button>
+        <div><div class="page-title">K-sis</div><div class="subtle" id="ksisPeriodLabel"></div></div>
+        <div id="statusLine" class="status-line" role="status">พร้อมใช้งาน</div>
+      </header>
+      <section class="filter-panel workspace-toolbar" aria-label="งวด KSIS">
+        <label><span>เดือน</span><select id="reportMonth"></select></label>
+        <label><span>ปี</span><input id="reportYear" type="number" min="2000" max="2600" step="1"></label>
+      </section>
+      <div class="ksis-desktop-launch" id="ksisDesktopLaunch">
+        <button type="button" class="secondary-button" id="ksisDesktopOpen">เปิด K-sis ในแอป</button>
+        <span class="subtle" id="ksisDesktopStatus" role="status"></span>
+      </div>
+      <div class="ksis-split">
+      <section class="panel report-table-panel ksis-tools">
+        <div class="ksis-tabs subject-tabs" role="tablist" aria-label="งาน KSIS">
+          <button type="button" id="ksisDraftButton" role="tab" aria-controls="ksisDraft" aria-selected="true" data-ksis-tab="draft">กรอก WS</button>
+          <button type="button" id="ksisAuditButton" role="tab" aria-controls="ksisAudit" aria-selected="false" data-ksis-tab="audit">ตรวจ WS</button>
+          <button type="button" id="ksisAtButton" role="tab" aria-controls="ksisAt" aria-selected="false" data-ksis-tab="at">กรอก AT</button>
+          <button type="button" id="ksisAtAuditButton" role="tab" aria-controls="ksisAtAudit" aria-selected="false" data-ksis-tab="atAudit">ตรวจ AT</button>
+          <button type="button" id="ksisMatchingButton" role="tab" aria-controls="ksisMatching" aria-selected="false" data-ksis-tab="matching">จับคู่รหัสคุมอง</button>
+        </div>
+        <section class="ksis-matching" id="ksisDraft" data-ksis-view="draft" role="tabpanel" aria-labelledby="ksisDraftButton">
+          <div class="matching-toolbar">
+            <label>วิชา<select id="ksisDraftSubject"><option value="ALL">ทุกวิชา (ME / EFL / TRP)</option><option value="ME">ME</option><option value="EFL">EFL</option><option value="TRP">TRP</option></select></label>
+            <button type="button" class="secondary-button" id="ksisDraftPreview">เตรียมข้อมูล / อ่านหน้า KSIS ปัจจุบัน</button>
+            <button type="button" class="primary-button" id="ksisDraftFill" disabled>กรอกและบันทึกหน้านี้</button>
+            <button type="button" class="secondary-button hidden" id="ksisDraftAcknowledge">ตรวจและจัดการข้อมูลบน KSIS แล้ว</button>
+          </div>
+          <div id="ksisDraftSource" class="subtle" role="status">ยังไม่ได้เตรียมข้อมูล</div>
+          <div class="matching-table-wrap" id="ksisDraftRows"><div class="empty-state">ยังไม่มี Preview</div></div>
+          <dialog id="ksisDraftDialog" class="matching-dialog">
+            <h2>ยืนยันกรอกและบันทึก WS</h2><p id="ksisDraftConfirmText"></p>
+            <p id="ksisDraftConfirmScope">กรอกระดับ หน้าปัจจุบัน WS used และ ST1 เท่านั้น • ไม่กรอก Zun/AT/DT • ข้ามสถานะ A • KC ใช้ WS used = 1 • บันทึกทุก 10 คน รวมทุกวิชาของเด็กคนเดียวกัน • ท้ายหน้าไม่ครบ 10 คนก็บันทึก • ไม่เปลี่ยนหน้าอัตโนมัติ</p>
+            <div class="matching-toolbar"><button type="button" id="ksisDraftCancel" class="secondary-button">ยกเลิก</button><button type="button" id="ksisDraftConfirm" class="primary-button">ยืนยันกรอก</button></div>
+          </dialog>
+        </section>
+        <section class="ksis-matching hidden" id="ksisAt" data-ksis-view="at" role="tabpanel" aria-labelledby="ksisAtButton">
+          <div class="matching-toolbar">
+            <label>วิชา<select id="ksisAtSubject"><option>ME</option><option>EFL</option><option>TRP</option></select></label>
+            <button type="button" class="secondary-button" id="ksisAtOpen">เปิดหน้า AT</button>
+            <button type="button" class="secondary-button" id="ksisAtPreview">เตรียม AT หน้าปัจจุบัน</button>
+            <button type="button" class="primary-button" id="ksisAtFill" disabled>กรอกและบันทึก AT หน้านี้</button>
+            <button type="button" class="secondary-button hidden" id="ksisAtAcknowledge">จัดการข้อมูล AT ค้างแล้ว</button>
+          </div>
+          <div id="ksisAtSource" class="subtle" role="status">ยังไม่ได้เตรียม AT</div>
+          <div id="ksisAtCounts" class="audit-counts" aria-label="สรุป AT"></div>
+          <section id="ksisAtInspection" class="at-inspection hidden" aria-label="ผลตรวจ AT แบบอ่านอย่างเดียว"></section>
+          <div id="ksisAtRows" class="matching-table-wrap"><div class="empty-state">ยังไม่มี Preview AT</div></div>
+          <dialog id="ksisAtDialog" class="matching-dialog">
+            <h2>ยืนยันกรอกและบันทึก AT</h2><p id="ksisAtConfirmText"></p>
+            <p>เฉพาะวิชาและหน้า KSIS ที่เตรียมไว้ • บันทึกทีละผลสอบ • ผ่าน = ใช่ • ข้ามผลสอบที่มีตรงกันแล้ว • ไม่เขียนทับผลสอบเดิม • ไม่กรอก WS, Zun หรือ DT</p>
+            <div class="matching-toolbar"><button type="button" class="secondary-button" id="ksisAtCancel">ยกเลิก</button><button type="button" class="primary-button" id="ksisAtConfirm">ยืนยันกรอกและบันทึก AT</button></div>
+          </dialog>
+        </section>
+        <section id="ksisAtAudit" class="ksis-matching hidden" data-ksis-view="atAudit" role="tabpanel" aria-labelledby="ksisAtAuditButton">
+          <div class="matching-toolbar">
+            <label>วิชา<select id="ksisAtAuditSubject"><option>ME</option><option>EFL</option><option>TRP</option></select></label>
+            <button type="button" class="secondary-button" id="ksisAtAuditCurrent">ตรวจ AT หน้าปัจจุบัน</button>
+            <button type="button" class="secondary-button" id="ksisAtAuditAll">ตรวจ AT ทุกหน้า</button>
+          </div>
+          <div id="ksisAtAuditSource" class="subtle" role="status">ยังไม่ได้ตรวจ AT</div>
+          <div id="ksisAtAuditCounts" class="audit-counts" aria-label="สรุปผลตรวจ AT"></div>
+          <div class="matching-filters">
+            <label>ผลตรวจ<select id="ksisAtAuditFilter"><option value="all">ทั้งหมด</option><option value="issues">เฉพาะที่ต้องตรวจ</option><option value="matched">ตรงกัน</option><option value="mismatch">ไม่ตรงกัน</option><option value="review">ต้องตรวจการจับคู่ / ข้อมูล</option><option value="missing_ksis">ไม่พบใน KSIS</option><option value="missing_report">ไม่พบใน Report</option></select></label>
+            <label>ค้นหา<input type="search" id="ksisAtAuditSearch" placeholder="ชื่อ / รหัสคุมอง"></label>
+            <span id="ksisAtAuditCount" role="status"></span>
+          </div>
+          <div id="ksisAtAuditRows" class="matching-table-wrap"><div class="empty-state">ยังไม่มีผลตรวจ AT</div></div>
+        </section>
+        <section class="ksis-matching hidden" id="ksisMatching" data-ksis-view="matching" role="tabpanel" aria-labelledby="ksisMatchingButton">
+          <div class="matching-toolbar">
+            <button type="button" class="secondary-button" id="ksisReadRoster">อ่านรายชื่อ KSIS ทุกหน้า</button>
+            <button type="button" class="secondary-button" id="ksisSelectExact" disabled>เลือกคู่ที่ตรงแน่นอน</button>
+            <button type="button" class="primary-button" id="ksisConfirmMatches" disabled>ยืนยันรหัสที่เลือก</button>
+          </div>
+          <div class="subtle" id="ksisMatchingSource" role="status">ยังไม่ได้อ่านรายชื่อ</div>
+          <div class="matching-filters">
+            <label>รายการ<select id="ksisMatchFilter"><option value="all">ทั้งหมด</option><option value="exact">ตรงแน่นอน</option><option value="review">วันเกิดต่างกัน</option><option value="ambiguous">พบหลายคู่</option><option value="conflict">รหัสขัดแย้ง</option><option value="unmatched">ไม่พบคู่</option><option value="invalid">ข้อมูลไม่ครบ</option><option value="matched">มีรหัสตรงแล้ว</option></select></label>
+            <label>ค้นหา<input id="ksisMatchSearch" type="search" placeholder="ชื่อ / รหัสคุมอง"></label>
+            <span id="ksisMatchCount" role="status"></span>
+          </div>
+          <div class="matching-table-wrap" id="ksisMatchRows"><div class="empty-state">ยังไม่มีรายการจับคู่</div></div>
+          <dialog id="ksisMatchConfirmDialog" class="matching-dialog">
+            <h2>ยืนยันบันทึกรหัสคุมอง</h2><p id="ksisMatchConfirmText"></p>
+            <p>บันทึกเฉพาะรหัสคุมองในรายวิชาของเด็กที่เลือก ไม่เปลี่ยน Student ID หรือ Enrollment ID และไม่บันทึกข้อมูลลง KSIS</p>
+            <div class="matching-toolbar"><button type="button" class="secondary-button" id="ksisCancelConfirm">ยกเลิก</button><button type="button" class="primary-button" id="ksisSaveConfirm">ยืนยันบันทึก</button></div>
+          </dialog>
+        </section>
+        <section id="ksisAudit" class="ksis-matching hidden" data-ksis-view="audit" role="tabpanel" aria-labelledby="ksisAuditButton">
+          <div class="matching-toolbar">
+            <label>วิชา<select id="ksisAuditSubject"><option value="ALL">ทุกวิชา (ME / EFL / TRP)</option><option>ME</option><option>EFL</option><option>TRP</option></select></label>
+            <button type="button" class="secondary-button" id="ksisAuditCurrent">ตรวจ WS หน้าปัจจุบัน</button>
+            <button type="button" class="secondary-button" id="ksisAuditAll">ตรวจ WS ทุกหน้า</button>
+          </div>
+          <div id="ksisAuditSource" class="subtle" role="status">ยังไม่ได้ตรวจข้อมูลที่บันทึก</div>
+          <div id="ksisAuditCounts" class="audit-counts" aria-label="สรุปผลตรวจ"></div>
+          <div class="matching-filters">
+            <label>ผลตรวจ<select id="ksisAuditFilter"><option value="all">ทั้งหมด</option><option value="issues">เฉพาะที่ต้องตรวจ</option><option value="matched">ตรงกัน</option><option value="mismatch">ไม่ตรงกัน</option><option value="review">ต้องตรวจการจับคู่ / ข้อมูล</option><option value="missing_ksis">ไม่พบใน KSIS</option><option value="missing_report">ไม่พบใน Report</option><option value="skipped">ข้าม A/OT</option></select></label>
+            <label>ค้นหา<input type="search" id="ksisAuditSearch" placeholder="ชื่อ / รหัสคุมอง"></label>
+            <span id="ksisAuditCount" role="status"></span>
+          </div>
+          <div id="ksisAuditRows" class="matching-table-wrap"><div class="empty-state">ยังไม่มีผลตรวจ</div></div>
+        </section>
+      </section>
+      <section class="ksis-browser-pane hidden" id="ksisBrowserPane" aria-label="เว็บ KSIS">
+        <header class="ksis-browser-toolbar"><strong>KSIS</strong><span class="subtle">kao.ksis.kumon.com</span><button type="button" class="secondary-button" id="ksisOpenReportB">Report B</button></header>
+        <div class="ksis-browser-slot" id="ksisBrowserSlot"></div>
+      </section>
+      </div>
+    </section>
+  </main>
+  <script src="/js/authClient.js?v=20261016-verified-restart"></script>
+  <script src="/js/appMenu.js?v=20261023-static-menu"></script>
+  <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
+  <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
+  <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
+  <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
+  <script type="module" src="/js/ksis.js?v=20261023-single-workspace"></script>
+</body>
+</html>

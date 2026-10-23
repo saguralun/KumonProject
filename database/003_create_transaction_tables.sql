@@ -235,6 +235,10 @@ CREATE TABLE billing_detail (
 
   enrollment_id INTEGER NOT NULL,
 
+  inserted_status_history_id INTEGER REFERENCES enrollment_status(enrollment_status_id) ON DELETE SET NULL,
+
+  payment_status_updated_at TIMESTAMP,
+
   current_level_master_id SMALLINT NOT NULL,
 
   current_zun_level_master_id SMALLINT,

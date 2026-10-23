@@ -360,11 +360,6 @@ function addError(issues, category, value, row, message) {
     addIssue(issues[category], value, row, message);
 }
 
-function addWarning(warnings, category, value, row, message) {
-    row.warnings.push(message);
-    addIssue(warnings[category], value, row, message);
-}
-
 function addInfo(info, category, value, row, message) {
     row.info.push(message);
     addIssue(info[category], value, row, message);

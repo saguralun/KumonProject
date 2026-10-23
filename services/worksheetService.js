@@ -454,14 +454,14 @@ function mapAtAttempt(row) {
     };
 }
 
-export async function getEnrollmentRow(enrollmentId, { activeOnly = true } = {}) {
+export async function getEnrollmentRow(enrollmentId, { activeOnly = true, client = pool } = {}) {
     const activeSql = activeOnly
         ? "AND status.status_code = ANY($2::text[])"
         : "";
     const params = activeOnly
         ? [enrollmentId, ACTIVE_STATUS_CODES]
         : [enrollmentId];
-    const result = await pool.query(`
+    const result = await client.query(`
         SELECT
             e.enrollment_id,
             e.student_id,
@@ -874,7 +874,8 @@ async function getWorksheetPacketSummaryForLevel({
     enrollment,
     levelMasterId,
     levelCode,
-    maxWorksheetNo
+    maxWorksheetNo,
+    client = pool
 }) {
     if (!enrollment?.enrollmentId || !levelMasterId) {
         return {
@@ -886,7 +887,7 @@ async function getWorksheetPacketSummaryForLevel({
         };
     }
 
-    const result = await pool.query(`
+    const result = await client.query(`
         WITH level_rows AS (
             SELECT
                 wu.worksheet_date,
@@ -952,19 +953,26 @@ async function getWorksheetPacketSummaryForLevel({
     };
 }
 
-async function getWorksheetPacketSummary(enrollment) {
-    const [main, zun] = await Promise.all([
-        getWorksheetPacketSummaryForLevel({
+async function readOnConnection(client, readers) {
+    if (client === pool) return Promise.all(readers.map((read) => read()));
+    const results = [];
+    for (const read of readers) results.push(await read());
+    return results;
+}
+
+async function getWorksheetPacketSummary(enrollment, client = pool) {
+    const [main, zun] = await readOnConnection(client, [
+        () => getWorksheetPacketSummaryForLevel({
             enrollment,
             levelMasterId: enrollment.currentLevelMasterId,
             levelCode: enrollment.currentLevelCode,
-            maxWorksheetNo: 200
+            maxWorksheetNo: 200, client
         }),
-        getWorksheetPacketSummaryForLevel({
+        () => getWorksheetPacketSummaryForLevel({
             enrollment,
             levelMasterId: enrollment.currentZunLevelMasterId,
             levelCode: enrollment.currentZunLevelCode,
-            maxWorksheetNo: 100
+            maxWorksheetNo: 100, client
         })
     ]);
 
@@ -1034,7 +1042,8 @@ async function getWorksheetProgressForLevel({
     enrollment,
     levelMasterId,
     levelCode,
-    maxWorksheetNo
+    maxWorksheetNo,
+    client = pool
 }) {
     if (!enrollment?.enrollmentId || !levelMasterId) {
         return {
@@ -1046,7 +1055,7 @@ async function getWorksheetProgressForLevel({
         };
     }
 
-    const result = await pool.query(`
+    const result = await client.query(`
         WITH level_cpws AS (
             SELECT
                 wu.actual_worksheet_no,
@@ -1084,19 +1093,19 @@ async function getWorksheetProgressForLevel({
     };
 }
 
-async function getWorksheetProgress(enrollment) {
-    const [main, zun] = await Promise.all([
-        getWorksheetProgressForLevel({
+async function getWorksheetProgress(enrollment, client = pool) {
+    const [main, zun] = await readOnConnection(client, [
+        () => getWorksheetProgressForLevel({
             enrollment,
             levelMasterId: enrollment.currentLevelMasterId,
             levelCode: enrollment.currentLevelCode,
-            maxWorksheetNo: 200
+            maxWorksheetNo: 200, client
         }),
-        getWorksheetProgressForLevel({
+        () => getWorksheetProgressForLevel({
             enrollment,
             levelMasterId: enrollment.currentZunLevelMasterId,
             levelCode: enrollment.currentZunLevelCode,
-            maxWorksheetNo: 100
+            maxWorksheetNo: 100, client
         })
     ]);
 
@@ -1107,8 +1116,8 @@ async function getWorksheetProgress(enrollment) {
     };
 }
 
-async function getLevelCompletionState(enrollment) {
-    const result = await pool.query(`
+async function getLevelCompletionState(enrollment, client = pool) {
+    const result = await client.query(`
         SELECT
             EXISTS (
                 SELECT 1
@@ -1167,7 +1176,7 @@ async function getLevelCompletionState(enrollment) {
     };
 
     if (atMasterId) {
-        const attemptResult = await pool.query(`
+        const attemptResult = await client.query(`
             SELECT
                 COUNT(*)::int AS attempt_count,
                 COALESCE(BOOL_OR(is_pass), FALSE) AS has_passed
@@ -1175,7 +1184,7 @@ async function getLevelCompletionState(enrollment) {
             WHERE enrollment_id = $1
               AND at_master_id = $2
         `, [enrollment.enrollmentId, atMasterId]);
-        const latestResult = await pool.query(`
+        const latestResult = await client.query(`
             SELECT
                 at_used.at_used_id,
                 at_used.enrollment_id,
@@ -1211,7 +1220,7 @@ async function getLevelCompletionState(enrollment) {
     }
 
     if (enrollment.currentZunLevelMasterId) {
-        const zunResult = await pool.query(`
+        const zunResult = await client.query(`
             SELECT
                 current_zun.next_level_master_id,
                 next_zun.level_code AS next_level_code
@@ -1230,7 +1239,7 @@ async function getLevelCompletionState(enrollment) {
         };
     }
 
-    const latestAnyAt = await getLatestAtAttempt(enrollment.enrollmentId);
+    const latestAnyAt = await getLatestAtAttempt(enrollment.enrollmentId, client);
     const hasWorksheet191 = Boolean(row.can_complete_ws_level);
     const nextLevelMasterId = row.next_level_master_id ?? null;
     const canCompleteWithoutAt = Boolean(
@@ -1283,8 +1292,8 @@ async function getLevelCompletionState(enrollment) {
     };
 }
 
-async function getLatestAtAttempt(enrollmentId) {
-    const result = await pool.query(`
+async function getLatestAtAttempt(enrollmentId, client = pool) {
+    const result = await client.query(`
         SELECT
             at_used.at_used_id,
             at_used.enrollment_id,
@@ -1694,17 +1703,15 @@ export async function saveWorksheetEntries(payload) {
 
         const savedRecords = await insertWorksheetRecords(client, records);
 
-        await client.query("COMMIT");
-
         const latestSavedDate = savedRecords.reduce((latestDate, record) => (
             record.worksheetDate > latestDate
                 ? record.worksheetDate
                 : latestDate
         ), receiveDate);
-        const [completionState, worksheetProgress, worksheetPacketSummary] = await Promise.all([
-            getLevelCompletionState(enrollment),
-            getWorksheetProgress(enrollment),
-            getWorksheetPacketSummary(enrollment)
+        const [completionState, worksheetProgress, worksheetPacketSummary] = await readOnConnection(client, [
+            () => getLevelCompletionState(enrollment, client),
+            () => getWorksheetProgress(enrollment, client),
+            () => getWorksheetPacketSummary(enrollment, client)
         ]);
         const gradeSyncStatus = computeGradeSyncStatus({
             subjectCode: enrollment.subjectCode,
@@ -1713,7 +1720,8 @@ export async function saveWorksheetEntries(payload) {
             progressPercent: worksheetProgress?.main?.percent
         });
 
-        return {
+        // Summary and insert succeed together, using the already-held connection.
+        const result = {
             success: true,
             records: savedRecords,
             nextReceiveDate: addDays(latestSavedDate, 1),
@@ -1722,6 +1730,8 @@ export async function saveWorksheetEntries(payload) {
             gradeSyncStatus,
             worksheetPacketSummary
         };
+        await client.query("COMMIT");
+        return result;
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -2348,14 +2358,13 @@ export async function deleteWorksheetEntry({
               AND is_stock_processed = FALSE
         `, [normalizedWorksheetUsedId, normalizedEnrollmentId]);
 
-        await client.query("COMMIT");
-        const rawEnrollment = await getEnrollmentRow(normalizedEnrollmentId);
+        const rawEnrollment = await getEnrollmentRow(normalizedEnrollmentId, { client });
         const refreshedEnrollment = rawEnrollment ? mapEnrollment(rawEnrollment) : null;
         const [completionState, worksheetProgress, worksheetPacketSummary] = refreshedEnrollment
-            ? await Promise.all([
-                getLevelCompletionState(refreshedEnrollment),
-                getWorksheetProgress(refreshedEnrollment),
-                getWorksheetPacketSummary(refreshedEnrollment)
+            ? await readOnConnection(client, [
+                () => getLevelCompletionState(refreshedEnrollment, client),
+                () => getWorksheetProgress(refreshedEnrollment, client),
+                () => getWorksheetPacketSummary(refreshedEnrollment, client)
             ])
             : [null, null, null];
         const gradeSyncStatus = refreshedEnrollment
@@ -2367,7 +2376,7 @@ export async function deleteWorksheetEntry({
             })
             : null;
 
-        return {
+        const response = {
             success: true,
             worksheetUsedId: normalizedWorksheetUsedId,
             completionState,
@@ -2375,6 +2384,8 @@ export async function deleteWorksheetEntry({
             gradeSyncStatus,
             worksheetPacketSummary
         };
+        await client.query("COMMIT");
+        return response;
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -2446,14 +2457,13 @@ export async function updateWorksheetEntryDate({
             year
         ]);
 
-        await client.query("COMMIT");
-        const rawEnrollment = await getEnrollmentRow(normalizedEnrollmentId);
+        const rawEnrollment = await getEnrollmentRow(normalizedEnrollmentId, { client });
         const refreshedEnrollment = rawEnrollment ? mapEnrollment(rawEnrollment) : null;
         const [completionState, worksheetProgress, worksheetPacketSummary] = refreshedEnrollment
-            ? await Promise.all([
-                getLevelCompletionState(refreshedEnrollment),
-                getWorksheetProgress(refreshedEnrollment),
-                getWorksheetPacketSummary(refreshedEnrollment)
+            ? await readOnConnection(client, [
+                () => getLevelCompletionState(refreshedEnrollment, client),
+                () => getWorksheetProgress(refreshedEnrollment, client),
+                () => getWorksheetPacketSummary(refreshedEnrollment, client)
             ])
             : [null, null, null];
         const gradeSyncStatus = refreshedEnrollment
@@ -2465,7 +2475,7 @@ export async function updateWorksheetEntryDate({
             })
             : null;
 
-        return {
+        const response = {
             success: true,
             entry: updatedResult.rows[0] ? mapHistoryRow(updatedResult.rows[0]) : null,
             worksheetUsedId: normalizedWorksheetUsedId,
@@ -2474,6 +2484,8 @@ export async function updateWorksheetEntryDate({
             gradeSyncStatus,
             worksheetPacketSummary
         };
+        await client.query("COMMIT");
+        return response;
     } catch (error) {
         await client.query("ROLLBACK");
         throw error;

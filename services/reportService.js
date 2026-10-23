@@ -18,7 +18,7 @@ const DEFAULT_BUFFER_PERCENT = 25;
 // elsewhere (worksheetService.js / studentService.js / stockReceiveService.js)
 // — a report for period (month, year) covers real calendar dates from the
 // 21st of the prior month through the 20th of this month.
-function periodDateRange(month, year) {
+export function periodDateRange(month, year) {
     const prevMonth = month === 1 ? 12 : month - 1;
     const prevYear = month === 1 ? year - 1 : year;
     const pad2 = (value) => String(value).padStart(2, "0");
@@ -775,6 +775,7 @@ async function loadEnrollmentBase(enrollmentIds) {
         SELECT
             e.enrollment_id,
             e.kumon_student_id,
+            e.is_kumon_connect,
             e.student_id,
             s.school_grade_id,
             sgm.school_grade,
@@ -1148,6 +1149,7 @@ export async function buildMonthlyReport({ month, year }) {
         const record = {
             ID: row.enrollment_id,
             StudentId: row.student_id,
+            IsKc: row.is_kumon_connect === true,
             CurrentLevelCode: levelSnapshot?.current_level_code || "",
             EnrollmentLevelCode: row.enrollment_level_code || "",
             EnrollmentStatusCode: row.status1_code || "",

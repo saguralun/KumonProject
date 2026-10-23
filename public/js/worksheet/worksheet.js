@@ -63,7 +63,12 @@ import {
     selectIncompleteWsEnrollment
 } from "./worksheetIncomplete.js";
 
+let contextGeneration = 0;
 export async function loadEnrollmentContext(enrollmentId) {
+    if (state.isSaving) return;
+    const generation = ++contextGeneration;
+    state.isLoadingContext = true;
+    updatePreview();
     setStatus("กำลังโหลดข้อมูลเด็ก...");
     // Any successful load should close out the search dropdown, even when
     // it wasn't the one that triggered this — e.g. picking a student from
@@ -77,7 +82,9 @@ export async function loadEnrollmentContext(enrollmentId) {
             Number(els.historyLimit.value)
         );
 
+        if (generation !== contextGeneration || state.isSaving) return;
         state.context = context;
+        state.isLoadingContext = false;
         state.history = context.history || [];
         state.worksheetPacketSummary = context.worksheetPacketSummary || null;
         state.worksheetMonthSummary = context.worksheetMonthSummary || null;
@@ -95,14 +102,24 @@ export async function loadEnrollmentContext(enrollmentId) {
         renderPatternButtons();
         renderWorksheetProgress();
         renderWorksheetInputs();
-        await refreshWorksheetMonthSummary();
+        // Paint the new student's history with the header, without waiting on a summary request.
         renderHistoryTable({ scrollToTop: true });
         renderWorksheetPacketSummary(state.worksheetPacketSummary);
         updateSecondaryActions();
         updateHistorySubtitle();
+        await refreshWorksheetMonthSummary();
+        if (generation !== contextGeneration) return;
+        renderHistoryTable();
         window.setTimeout(() => focusFirstMainInput(), 30);
     } catch (error) {
-        setStatus(error.message, "error");
+        if (generation === contextGeneration) {
+            state.isLoadingContext = false;
+            if (state.context) {
+                els.studentSubjectSelect.value = String(state.context.enrollment.enrollmentId);
+                els.studentSearch.value = `#${state.context.enrollment.enrollmentId} ${state.context.enrollment.studentName}`;
+            }
+            updatePreview(); setStatus(error.message, "error");
+        }
     }
 }
 
@@ -171,7 +188,7 @@ function advanceWorksheet(kind, index) {
 }
 
 function shiftDate(days) {
-    if (!els.receiveDate.value) {
+    if (state.isSaving || !els.receiveDate.value) {
         return;
     }
 
@@ -180,13 +197,16 @@ function shiftDate(days) {
 
 function setSaving(isSaving) {
     state.isSaving = isSaving;
+    for (const element of [els.studentSearch, els.studentSubjectSelect, els.receiveDate, els.datePrev, els.dateNext, els.historyLimit, els.findIncompleteWs]) {
+        element.disabled = isSaving;
+    }
     els.saveButton.disabled = true;
     els.saveButton.textContent = isSaving ? "⏳ Saving" : "💾 Save";
     updatePreview();
 }
 
 async function saveEntries() {
-    if (!state.context || state.isSaving || els.saveButton.disabled) {
+    if (!state.context || state.isSaving || state.isLoadingContext || els.saveButton.disabled) {
         return;
     }
 
@@ -197,11 +217,18 @@ async function saveEntries() {
         mainWorksheetNos: readWorksheetNosFromDom("main"),
         zunWorksheetNos: readWorksheetNosFromDom("zun")
     };
+    const context = state.context;
+    const generation = contextGeneration;
+    let outcome = null;
 
     setSaving(true);
 
     try {
         const result = await worksheetApi.saveEntries(payload);
+        if (state.context !== context || generation !== contextGeneration) {
+            outcome = { message: `บันทึก WS #${payload.enrollmentId} แล้ว กรุณาโหลดประวัติใหม่`, kind: 'success' };
+            return;
+        }
         const historyLimit = Number(els.historyLimit.value);
 
         state.history = prependHistoryRows(
@@ -222,12 +249,13 @@ async function saveEntries() {
         renderWorksheetProgress();
         renderWorksheetPacketSummary(state.worksheetPacketSummary);
         updateSecondaryActions();
-        setStatus(`บันทึก ${result.records.length} records แล้ว`, "success");
+        outcome = { message: `บันทึก ${result.records.length} records แล้ว`, kind: 'success' };
         window.setTimeout(() => focusFirstMainInput(), 30);
     } catch (error) {
-        setStatus(error.message, "error");
+        outcome = { message: error.message, kind: 'error' };
     } finally {
         setSaving(false);
+        if (outcome) setStatus(outcome.message, outcome.kind);
     }
 }
 

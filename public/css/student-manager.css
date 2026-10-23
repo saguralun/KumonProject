@@ -117,66 +117,8 @@ input.field-error:disabled {
 
 .student-page {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   min-height: 100vh;
-}
-
-.student-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 100vh;
-  padding: 10px 16px 14px;
-  background: var(--rail);
-  color: #e5eef7;
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.nav-group {
-  display: grid;
-  gap: 6px;
-}
-
-.nav-group-label {
-  padding: 0 4px;
-  color: #7c8ba3;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.home-link {
-  display: block;
-  min-height: 34px;
-  border: 1px solid rgba(226, 232, 240, 0.14);
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: #dbeafe;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 800;
-  transition: background-color var(--ease), color var(--ease);
-}
-
-.home-link:hover,
-.home-link.active {
-  border-color: #dbeafe;
-  background: #eaf2ff;
-  color: var(--blue);
-}
-
-.side-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  margin-top: 8px;
 }
 
 h1 {
@@ -188,10 +130,6 @@ h1 {
 .subtle {
   color: var(--muted);
   font-size: 12px;
-}
-
-.student-sidebar .subtle {
-  color: #9fb0c3;
 }
 
 .search-box {
@@ -427,6 +365,8 @@ textarea:focus {
   gap: 7px;
   margin: 0;
 }
+
+#enrollmentAbsentButton.payment-absent-target { outline: 3px solid #b45309; outline-offset: 3px; background: #ffedd5; color: #9a3412; }
 
 .panel-title {
   display: flex;
@@ -1096,7 +1036,7 @@ html[data-role="instructor"] .hidden,
 
 @media (max-width: 1180px) {
   .student-page {
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .form-grid {
@@ -1120,11 +1060,6 @@ html[data-role="instructor"] .hidden,
   .student-modal-form .ksis-preview td:first-child { width: 45px; }
   .student-page {
     display: block;
-  }
-
-  .student-sidebar {
-    min-height: auto;
-    max-height: 42vh;
   }
 
   .topbar,
@@ -1165,23 +1100,10 @@ html[data-role="instructor"] .hidden,
   }
 
   .student-page {
-    grid-template-columns: 320px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     height: 100vh;
     min-height: 0;
     overflow: hidden;
-  }
-
-  .student-sidebar {
-    gap: 8px;
-    height: 100vh;
-    min-height: 0;
-    overflow: hidden;
-    padding: 10px;
-  }
-
-  .side-header {
-    gap: 8px;
-    margin-top: 4px;
   }
 
   h1 {
@@ -1309,7 +1231,6 @@ html[data-role="instructor"] .hidden,
   .address-grid {
     margin-top: 6px;
   }
-
 
   .enrollment-tabs,
   .history-tabs {

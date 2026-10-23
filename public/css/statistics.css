@@ -57,138 +57,16 @@ button:disabled {
 
 .statistics-page {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-}
-
-.statistics-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-  border-right: 1px solid var(--line);
-  background: #132033;
-  color: #e5edf7;
-  padding: 10px;
-}
-
-/* Everything between the nav/header and the auth bar scrolls on its own
-   — .stats-legend keeps growing (more zones, longer explanatory notes)
-   and without this the whole sidebar (nav + auth-bar included) would
-   scroll as one unit, pushing the logout button below the fold instead
-   of leaving it always reachable at the bottom (reported directly: the
-   admin/logout area had been scrolled out of view). Same fix
-   progress-chart.css already uses for the identical reason. */
-.sidebar-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 4px;
-}
-
-.home-link {
-  display: block;
-  min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: #dbeafe;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.home-link.active,
-.home-link:hover {
-  border-color: #dbeafe;
-  background: #eaf2ff;
-  color: var(--blue);
-}
-
-.nav-flyout {
-  position: relative;
-}
-
-.nav-flyout::after {
-  position: absolute;
-  top: 0;
-  left: 100%;
-  width: 10px;
-  height: 100%;
-  content: "";
-}
-
-.nav-flyout-trigger {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  justify-content: space-between;
-  border-color: rgba(255, 255, 255, 0.12);
-  background: transparent;
-  color: #dbeafe;
-  text-align: left;
-}
-
-.nav-flyout-trigger::after {
-  content: ">";
-  margin-left: 12px;
-  color: #dbeafe;
-  font-weight: 900;
-}
-
-.nav-flyout:hover .nav-flyout-trigger {
-  border-color: #dbeafe;
-  background: #17345a;
-  color: #ffffff;
-}
-
-.nav-flyout-menu {
-  position: absolute;
-  z-index: 50;
-  top: 0;
-  left: calc(100% + 8px);
-  display: none;
-  min-width: 190px;
-  padding: 7px;
-  border: 1px solid rgba(219, 234, 254, 0.45);
-  border-radius: 8px;
-  background: #102238;
-  box-shadow: 0 16px 34px rgba(2, 6, 23, 0.28);
-}
-
-.nav-flyout:hover .nav-flyout-menu {
-  display: grid;
-  gap: 5px;
-}
-
-.side-header {
-  margin-top: 0;
-}
-
-.side-header h1 {
-  margin: 0;
-  font-size: 22px;
 }
 
 .subtle {
   color: var(--muted);
   font-size: 13px;
-}
-
-.statistics-sidebar .subtle {
-  color: #a9b8cc;
 }
 
 [data-admin-only],

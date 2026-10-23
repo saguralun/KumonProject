@@ -57,77 +57,16 @@ button:disabled {
 
 .progress-page {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-}
-
-.progress-sidebar {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-  border-right: 1px solid var(--line);
-  background: #132033;
-  color: #e5edf7;
-  padding: 10px;
-}
-
-/* Everything between the nav/header and the auth bar scrolls on its own
-   — the grade filter list can grow to a full row per grade, and without
-   this the whole sidebar (nav included) would scroll as one unit,
-   pushing the logout button below the fold on shorter screens instead
-   of leaving it always reachable at the bottom. */
-.sidebar-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  display: grid;
-  gap: 18px;
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.home-link {
-  display: block;
-  min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: #dbeafe;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.home-link.active,
-.home-link:hover {
-  border-color: #dbeafe;
-  background: #eaf2ff;
-  color: var(--blue);
-}
-
-.side-header h1 {
-  margin: 0;
-  font-size: 22px;
 }
 
 .subtle {
   color: var(--muted);
   font-size: 13px;
-}
-
-.progress-sidebar .subtle {
-  color: #a9b8cc;
 }
 
 .filter-panel {
@@ -525,8 +464,16 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .progress-svg .ref-line-label {
-  font-size: 10px;
-  font-weight: 800;
+  font-size: 11px;
+  font-weight: 700;
+  fill: var(--ref-color);
+}
+
+.progress-svg .ref-label-connector {
+  fill: none;
+  stroke: var(--ref-color);
+  stroke-width: 1;
+  opacity: 0.7;
 }
 
 .progress-svg .student-dot {

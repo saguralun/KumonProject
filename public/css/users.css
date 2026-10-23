@@ -83,69 +83,11 @@ select:focus {
 
 .users-page {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-}
-
-.users-sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  overflow: auto;
-  padding: 14px;
-  background: var(--rail);
-  color: #e5eef7;
-}
-
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.nav-group {
-  display: grid;
-  gap: 6px;
-}
-
-.nav-group-label {
-  padding: 0 4px;
-  color: #7c8ba3;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.home-link {
-  display: block;
-  min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: #dbeafe;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 800;
-  transition: background-color var(--ease), border-color var(--ease), color var(--ease);
-}
-
-.home-link.active,
-.home-link:hover {
-  border-color: #dbeafe;
-  background: #eaf2ff;
-  color: var(--blue);
-}
-
-.side-header {
-  margin-top: 4px;
 }
 
 h1 {
@@ -157,10 +99,6 @@ h1 {
 .subtle {
   color: var(--muted);
   font-size: 13px;
-}
-
-.users-sidebar .subtle {
-  color: #a9b8cc;
 }
 
 .auth-bar {
@@ -626,7 +564,4 @@ tbody tr.is-inactive {
     height: auto;
   }
 
-  .users-sidebar {
-    height: auto;
-  }
 }

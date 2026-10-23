@@ -1,42 +1,65 @@
 # Tests
 
-Run with:
+## Safe Defaults
 
-```bash
+```powershell
 npm test
 ```
 
-Uses Node's built-in test runner (`node --test`, `node:assert/strict`) —
-no extra dependency needed, works with this project's ESM setup as-is.
-Node auto-discovers every `test/**/*.test.js` file.
+Node discovers `test/**/*.test.js`. Database-backed unit tests replace both
+`pool.query` and `pool.connect` with test doubles. They must never call the
+production pool: this machine's `.env` points at real data.
 
-## Scope so far
+Some tests start temporary loopback HTTP fixture servers. They do not start
+the application server. Browser and database integration tests are opt-in.
 
-Pure unit tests only — no database, no live server, no network calls.
-Every test here imports a real service file and calls its exported
-functions directly with plain in-memory arguments; none of them touch
-Postgres or the running app. That's deliberate: this machine's `.env`
-points at the real production database, so a test suite that ran real
-queries could read or write live data. Don't add a test here that calls
-a DB-touching function (anything that does `pool.query(...)`) without
-first working out a separate test-database strategy.
+## Full Local Suite
 
-Covered:
-- `services/httpError.js` — the shared error-with-status-code helper
-- `services/enrollmentHelpers.js` — `isCompleterLevel`, `formatStudentName`
-- `services/worksheetService.js` — `normalizeDate`, `assertIsoDate`,
-  `normalizeBillingPeriod` (including the day > 20 "rolls into next
-  month" Kumon billing rule)
-- `services/printerRawService.js` — the receipt-formatting helpers
-  (`formatMoneyAscii`, `hasThai`, `splitNickname`, `monthNameEn`,
-  `formatDateDisplay`, `formatTimeDisplay`)
-- `services/authService.js` — `verifyGuestLogin`'s validation logic
-  (deliberately never asserts against the real `GUEST_PIN` value in
-  committed source — see that test file's comment)
+```powershell
+$env:TEST_BROWSER_UI = '1'
+$env:TEST_ISOLATED_PG = '1'
+node --test --test-concurrency=1
+```
 
-Not covered yet: anything that touches the database (most of
-`studentService.js`, `paymentService.js`, `worksheetService.js`'s
-DB-backed functions, etc.), the frontend `public/js/*.js` files (would
-need a browser-like environment or DOM stubbing to test in isolation),
-and the printer transports (real hardware/network I/O, not something to
-unit test).
+Browser tests use Playwright, installed Chrome and synthetic page/API fixtures.
+Embedded-app tests use a separate Electron fixture/profile. They do not access
+the real KSIS account, session, application server or student records.
+Serial execution avoids competing browser fixtures on slower workstations.
+
+`isolatedDatabase.integration.test.js` runs on Windows and requires installed
+PostgreSQL binaries (default `C:/Program Files/PostgreSQL/18/bin`; override with
+`TEST_PG_BIN`). It creates its own cluster in a uniquely named temporary folder,
+binds a random loopback port, verifies that cluster's identity, and directs all
+service calls to it. It never derives its connection from `DB_*`. Schema setup,
+migrations, payment/status changes, WS, stock cuts and restore tests run only
+inside that disposable cluster. The test shuts down and removes only its own
+cluster when finished.
+
+Do not enable `TEST_WINDOWS_RESTART` for routine checks. It is a separate opt-in
+restart-helper test, not necessary for this suite's application regression check.
+
+## Coverage
+
+- Payment receipt allocation and duplicate-payment protection under concurrency.
+- Cancellation provenance, legacy receipts, later status edits and later bills.
+- WS connection-pool saturation, rollback, delete/date-edit transactions.
+- Stock locking, missing balances, concurrent cuts and late arrivals.
+- Account revocation, role changes, update authorization and Opening Schedule.
+- Atomic restore, including a real failed COPY on the disposable database.
+- Student selection during saves, stale responses and visible save failures.
+- Shared header menu on all 16 workspaces at desktop/mobile widths: no edge
+  handle, full-width workspace, click-outside/Escape close, keyboard focus trap,
+  permission visibility and menu state reset after navigation. The first paint
+  stays full-width with navigation hidden even before scripts initialize.
+- Integrated main desktop: real login/logout in fixtures, normal-page navigation,
+  exact visible/controlled KSIS view, per-account remote sessions, rejected
+  mismatched app sessions, one-window printing, downloads, attachment retries
+  and non-destructive shortcut reuse. Electron profiles are temporary test-only
+  directories; printer operations are replaced with a harmless callback.
+- Report calculations, KSIS identity matching, WS/AT previews and audits,
+  guarded saves, pagination, shared embedded workspace and responsive layout
+  using synthetic fixtures.
+
+Passing these checks does not prove an untested live KSIS change, printer,
+network outage or production deployment works. Never run live save/restore/
+restart actions without separate authorization.

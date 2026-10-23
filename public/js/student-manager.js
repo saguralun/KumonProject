@@ -290,6 +290,7 @@ function enrollmentTabStatusClass(statusGroup1Code) {
 }
 
 function renderEnrollmentTabs() {
+    els.enrollmentAbsentButton.classList.remove("payment-absent-target");
     const enrollments = state.profile?.enrollments || [];
 
     if (!enrollments.length) {
@@ -416,30 +417,6 @@ function closeAddStudentModal() {
     state.addStudentValidationActive = false;
     state.addStudentDuplicate = null;
     setAddStudentMessage();
-}
-
-function showNewStudentWorkspace() {
-    state.selectedStudentId = null;
-    state.profile = {
-        student: null,
-        enrollments: []
-    };
-    state.selectedEnrollmentId = null;
-    state.isNewEnrollment = false;
-    fillStudentForm({
-        prefixId: state.masters.prefixes[0]?.id || ""
-    });
-    els.pageTitle.textContent = "เพิ่มนักเรียนใหม่";
-    els.pageSubtitle.textContent = "กรอกข้อมูลเด็ก แล้ว Save Student ก่อนเพิ่มวิชา";
-    els.studentFormSubtitle.textContent = "New Student";
-    els.newEnrollmentButton.disabled = true;
-    updateWsGraphButtonVisibility();
-    els.enrollmentTabs.innerHTML = "";
-    els.enrollmentForm.classList.add("hidden");
-    els.enrollmentEmpty.classList.remove("hidden");
-    els.enrollmentEmpty.textContent = "บันทึก Student ก่อน แล้วค่อยเพิ่ม Subject";
-    els.historyTableWrap.innerHTML = `<div class="empty-state">ยังไม่มีประวัติ</div>`;
-    renderStudentList();
 }
 
 async function saveNewStudent(event) {
@@ -829,21 +806,21 @@ async function cancelBilling(billingId) {
         return;
     }
 
-    if (!window.confirm(`ยกเลิกบิล #${billingId} ใช่ไหม? ระบบจะย้อนสถานะ enrollment ที่เกี่ยวข้องกลับไปเป็นก่อนบิลนี้ด้วย`)) {
+    if (!window.confirm(`ยกเลิกบิล #${billingId} ใช่ไหม? สถานะที่แก้ภายหลังจะไม่ถูกย้อนกลับ`)) {
         return;
     }
 
     setStatus("กำลังยกเลิกบิล...");
 
     try {
-        await requestJson("/api/payment/receipt/cancel", {
+        const data = await requestJson("/api/payment/receipt/cancel", {
             method: "POST",
             body: JSON.stringify({ billingId })
         });
 
         await loadProfile(state.selectedStudentId, { preferredEnrollmentId: state.selectedEnrollmentId });
         await loadHistory();
-        setStatus("ยกเลิกบิลแล้ว");
+        setStatus(`ยกเลิกบิลแล้ว${data.warning ? ' • ' + data.warning : ''}`);
     } catch (error) {
         setStatus(error.message, "error");
     }
@@ -1201,7 +1178,23 @@ async function init() {
         fillMasterSelects();
         bindEvents();
         bindKsisImport();
+        const params = new URLSearchParams(window.location.search);
+        const linkedStudent = params.get("studentId");
+        const linkedEnrollment = params.get("enrollmentId");
+        const validId = (value) => /^[1-9]\d*$/.test(value) && Number.isSafeInteger(Number(value));
+        if (linkedStudent !== null && !validId(linkedStudent)) throw new Error("รหัสนักเรียนในลิงก์ไม่ถูกต้อง");
+        if (linkedEnrollment !== null && (!linkedStudent || !validId(linkedEnrollment))) throw new Error("รหัสรายวิชาในลิงก์ไม่ถูกต้อง");
+        if (linkedStudent) els.studentSearch.value = linkedStudent;
         await loadStudents();
+        if (linkedStudent) {
+            await loadProfile(Number(linkedStudent), { preferredEnrollmentId: linkedEnrollment ? Number(linkedEnrollment) : null });
+            if (linkedEnrollment && Number(state.selectedEnrollmentId) !== Number(linkedEnrollment)) {
+                setStatus("ไม่พบรายวิชาจากลิงก์ในนักเรียนคนนี้ กรุณาตรวจรายวิชา", "error");
+                return;
+            }
+            if (params.get("focus") === "absent") focusPaymentAbsentAction();
+            return;
+        }
         const firstStudent = state.students[0];
 
         if (firstStudent) {
@@ -1211,6 +1204,32 @@ async function init() {
         }
     } catch (error) {
         setStatus(error.message, "error");
+    }
+}
+
+function focusPaymentAbsentAction() {
+    const enrollment = selectedEnrollment();
+    if (!enrollment || enrollment.statusGroup1Code !== "C") {
+        setStatus(`รายวิชานี้${enrollment ? `เป็นสถานะ ${enrollment.statusGroup1Code}` : "ไม่มีข้อมูล"} จึงไม่มีปุ่ม Absent`, "error");
+        return;
+    }
+    const focus = () => {
+        if (!["admin", "instructor"].includes(document.documentElement.dataset.role)) return;
+        const button = els.enrollmentAbsentButton;
+        const details = button.closest("details");
+        if (details) details.open = true;
+        button.classList.add("payment-absent-target");
+        button.scrollIntoView({ block: "center" });
+        button.focus({ preventScroll: true });
+        setStatus(`รายการยังไม่จ่าย • ${enrollment.subjectCode} #${enrollment.enrollmentId} • ยังไม่เปลี่ยนสถานะ`);
+    };
+    if (document.documentElement.dataset.role) focus();
+    else {
+        const observer = new MutationObserver(() => {
+            if (!document.documentElement.dataset.role) return;
+            observer.disconnect(); focus();
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-role"] });
     }
 }
 

@@ -58,11 +58,10 @@ test("Matching view requires review and explicit confirmation before any save re
             }
             await route.fulfill({ contentType: "application/json", body: JSON.stringify(data) });
         });
-        await page.goto(`http://127.0.0.1:${server.address().port}/report.html`);
-        await page.locator("#reportMenuButton").click();
+        await page.goto(`http://127.0.0.1:${server.address().port}/ksis.html`);
         await page.locator("#ksisMatchingButton").click();
-        assert.equal(await page.locator("#reportTableWrap").isVisible(), false);
-        assert.equal(await page.locator("#levelSummary").isVisible(), false);
+        assert.equal(await page.locator("#ksisDraft").isVisible(), false);
+        assert.equal(await page.locator("#ksisAudit").isVisible(), false);
         await page.locator("#ksisReadRoster").click();
         await page.locator(".matching-table").waitFor();
         assert.equal(saves, 0);

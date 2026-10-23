@@ -365,29 +365,6 @@ export function applyOpeningScheduleFromExistingEnrollment() {
     });
 }
 
-export function moveOpeningScheduleUpIfNeeded() {
-    const form = els.addEnrollmentForm;
-
-    if (form.elements.openingScheduleId1.value || !form.elements.openingScheduleId2.value) {
-        return;
-    }
-
-    const day2 = form.elements.openingDay2.value;
-    const time2 = form.elements.openingTime2.value;
-
-    setFormValue(form, "openingDay2", "");
-    refreshAddOpeningTimeOptions("2");
-    setFormValue(form, "openingScheduleId2", "");
-    setAutoFilled(form, "openingScheduleId2", false);
-
-    refreshAddOpeningDayOptions({ changedSlot: "2" });
-    setFormValue(form, "openingDay1", day2);
-    refreshAddOpeningTimeOptions("1");
-    setFormValue(form, "openingTime1", time2);
-    updateAddOpeningSchedule("1");
-    refreshAddOpeningDayOptions({ changedSlot: "1" });
-}
-
 export function getAddEnrollmentChecks() {
     const form = els.addEnrollmentForm;
     const values = readForm(form);

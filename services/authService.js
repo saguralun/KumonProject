@@ -28,6 +28,13 @@ function sanitizeAccount(row) {
     };
 }
 
+export async function getActiveSessionAccount(userId) {
+    if (!Number.isSafeInteger(Number(userId)) || Number(userId) < 1) return null;
+    const result = await pool.query(`SELECT user_id, username, display_name, role
+        FROM app_user WHERE user_id = $1 AND is_active = TRUE`, [Number(userId)]);
+    return result.rows[0] ? sanitizeAccount(result.rows[0]) : null;
+}
+
 // Handles both "admin" and "staff" DB-backed accounts — the role that
 // decides what a signed-in account may do comes from the row itself, not
 // from which login form was used.

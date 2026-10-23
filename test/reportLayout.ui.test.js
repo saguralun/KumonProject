@@ -104,7 +104,6 @@ test("Report B subject tabs, 20-person pages and period invalidation work on des
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
     assert.equal(await page.locator("#reportTableWrap").evaluate((element) => element.scrollWidth > element.clientWidth), true);
     assert.ok(await page.locator(".report-workspace").evaluate((element) => element.clientWidth >= 370));
-    await page.locator("#reportMenuButton").click();
     await page.locator("#reportYear").fill("2025");
     await page.locator("#reportYear").dispatchEvent("change");
     assert.equal(await page.locator(".student-start").count(), 0);

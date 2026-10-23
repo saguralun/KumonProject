@@ -1,35 +1,62 @@
-// Shared across every page — drives the sidebar nav's flyout submenus
-// (งานประจำ/จัดการ/คลัง/ระบบ) open/closed via real mouseenter/mouseleave
-// instead of CSS `:hover`.
-//
-// Why: `:hover` is purely positional — it applies the instant the page
-// renders if the cursor already happens to be resting over the element,
-// with no concept of "did the pointer actually just cross in". That's
-// exactly what happens after clicking a link inside a flyout: the new
-// page loads with the SAME sidebar layout, the cursor is still sitting at
-// the same screen position (now over whichever trigger renders there on
-// this page), and its flyout pops open on its own — looking like a
-// random floating menu the user never asked for, right after navigating.
-// A real mouseenter event has no such retroactive case: it only fires on
-// a genuine boundary-crossing pointer move, so it can't fire just because
-// the page happened to load under the cursor.
-//
-// Pairs with app-scale.css's `.nav-flyout.nav-flyout-open .nav-flyout-*`
-// rules (which replaced the old `.nav-flyout:hover .nav-flyout-*` ones —
-// see the comment there). `.nav-flyout::after` (the small bridge covering
-// the visual gap between trigger and menu) still works unchanged here:
-// it's a descendant of `.nav-flyout`, so moving the pointer over it still
-// keeps `.nav-flyout` "entered" for mouseenter/mouseleave the same way it
-// did for :hover.
+// Pointer events avoid opening menus when navigation renders under a stationary cursor.
 (function () {
   function init() {
-    document.querySelectorAll(".nav-flyout").forEach((flyout) => {
-      flyout.addEventListener("mouseenter", () => {
-        flyout.classList.add("nav-flyout-open");
+    const groups = [];
+    document.querySelectorAll('.nav-flyout').forEach((flyout, index) => {
+      const trigger = flyout.querySelector('.nav-flyout-trigger');
+      const menu = flyout.querySelector('.nav-flyout-menu');
+      if (!trigger || !menu) return;
+      const panel = flyout.closest('.app-menu-panel');
+      menu.id ||= `appMenuGroup${index}`;
+      trigger.setAttribute('aria-controls', menu.id);
+      let pinned = false, hovered = false, closeTimer;
+      function position() {
+        if (!panel || !flyout.classList.contains('nav-flyout-open')) return;
+        const anchor = trigger.getBoundingClientRect(), panelRect = panel.getBoundingClientRect();
+        if (anchor.bottom <= panelRect.top || anchor.top >= panelRect.bottom) { close(); return; }
+        // Fixed positioning escapes panel scrolling while preserving its focus trap.
+        const width = Math.min(240, innerWidth - 24), right = panelRect.right + 8;
+        menu.style.width = `${width}px`;
+        menu.style.left = `${right + width <= innerWidth - 12 ? right : Math.max(12, innerWidth - width - 12)}px`;
+        menu.style.top = `${Math.max(12, Math.min(anchor.top, innerHeight - menu.getBoundingClientRect().height - 12))}px`;
+      }
+      function close() {
+        clearTimeout(closeTimer); pinned = hovered = false;
+        flyout.classList.remove('nav-flyout-open'); trigger.setAttribute('aria-expanded', 'false');
+      }
+      function open() {
+        clearTimeout(closeTimer);
+        groups.forEach(group => { if (group.close !== close) group.close(); });
+        flyout.classList.add('nav-flyout-open'); trigger.setAttribute('aria-expanded', 'true'); position();
+      }
+      groups.push({ close });
+      close();
+      flyout.addEventListener('mouseenter', () => {
+        if (!matchMedia('(hover: hover)').matches) return;
+        hovered = true; open();
       });
       flyout.addEventListener("mouseleave", () => {
-        flyout.classList.remove("nav-flyout-open");
+        hovered = false;
+        // Keep the flyout open while the pointer crosses the gap beside the panel.
+        closeTimer = setTimeout(() => { if (!pinned && !flyout.contains(document.activeElement)) close(); }, 180);
       });
+      trigger.addEventListener('click', (event) => {
+        const next = event.detail > 0 && hovered && !pinned ? true : !flyout.classList.contains('nav-flyout-open');
+        if (next) { pinned = true; open(); } else close();
+      });
+      trigger.addEventListener('keydown', (event) => {
+        if (['ArrowDown', 'ArrowRight'].includes(event.key)) {
+          event.preventDefault(); pinned = true; open();
+          [...menu.querySelectorAll('a[href]')].find(link => link.getClientRects().length && getComputedStyle(link).visibility !== 'hidden')?.focus();
+        }
+      });
+      flyout.addEventListener('keydown', event => {
+        if (event.key === 'ArrowLeft') { event.preventDefault(); close(); trigger.focus(); }
+      });
+      flyout.addEventListener('focusout', event => { if (!flyout.contains(event.relatedTarget) && !hovered) close(); });
+      panel?.addEventListener('scroll', position, { passive: true });
+      window.addEventListener('resize', position);
+      document.addEventListener('app:menu-change', event => { if (!event.detail.open) close(); });
     });
   }
 

@@ -51,22 +51,11 @@ button:disabled {
 
 .payment-page {
   display: grid;
-  grid-template-columns: 320px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   height: 100vh;
   height: 100dvh;
   min-height: 0;
   overflow: hidden;
-}
-
-.payment-sidebar {
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  overflow: auto;
-  border-right: 1px solid var(--line);
-  background: #132033;
-  color: #e5edf7;
-  padding: 10px;
 }
 
 .auth-bar {
@@ -170,58 +159,9 @@ html[data-role="staff"] [data-staff-up] {
   display: revert !important;
 }
 
-.side-nav {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 18px;
-}
-
-.nav-group {
-  display: grid;
-  gap: 6px;
-}
-
-.nav-group-label {
-  padding: 0 4px;
-  color: #7c8ba3;
-  font-size: 10.5px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.home-link {
-  display: block;
-  min-height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
-  padding: 8px 10px;
-  color: #dbeafe;
-  text-decoration: none;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.home-link.active,
-.home-link:hover {
-  border-color: #dbeafe;
-  background: #eaf2ff;
-  color: var(--blue);
-}
-
-.side-header h1 {
-  margin: 0;
-  font-size: 24px;
-}
-
 .subtle {
   color: var(--muted);
   font-size: 13px;
-}
-
-.payment-sidebar .subtle {
-  color: #a9b8cc;
 }
 
 .filter-panel {
@@ -589,6 +529,13 @@ button.summary-card.is-active {
   color: var(--blue);
 }
 
+.status-pill.payment-unpaid-shortcut { display: none; text-decoration: none; cursor: pointer; }
+html[data-role="admin"] .payment-unpaid-shortcut,
+html[data-role="instructor"] .payment-unpaid-shortcut { display: inline-flex; }
+html[data-role="admin"] .payment-unpaid-label,
+html[data-role="instructor"] .payment-unpaid-label { display: none; }
+.payment-unpaid-shortcut:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+
 .payment-table-wrap {
   flex: 1 1 auto;
   min-height: 0;
@@ -939,10 +886,6 @@ button.summary-card.is-active {
 @media (max-width: 860px) {
   .payment-page {
     grid-template-columns: 1fr;
-  }
-
-  .payment-sidebar {
-    border-right: 0;
   }
 
   .summary-section {

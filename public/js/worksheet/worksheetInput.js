@@ -83,12 +83,6 @@ export function moveWorksheetNo(currentValue, options, direction, { allowEmpty =
     return String(worksheetNos[index]);
 }
 
-export function isValidWorksheetNo(value, options) {
-    const worksheetNo = normalizeWorksheetNo(value);
-
-    return options.some((option) => option.worksheetNo === worksheetNo);
-}
-
 function worksheetBaseNo(startNo) {
     return Math.floor((startNo - 1) / 10) * 10;
 }

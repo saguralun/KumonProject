@@ -74,10 +74,8 @@ function renderAuthBar(user) {
   // CSS/JS edit every time someone adds one.
   const roleLabels = { admin: "Admin", instructor: "Instructor", staff: "Staff", guest: "Guest" };
   const roleLabel = roleLabels[user.role] || user.role;
-  // Guest accounts are for daily front-desk tasks only — an update restarts
-  // the server for the whole LAN, so keep that button out of their reach
-  // entirely rather than rendering then hiding it.
-  const updateButtonHtml = user.role === "guest"
+  // Updating restarts the server for the whole LAN and is Admin-only.
+  const updateButtonHtml = user.role !== "admin"
     ? ""
     : `<button type="button" class="auth-update-button hidden" id="authUpdateButton">🔄 อัพเดท</button>`;
 
@@ -97,6 +95,24 @@ function renderAuthBar(user) {
   });
 
   bindUpdateButton();
+}
+
+function bindKsisDesktopLinks(role) {
+  if (!["admin", "instructor"].includes(role) || window.kumonDesktop) return;
+  document.querySelectorAll("[data-ksis-link].is-granted").forEach((link) => {
+    link.addEventListener("click", async (event) => {
+      if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+      event.preventDefault();
+      if (link.getAttribute("aria-busy") === "true") return;
+      link.setAttribute("aria-busy", "true");
+      try {
+        const response = await fetch("/api/ksis/desktop/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || data.success === false) throw new Error(data.error || "เปิด K-sis ในแอปไม่สำเร็จ");
+      } catch (error) { alert(error.message); window.location.href = link.href; }
+      finally { link.removeAttribute("aria-busy"); }
+    });
+  });
 }
 
 function bindUpdateButton() {
@@ -161,4 +177,5 @@ async function checkForUpdateAndShowButton(button) {
   applyPermissionVisibility(permissions);
   hideEmptyFlyouts();
   renderAuthBar(user);
+  bindKsisDesktopLinks(user.role);
 })();

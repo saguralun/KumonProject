@@ -436,18 +436,6 @@ function buildStudentPreview(student, masters, issues, blockingRows) {
     return row;
 }
 
-function printIssueSection(title, issues) {
-    const list = issueList(issues);
-
-    console.log(`${title}: ${list.reduce((sum, issue) => sum + issue.count, 0)}`);
-
-    if (list.length === 0) {
-        return;
-    }
-
-    console.dir(list, { depth: null });
-}
-
 const STUDENT_COLUMNS = [
     { key: "row_number", label: "#" },
     { key: "prefix_id", label: "Prefix" },

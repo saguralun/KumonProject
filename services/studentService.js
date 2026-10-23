@@ -121,15 +121,6 @@ function requiredDate(value, label) {
     return dateText;
 }
 
-function periodFromDate(dateText) {
-    const [yearText, monthText] = String(dateText).slice(0, 10).split("-");
-
-    return {
-        month: Number(monthText),
-        year: Number(yearText)
-    };
-}
-
 function kumonPeriodFromDate(dateText) {
     const [yearText, monthText, dayText] = String(dateText).slice(0, 10).split("-");
     const period = {
@@ -737,10 +728,10 @@ export async function searchStudents({
     }));
 }
 
-export async function getStudentProfile(studentId) {
+export async function getStudentProfile(studentId, client = pool) {
     const normalizedStudentId = requiredInt(studentId, "Student ID");
-    const [studentResult, enrollmentResult] = await Promise.all([
-        pool.query(`
+    const reads = [
+        () => client.query(`
             SELECT
                 student.*,
                 prefix.prefix_name,
@@ -752,7 +743,7 @@ export async function getStudentProfile(studentId) {
                 ON grade.school_grade_id = student.school_grade_id
             WHERE student.student_id = $1
         `, [normalizedStudentId]),
-        pool.query(`
+        () => client.query(`
             SELECT
                 e.*,
                 COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE) AS is_kumon_connect,
@@ -821,7 +812,10 @@ export async function getStudentProfile(studentId) {
             WHERE e.student_id = $1
             ORDER BY subject.subject_id, e.enrollment_id
         `, [normalizedStudentId])
-    ]);
+    ];
+    const [studentResult, enrollmentResult] = client === pool
+        ? await Promise.all(reads.map((read) => read()))
+        : [await reads[0](), await reads[1]()];
 
     if (!studentResult.rows[0]) {
         throw httpError(404, "ไม่พบ student");
@@ -1082,10 +1076,11 @@ export async function createEnrollment(studentId, payload) {
             ]);
         }
 
+        const profile = await getStudentProfile(normalizedStudentId, client);
         await client.query("COMMIT");
         return {
             enrollmentId,
-            profile: await getStudentProfile(normalizedStudentId)
+            profile
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -1154,10 +1149,11 @@ export async function updateEnrollment(studentId, enrollmentId, payload) {
             throw httpError(404, "ไม่พบ enrollment ของ student นี้");
         }
 
+        const profile = await getStudentProfile(normalizedStudentId, client);
         await client.query("COMMIT");
         return {
             enrollmentId: normalizedEnrollmentId,
-            profile: await getStudentProfile(normalizedStudentId)
+            profile
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -1211,12 +1207,13 @@ export async function deleteEnrollmentIfNoBilling(studentId, enrollmentId) {
             WHERE enrollment_id = $1
               AND student_id = $2
         `, [normalizedEnrollmentId, normalizedStudentId]);
+        const profile = await getStudentProfile(normalizedStudentId, client);
         await client.query("COMMIT");
 
         return {
             deletedEnrollmentId: normalizedEnrollmentId,
             deletedDtRows: deletedDtResult.rowCount,
-            profile: await getStudentProfile(normalizedStudentId)
+            profile
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -1445,12 +1442,13 @@ export async function applyEnrollmentStatusAction(studentId, enrollmentId, paylo
             throw httpError(400, "Action ไม่ถูกต้อง");
         }
 
+        const profile = await getStudentProfile(normalizedStudentId, client);
         await client.query("COMMIT");
 
         return {
             enrollmentId: normalizedEnrollmentId,
             message,
-            profile: await getStudentProfile(normalizedStudentId)
+            profile
         };
     } catch (error) {
         await client.query("ROLLBACK");
@@ -1487,15 +1485,6 @@ export async function deleteEnrollmentStatusEntry(studentId, enrollmentStatusId)
     }
 
     return { enrollmentStatusId: normalizedEntryId };
-}
-
-export async function getStudentHistory(studentId, type = "ws") {
-    const normalizedStudentId = requiredInt(studentId, "Student ID");
-    const normalizedType = String(type || "ws").toLowerCase();
-    return getStudentHistoryRows({
-        studentId: normalizedStudentId,
-        type: normalizedType
-    });
 }
 
 export async function getStudentWsGraph({

@@ -15,6 +15,7 @@ import stockSummaryRoutes from "./routes/stockSummaryRoutes.js";
 import exportRoutes from "./routes/exportRoutes.js";
 import progressChartRoutes from "./routes/progressChartRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
+import ksisRoutes from "./routes/ksisRoutes.js";
 import forecastRoutes from "./routes/forecastRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -24,9 +25,12 @@ import systemRoutes from "./routes/systemRoutes.js";
 import backupRoutes from "./routes/backupRoutes.js";
 import statisticsRoutes from "./routes/statisticsRoutes.js";
 import { checkAndApplySchoolYearUpgrade } from "./services/schoolYearUpgradeService.js";
+import { mainDesktop } from './services/appDesktop.js';
 import {
   requireAuth,
+  refreshAccountSession,
   requireAdmin,
+  requireStaff,
   requirePage,
   requireAdminPage,
   requirePermission,
@@ -61,6 +65,8 @@ app.use(session({
   }
 }));
 
+app.use(refreshAccountSession);
+
 // Public: login/logout/session-check. Must stay unauthenticated.
 app.use("/api/auth", authRoutes);
 
@@ -80,9 +86,7 @@ app.get("/api/server-info", (req, res) => {
   });
 });
 
-// Public: lets the login page show "a newer version is on GitHub" and
-// offer a one-click update, before anyone has logged in — this repo is
-// public, so the check itself needs no credentials either way.
+// Version checks are public; applying an update is guarded by requireAdmin.
 app.use("/api/system", systemRoutes);
 
 // Page shells. Registered before express.static so unauthenticated
@@ -140,6 +144,10 @@ app.get("/report.html", requirePermissionPage("page:report"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "report.html"));
 });
 
+app.get("/ksis.html", requirePermissionPage("page:report"), requireStaff, (req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, "ksis.html"));
+});
+
 app.get("/statistics.html", requirePermissionPage("page:statistics"), (req, res) => {
   res.sendFile(path.join(PUBLIC_DIR, "statistics.html"));
 });
@@ -177,6 +185,7 @@ app.use("/api/export", requireAuth, exportRoutes);
 app.use("/api/progress-chart", requirePermission("page:progress-chart"), progressChartRoutes);
 app.use("/api/forecast", requirePermission("page:forecast"), forecastRoutes);
 app.use("/api/report", requirePermission("page:report"), reportRoutes);
+app.use("/api/ksis", requirePermission("page:report"), ksisRoutes);
 app.use("/api/statistics", requirePermission("page:statistics"), statisticsRoutes);
 app.use("/api/users", requireAdmin, userRoutes);
 app.use("/api/roles", requireAdmin, roleRoutes);
@@ -190,6 +199,9 @@ app.use("/migration", requireAdmin, express.static("migration"));
 app.listen(PORT, HOST, () => {
   console.log(`KumonDB running at http://localhost:${PORT}`);
   console.log(`LAN access enabled on http://${HOST}:${PORT}`);
+  if (process.env.KUMON_DESKTOP_MAIN === '1') {
+    mainDesktop.open({ origin: `http://localhost:${PORT}` }).catch((error) => console.error('[desktop] เปิดหน้าต่าง KumonDB ไม่สำเร็จ:', error.message));
+  }
 });
 
 // School-year rollover: a no-op every single time except the one moment

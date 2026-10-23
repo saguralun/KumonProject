@@ -13,6 +13,7 @@ const ITEM_TYPE_CONFIG = {
     ws: {
         stockTypeCode: "WS",
         usedTable: "worksheet_used",
+        usedPk: "worksheet_used_id",
         masterTable: "worksheet_master",
         masterFk: "worksheet_master_id",
         dateColumn: "worksheet_date",
@@ -30,6 +31,7 @@ const ITEM_TYPE_CONFIG = {
     cd: {
         stockTypeCode: "CD",
         usedTable: "cd_used",
+        usedPk: "cd_used_id",
         masterTable: "cd_master",
         masterFk: "cd_master_id",
         dateColumn: "cd_date",
@@ -208,18 +210,14 @@ export async function processPendingDates(type, dates) {
     try {
         await client.query("BEGIN");
 
-        // Lock the exact pending CD rows so returns and cuts cannot change stock twice.
-        let pendingParams = [normalizedDates];
-        let pendingCdFilter = "";
-        if (config.type === "cd") {
-            const pending = await client.query(`
-                SELECT cd_used_id FROM ${TABLE_SCHEMA}.cd_used
-                WHERE is_stock_processed = FALSE AND cd_date = ANY($1::date[])
-                ORDER BY cd_used_id FOR UPDATE
-            `, [normalizedDates]);
-            pendingParams = [normalizedDates, pending.rows.map((row) => row.cd_used_id)];
-            pendingCdFilter = "AND cd_used_id = ANY($2::int[])";
-        }
+        // Deduct and mark only the locked rows; later inserts belong to a later cut.
+        const pending = await client.query(`
+            SELECT ${config.usedPk} FROM ${TABLE_SCHEMA}.${config.usedTable}
+            WHERE is_stock_processed = FALSE AND ${config.dateColumn} = ANY($1::date[])
+            ORDER BY ${config.usedPk} FOR UPDATE
+        `, [normalizedDates]);
+        const pendingParams = [normalizedDates, pending.rows.map((row) => row[config.usedPk])];
+        const pendingFilter = `AND ${config.usedPk} = ANY($2::int[])`;
 
         // Real stock impact: only cpws=TRUE rows count toward the
         // INSERT/UPDATE-stock loop below.
@@ -229,7 +227,7 @@ export async function processPendingDates(type, dates) {
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
               AND ${config.cpwsColumn} = TRUE
-              ${pendingCdFilter}
+              ${pendingFilter}
             GROUP BY ${config.masterFk}
         `, pendingParams);
 
@@ -242,7 +240,7 @@ export async function processPendingDates(type, dates) {
             FROM ${TABLE_SCHEMA}.${config.usedTable}
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
-              ${pendingCdFilter}
+              ${pendingFilter}
         `, pendingParams);
 
         if (!pendingCountResult.rows[0].pending_count) {
@@ -252,7 +250,7 @@ export async function processPendingDates(type, dates) {
         for (const item of itemsResult.rows) {
             await client.query(`
                 INSERT INTO ${TABLE_SCHEMA}.stock (stock_type_id, master_id, quantity)
-                VALUES ($1, $2, $3)
+                VALUES ($1, $2, -$3::integer)
                 ON CONFLICT (stock_type_id, master_id) DO UPDATE
                     SET quantity = ${TABLE_SCHEMA}.stock.quantity - $3,
                         updated_at = CURRENT_TIMESTAMP
@@ -270,7 +268,7 @@ export async function processPendingDates(type, dates) {
             SET is_stock_processed = TRUE
             WHERE is_stock_processed = FALSE
               AND ${config.dateColumn} = ANY($1::date[])
-              ${pendingCdFilter}
+              ${pendingFilter}
         `, pendingParams);
 
         await client.query("COMMIT");

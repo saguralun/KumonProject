@@ -4,6 +4,7 @@
   "description": "Kumon Management System",
   "main": "server.js",
   "type": "module",
+  "engines": { "node": ">=22.12.0" },
   "scripts": {
     "test": "node --test",
     "start": "node server.js",
@@ -18,8 +19,10 @@
     "@napi-rs/canvas": "^1.0.8",
     "bcryptjs": "^3.0.3",
     "connect-pg-simple": "^10.0.0",
+    "cookie": "0.7.2",
     "csv-parse": "^7.0.2",
     "dotenv": "^17.4.2",
+    "electron": "45.0.0",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",

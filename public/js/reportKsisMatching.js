@@ -1,6 +1,6 @@
 const labels = { exact: "ตรงแน่นอน", review: "วันเกิดต่างกัน", ambiguous: "พบหลายคู่", conflict: "รหัสขัดแย้ง", unmatched: "ไม่พบคู่", invalid: "ข้อมูลไม่ครบ", matched: "มีรหัสตรงแล้ว" };
 
-export function setupKsisMatching({ open, setStatus }) {
+export function setupKsisMatching({ open, setStatus, onStateChange = () => {} }) {
   const get = (id) => document.getElementById(id);
   const read = get("ksisReadRoster"), selectExact = get("ksisSelectExact"), confirm = get("ksisConfirmMatches");
   const source = get("ksisMatchingSource"), filter = get("ksisMatchFilter"), search = get("ksisMatchSearch");
@@ -11,6 +11,7 @@ export function setupKsisMatching({ open, setStatus }) {
   const eligible = (row) => !["matched", "invalid"].includes(row.status) && row.candidates.some((item) => !item.conflict);
   const optionText = (item) => `#${item.studentId} ${item.name} • ${item.birthDate || "ไม่ระบุวันเกิด"}`;
   function render() {
+    onStateChange({ busy });
     const rows = (preview?.rows || []).filter((row) => (filter.value === "all" || row.status === filter.value)
       && `${row.fullName} ${row.kumonId} ${row.candidates.map((item) => item.name).join(" ")}`.toLocaleLowerCase("th").includes(search.value.trim().toLocaleLowerCase("th")));
     const selected = [...chosen.values()].filter(Boolean).length;
@@ -36,7 +37,7 @@ export function setupKsisMatching({ open, setStatus }) {
     try {
       const data = await requestJson("/api/students/ksis/matching/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       if (data.requiresLogin) {
-        source.textContent = "กรุณาเข้าสู่ระบบในหน้าต่าง Chrome ของ KSIS ที่เปิดขึ้น แล้วกดอ่านรายชื่ออีกครั้ง";
+        source.textContent = "กรุณาเข้าสู่ระบบ KSIS ที่เปิดไว้ แล้วกดอ่านรายชื่ออีกครั้ง";
         return;
       }
       preview = data;

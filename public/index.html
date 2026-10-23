@@ -66,25 +66,13 @@
 
     .table-page {
       display: grid;
-      grid-template-columns: 320px minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
       height: 100vh;
       height: 100dvh;
       min-height: 0;
       overflow: hidden;
     }
 
-    .table-sidebar {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      height: 100vh;
-      height: 100dvh;
-      min-height: 0;
-      overflow: hidden;
-      padding: 10px;
-      background: var(--rail);
-      color: #e5eef7;
-    }
 
     .topbar {
       display: flex;
@@ -100,57 +88,17 @@
       line-height: 1.2;
     }
 
-    .subtitle,
-    .table-sidebar .subtle {
+.subtitle {
       margin-top: 5px;
       color: var(--muted);
       font-size: 13px;
     }
 
-    .table-sidebar .subtle {
-      color: #a9b8cc;
-    }
 
-    .side-nav {
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      margin-bottom: 10px;
-    }
 
-    .nav-group {
-      display: grid;
-      gap: 6px;
-    }
 
-    .nav-group-label {
-      padding: 0 4px;
-      color: #7c8ba3;
-      font-size: 10.5px;
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
 
-    .home-link {
-      display: block;
-      min-height: 34px;
-      border: 1px solid rgba(226, 232, 240, 0.14);
-      border-radius: 7px;
-      padding: 8px 10px;
-      color: #dbeafe;
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 800;
-      transition: background-color var(--ease), border-color var(--ease), color var(--ease);
-    }
 
-    .home-link:hover,
-    .home-link.active {
-      border-color: #dbeafe;
-      background: #eaf2ff;
-      color: var(--blue);
-    }
 
     .auth-bar {
       margin-top: auto;
@@ -495,9 +443,6 @@
         grid-template-columns: 1fr;
       }
 
-      .table-sidebar {
-        min-height: auto;
-      }
 
       .section {
         grid-template-columns: 1fr;
@@ -514,11 +459,13 @@
     }
   </style>
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
+  <link rel="stylesheet" href="/css/app-menu.css?v=20261023-static-menu">
+  <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
 </head>
 
 <body>
-  <main class="table-page">
-    <aside class="table-sidebar">
+  <main class="table-page app-menu-layout">
+    <aside class="app-menu-panel" id="appNavigation" role="dialog" aria-label="เมนูหลัก" aria-modal="true" aria-hidden="true" inert>
       <nav class="side-nav" aria-label="Main navigation">
         <a class="home-link active current-page" href="/" data-requires-permission="page:tables">🗂️ Tables</a>
         <div class="nav-flyout">
@@ -533,6 +480,7 @@
             <a class="home-link" href="/student-manager.html">👤 Students</a>
             <a class="home-link" href="/payment.html" data-requires-permission="page:payment">💰 Payment</a>
             <a class="home-link" href="/report.html" data-requires-permission="page:report">📊 Report</a>
+            <a class="home-link" href="/ksis.html" data-ksis-link data-requires-permission="page:report">🌐 K-sis</a>
             <a class="home-link" href="/progress-chart.html" data-requires-permission="page:progress-chart">📈 Progress Chart</a>
             <a class="home-link" href="/statistics.html" data-requires-permission="page:statistics">🧮 Statistics</a>
           </div>
@@ -563,6 +511,7 @@
 
     <section class="table-workspace">
       <header class="topbar">
+        <button type="button" class="app-menu-icon-button app-menu-toggle" id="appMenuButton" aria-label="เปิดเมนู" title="เปิดเมนู" data-tooltip="เปิดเมนู" aria-haspopup="dialog" aria-controls="appNavigation" aria-expanded="false"><img src="/icons/lucide/menu.svg" alt="" width="20" height="20"></button>
         <div>
           <h1>KumonDB Table Explorer</h1>
           <div class="subtitle">Browse master and transaction data</div>
@@ -949,7 +898,7 @@
     loadTables();
   </script>
   <script src="/js/authClient.js?v=20261016-verified-restart"></script>
-  <script src="/js/sidebarDrawer.js?v=20260902-drawer-resizeobserver"></script>
-  <script src="/js/navFlyout.js?v=20260905-hover-intent-flyout"></script>
+  <script src="/js/appMenu.js?v=20261023-static-menu"></script>
+  <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
 </body>
 </html>
