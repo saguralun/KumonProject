@@ -13,6 +13,9 @@ const GITHUB_REPO = "saguralun/KumonProject";
 const GITHUB_BRANCH = "main";
 const INSTANCE_ID = randomUUID();
 let updateInProgress = false;
+let updateCheckPending;
+let updateCheckCache;
+let updateCheckExpires = 0;
 
 export function getRuntimeStatus() {
     return { instanceId: INSTANCE_ID, processId: process.pid };
@@ -65,6 +68,19 @@ async function runGit(args) {
 // doesn't touch local git state (a background version check shouldn't be
 // mutating anything).
 export async function checkForUpdate() {
+    if (updateCheckCache && Date.now() < updateCheckExpires) return updateCheckCache;
+    if (!updateCheckPending) {
+        // All open pages share one short-lived result, avoiding GitHub rate limits.
+        updateCheckPending = readRemoteVersion().then((result) => {
+            updateCheckCache = result;
+            updateCheckExpires = Date.now() + 60000;
+            return result;
+        }).finally(() => { updateCheckPending = null; });
+    }
+    return updateCheckPending;
+}
+
+async function readRemoteVersion() {
     try {
         const [{ stdout: localHead }, { stdout: localMessage }] = await Promise.all([
             runGit(["rev-parse", "HEAD"]),
@@ -74,7 +90,7 @@ export async function checkForUpdate() {
 
         const response = await fetch(
             `https://api.github.com/repos/${GITHUB_REPO}/commits/${GITHUB_BRANCH}`,
-            { headers: { "User-Agent": "KumonDB-update-check", Accept: "application/vnd.github+json" } }
+            { headers: { "User-Agent": "KumonDB-update-check", Accept: "application/vnd.github+json" }, signal: AbortSignal.timeout(10000) }
         );
 
         if (!response.ok) {
@@ -83,6 +99,7 @@ export async function checkForUpdate() {
 
         const data = await response.json();
         const remoteCommit = String(data.sha || "");
+        if (!/^[a-f0-9]{40}$/i.test(remoteCommit)) throw new Error('อ่านเวอร์ชันล่าสุดไม่สำเร็จ');
         const remoteMessage = String(data.commit?.message || "").split("\n")[0];
 
         return {

@@ -45,6 +45,9 @@ restart-helper test, not necessary for this suite's application regression check
 - WS connection-pool saturation, rollback, delete/date-edit transactions.
 - Stock locking, missing balances, concurrent cuts and late arrivals.
 - Account revocation, role changes, update authorization and Opening Schedule.
+- Update availability while login/workspace pages stay open, including normal
+  local users, focus/online retries, offline notices, shared version-check cache,
+  explicit cancellation and verified restart waiting (mocked installation).
 - Atomic restore, including a real failed COPY on the disposable database.
 - Student selection during saves, stale responses and visible save failures.
 - Shared header menu on all 16 workspaces at desktop/mobile widths: no edge

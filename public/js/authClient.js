@@ -149,21 +149,17 @@ function bindUpdateButton() {
     }
   });
 
-  checkForUpdateAndShowButton(button);
-}
-
-async function checkForUpdateAndShowButton(button) {
-  try {
-    const response = await fetch("/api/system/update-check");
-    const data = await response.json().catch(() => ({}));
-
-    if (data.checked && !data.upToDate) {
+  import('./updateMonitor.js?v=20261023-update-anytime').then(({ startUpdateMonitor }) => {
+    startUpdateMonitor((data) => {
       button.title = data.remoteMessage || `commit ${data.remoteCommit}`;
-      button.classList.remove("hidden");
-    }
-  } catch (error) {
-    // Non-critical — just skip showing it if the endpoint is unreachable.
-  }
+      button.classList.toggle('hidden', data.upToDate);
+      const toggle = document.querySelector('.app-menu-toggle');
+      if (toggle) {
+        toggle.classList.toggle('app-menu-has-update', !data.upToDate);
+        toggle.title = toggle.dataset.tooltip = data.upToDate ? 'เปิดเมนู' : 'เปิดเมนู · มีอัปเดตโปรแกรม';
+      }
+    }, { isBusy: () => button.disabled });
+  }).catch(() => {});
 }
 
 (async function initAuth() {

@@ -39,23 +39,12 @@ async function loadLanInfo() {
 
 loadLanInfo();
 
-async function checkUpdateStatus() {
-  try {
-    const response = await fetch("/api/system/update-check");
-    const data = await response.json();
-
-    if (!data.checked || data.upToDate) {
-      return;
-    }
-
+import('./updateMonitor.js?v=20261023-update-anytime').then(({ startUpdateMonitor }) => {
+  startUpdateMonitor((data) => {
     els.updateBannerMessage.textContent = data.remoteMessage || `commit ${data.remoteCommit}`;
-    els.updateBanner.classList.remove("hidden");
-  } catch (error) {
-    // Non-critical — just skip showing it if the endpoint is unreachable.
-  }
-}
-
-checkUpdateStatus();
+    els.updateBanner.classList.toggle('hidden', data.upToDate);
+  }, { isBusy: () => updating });
+}).catch(() => {});
 
 function setMessage(text) {
   if (!text) {
