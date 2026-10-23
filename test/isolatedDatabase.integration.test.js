@@ -8,7 +8,7 @@ import { promisify } from 'node:util';
 import { execFile } from 'node:child_process';
 import pg from 'pg';
 import productionPool from '../config/db.js';
-import { receiveReceiptPayment, cancelReceiptPayment } from '../services/paymentService.js';
+import { receiveReceiptPayment, cancelReceiptPayment, previewReceipt, getPaymentStatus } from '../services/paymentService.js';
 import { saveWorksheetEntries } from '../services/worksheetService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
@@ -61,6 +61,27 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             return (await database.query(`INSERT INTO kumon.enrollment(student_id,subject_id,current_level_master_id,starting_worksheet_master_id,en_start_date,current_status_group1_id) VALUES($1,1,$2,$3,'2026-10-01',$4) RETURNING enrollment_id`, [person.student_id, ws.level_master_id, ws.worksheet_master_id, statuses.get('N')])).rows[0].enrollment_id;
         }
         const payment = (enrollmentId) => receiveReceiptPayment({ enrollmentId, billingDate: '2026-10-23', billingMonth: 10, billingYear: 2026 });
+        await t.test('Paying two of three subjects commits exactly two details and leaves the third for a second receipt', async () => {
+            const id = await student('Partial three');
+            const person = (await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].student_id;
+            const ids = [id];
+            for (const code of ['EFL', 'TRP']) {
+                const master = (await database.query(`SELECT wm.worksheet_master_id,wm.level_master_id,lm.subject_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id JOIN kumon.subject_master sm ON sm.subject_id=lm.subject_id WHERE sm.subject_code=$1 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1`, [code])).rows[0];
+                ids.push((await database.query(`INSERT INTO kumon.enrollment(student_id,subject_id,current_level_master_id,starting_worksheet_master_id,en_start_date,current_status_group1_id) VALUES($1,$2,$3,$4,'2026-10-01',$5) RETURNING enrollment_id`, [person, master.subject_id, master.level_master_id, master.worksheet_master_id, statuses.get('N')])).rows[0].enrollment_id);
+            }
+            const payload = { enrollmentId: ids[2], billingDate: '2026-10-23', billingMonth: 10, billingYear: 2026, selectedEnrollmentIds: ids.slice(0, 2) };
+            const first = await receiveReceiptPayment(payload);
+            assert.deepEqual(first.receipt.receiptDetails.map((row) => row.enrollmentId), ids.slice(0, 2));
+            assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.billing_detail WHERE billing_id=$1', [first.billingId])).rows[0].n, 2);
+            const next = await previewReceipt({ ...payload, selectedEnrollmentIds: null });
+            assert.equal(next.receipt.partiallyPaid, true); assert.equal(next.receipt.billingId, null);
+            assert.deepEqual(next.receipt.receiptDetails.map((row) => row.enrollmentId), ids.slice(2));
+            const status = await getPaymentStatus({ billingMonth: 10, billingYear: 2026, status: 'partial' });
+            assert.equal(status.rows.find((row) => row.studentId === person)?.unpaidEnrollmentCount, 1);
+            const second = await receiveReceiptPayment({ ...payload, selectedEnrollmentIds: ids.slice(2) });
+            assert.notEqual(first.billingId, second.billingId);
+            assert.deepEqual(second.receipt.receiptDetails.map((row) => row.enrollmentId), ids.slice(2));
+        });
         await t.test('Concurrent receipts get unique numbers, even for the first receipts of a month', async () => {
             const ids = await Promise.all(['One', 'Two', 'Three', 'Four'].map(student));
             const results = await Promise.all(ids.map(payment));

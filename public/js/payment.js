@@ -25,6 +25,9 @@ const els = {
     printUnpaidButton: document.getElementById("printUnpaidButton"),
     exportUnpaidButton: document.getElementById("exportUnpaidButton"),
     receiptModal: document.getElementById("receiptModal"),
+    receiptMessage: document.getElementById('receiptMessage'),
+    receiptConfirmDialog: document.getElementById('receiptConfirmDialog'),
+    receiptConfirmMessage: document.getElementById('receiptConfirmMessage'),
     receiptModalSubtitle: document.getElementById("receiptModalSubtitle"),
     receiptClose: document.getElementById("receiptClose"),
     receiptPaymentControls: document.getElementById("receiptPaymentControls"),
@@ -697,6 +700,7 @@ function focusPrimaryReceiptAction() {
 }
 
 function openReceipt(row) {
+    setReceiptMessage('');
     state.selectedRow = row;
     state.receipt = null;
     state.receiptPrintUsed = false;
@@ -717,11 +721,37 @@ function closeReceipt() {
     els.receiptModal.classList.add("hidden");
 }
 
+function setReceiptMessage(message) {
+    els.receiptMessage.textContent = message;
+    els.receiptMessage.classList.toggle('hidden', !message);
+}
+
+function confirmReceiptAction(message) {
+    const dialog = els.receiptConfirmDialog;
+    if (dialog.open) return Promise.resolve(false);
+    els.receiptConfirmMessage.textContent = message;
+    dialog.returnValue = 'cancel';
+    return new Promise((resolve) => {
+        dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
+        dialog.showModal();
+    });
+}
+
 async function receivePayment() {
     if (!state.selectedRow || !state.receipt || state.isReceivingPayment) {
         return;
     }
 
+    setReceiptMessage('');
+    const receipt = state.receipt, selectedRow = state.selectedRow;
+    const payload = {
+        enrollmentId: selectedRow.sourceEnrollmentId,
+        billingDate: receipt.billingDate,
+        billingMonth: receipt.billingMonth,
+        billingYear: receipt.billingYear,
+        paymentMethodId: els.receiptPaymentMethod.value || receipt.paymentMethodId,
+        selectedEnrollmentIds: selectedReceiptEnrollmentIds()
+    };
     const confirmMessage = [
         "รับเงินและบันทึกใบเสร็จนี้ใช่ไหม?",
         `นักเรียน: ${state.receipt.studentName}`,
@@ -731,7 +761,14 @@ async function receivePayment() {
         `วิธีจ่าย: ${els.receiptPaymentMethod.options[els.receiptPaymentMethod.selectedIndex]?.textContent || state.receipt.paymentMethodName}`
     ].join("\n");
 
-    if (!window.confirm(confirmMessage)) {
+    if (!await confirmReceiptAction(confirmMessage)) {
+        return;
+    }
+    if (state.isReceivingPayment) return;
+    if (state.receipt !== receipt || state.selectedRow !== selectedRow
+        || String(payload.paymentMethodId) !== String(els.receiptPaymentMethod.value || receipt.paymentMethodId)
+        || payload.selectedEnrollmentIds.join(',') !== selectedReceiptEnrollmentIds().join(',')) {
+        setReceiptMessage('ข้อมูลใบเสร็จเปลี่ยนระหว่างยืนยัน กรุณาตรวจยอดและเลือกวิชาใหม่ ยังไม่ได้รับเงิน');
         return;
     }
 
@@ -742,14 +779,7 @@ async function receivePayment() {
     try {
         const data = await requestJson("/api/payment/receipt/payment", {
             method: "POST",
-            body: JSON.stringify({
-                enrollmentId: state.selectedRow.sourceEnrollmentId,
-                billingDate: state.receipt.billingDate,
-                billingMonth: state.receipt.billingMonth,
-                billingYear: state.receipt.billingYear,
-                paymentMethodId: els.receiptPaymentMethod.value || state.receipt.paymentMethodId,
-                selectedEnrollmentIds: selectedReceiptEnrollmentIds()
-            })
+            body: JSON.stringify(payload)
         });
 
         state.receipt = data.receipt;
@@ -766,6 +796,7 @@ async function receivePayment() {
         await loadPaymentStatus();
     } catch (error) {
         state.isReceivingPayment = false;
+        setReceiptMessage(error.message);
         setStatus(error.message, "error");
         renderReceipt(state.receipt);
     }
@@ -776,6 +807,7 @@ async function cancelPayment() {
         return;
     }
 
+    const billingId = state.receipt.billingId;
     const confirmMessage = [
         "ยกเลิกใบเสร็จนี้ใช่ไหม?",
         `ใบเสร็จ: ${state.receipt.receiptBook}/${state.receipt.receiptNo}`,
@@ -784,18 +816,24 @@ async function cancelPayment() {
         "ยกเลิกใบเสร็จและประวัติที่บิลนี้สร้าง โดยไม่ย้อนสถานะที่แก้ภายหลัง"
     ].join("\n");
 
-    if (!window.confirm(confirmMessage)) {
+    if (!await confirmReceiptAction(confirmMessage)) {
+        return;
+    }
+    if (state.isCancellingPayment) return;
+    if (state.receipt?.billingId !== billingId) {
+        setReceiptMessage('ใบเสร็จเปลี่ยนระหว่างยืนยัน กรุณาตรวจใหม่ ยังไม่ได้ยกเลิก');
         return;
     }
 
     state.isCancellingPayment = true;
+    setReceiptMessage('');
     renderReceipt(state.receipt);
 
     try {
         const data = await requestJson("/api/payment/receipt/cancel", {
             method: "POST",
             body: JSON.stringify({
-                billingId: state.receipt.billingId
+                billingId
             })
         });
 
@@ -803,6 +841,7 @@ async function cancelPayment() {
         await loadPaymentStatus();
         setStatus(`ยกเลิกใบเสร็จ ${data.receiptBook}/${data.receiptNo} แล้ว${data.warning ? ' • ' + data.warning : ''}`);
     } catch (error) {
+        setReceiptMessage(error.message);
         setStatus(error.message, "error");
     } finally {
         state.isCancellingPayment = false;

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/payment.css?v=20261022-unpaid-shortcut">
+  <link rel="stylesheet" href="/css/payment.css?v=20261023-payment-errors">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-static-menu">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
@@ -166,6 +166,7 @@
         <button type="button" class="icon-button" id="receiptClose" aria-label="Close">✕</button>
       </div>
 
+      <div class="receipt-message hidden" id="receiptMessage" role="alert"></div>
       <div class="receipt-modal-body">
         <div class="receipt-control-panel">
           <div class="receipt-period-controls" id="receiptPaymentControls">
@@ -192,12 +193,23 @@
     </div>
   </div>
 
+  <dialog class="receipt-confirm-dialog" id="receiptConfirmDialog" aria-labelledby="receiptConfirmTitle">
+    <form method="dialog">
+      <h2 id="receiptConfirmTitle">ยืนยันรายการ</h2>
+      <p id="receiptConfirmMessage"></p>
+      <div class="receipt-confirm-actions">
+        <button type="submit" class="secondary-button" value="cancel" autofocus>ยกเลิก</button>
+        <button type="submit" class="save-button" id="receiptConfirmAccept" value="confirm">ยืนยัน</button>
+      </div>
+    </form>
+  </dialog>
+
   <script src="/js/authClient.js?v=20261016-verified-restart"></script>
   <script src="/js/appMenu.js?v=20261023-static-menu"></script>
   <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script type="module" src="/js/payment.js?v=20261022-unpaid-same-tab"></script>
+  <script type="module" src="/js/payment.js?v=20261023-payment-errors"></script>
 </body>
 </html>

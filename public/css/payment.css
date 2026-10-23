@@ -705,6 +705,32 @@ html[data-role="instructor"] .payment-unpaid-label { display: none; }
   box-shadow: var(--shadow);
 }
 
+.receipt-message {
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fff1f2;
+  color: #b91c1c;
+  overflow-wrap: anywhere;
+}
+
+.receipt-confirm-dialog {
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  margin: auto;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.receipt-confirm-dialog::backdrop { background: #0f172a80; }
+.receipt-confirm-dialog h2 { margin: 0 0 12px; font-size: 18px; }
+.receipt-confirm-dialog p { white-space: pre-line; overflow-wrap: anywhere; }
+.receipt-confirm-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
 .receipt-modal-body {
   display: grid;
   grid-template-columns: minmax(250px, 1fr) minmax(320px, 1.1fr);
@@ -928,6 +954,8 @@ html[data-role="instructor"] .payment-unpaid-label { display: none; }
   }
 
   .payment-page,
+  .receipt-message,
+  .receipt-confirm-dialog,
   .receipt-dialog-header,
   .receipt-period-controls,
   .receipt-subject-picker,
