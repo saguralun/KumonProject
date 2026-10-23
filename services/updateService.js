@@ -5,7 +5,6 @@ import fs from "fs/promises";
 import { openSync, closeSync } from "fs";
 import { randomUUID } from "crypto";
 import { httpError } from "./httpError.js";
-import { preparePaymentDatabase } from './databaseUpgradeService.js';
 
 const execFileAsync = promisify(execFile);
 const REPO_DIR = process.cwd();
@@ -16,6 +15,7 @@ let updateInProgress = false;
 let updateCheckPending;
 let updateCheckCache;
 let updateCheckExpires = 0;
+let updateNeedsRetry = false;
 
 export function getRuntimeStatus() {
     return { instanceId: INSTANCE_ID, processId: process.pid };
@@ -68,8 +68,7 @@ async function runGit(args) {
 // doesn't touch local git state (a background version check shouldn't be
 // mutating anything).
 export async function checkForUpdate() {
-    if (updateCheckCache && Date.now() < updateCheckExpires) return updateCheckCache;
-    if (!updateCheckPending) {
+    if (!(updateCheckCache && Date.now() < updateCheckExpires) && !updateCheckPending) {
         // All open pages share one short-lived result, avoiding GitHub rate limits.
         updateCheckPending = readRemoteVersion().then((result) => {
             updateCheckCache = result;
@@ -77,7 +76,11 @@ export async function checkForUpdate() {
             return result;
         }).finally(() => { updateCheckPending = null; });
     }
-    return updateCheckPending;
+    const result = updateCheckPending ? await updateCheckPending : updateCheckCache;
+    const report = await fs.readFile(path.join(REPO_DIR, 'logs', 'database-upgrade-latest.json'), 'utf8')
+        .then(JSON.parse).catch(() => null);
+    const preparationRequired = updateNeedsRetry || report?.ready === false;
+    return { ...result, upToDate: result.checked && preparationRequired ? false : result.upToDate, preparationRequired };
 }
 
 async function readRemoteVersion() {
@@ -150,6 +153,7 @@ async function performUpdate() {
 
     try {
         ({ stdout: pullOut } = await runGit(["pull", "origin", GITHUB_BRANCH, "--ff-only"]));
+        updateNeedsRetry = true;
     } catch (error) {
         throw httpError(500, `git pull ไม่สำเร็จ: ${error.message}`);
     }
@@ -174,7 +178,16 @@ async function performUpdate() {
         );
     }
 
-    await preparePaymentDatabase();
+    // Use the newly pulled code, not modules cached by the old running server.
+    let database;
+    try {
+        const prepared = await execFileAsync(process.execPath, ['scripts/prepare-database.js', '--update'],
+            { cwd: REPO_DIR, timeout: 10 * 60 * 1000, windowsHide: true });
+        database = JSON.parse(prepared.stdout.trim().split(/\r?\n/).at(-1));
+        if (!database.ready) throw new Error('ฐานข้อมูลยังไม่พร้อม');
+    } catch (error) {
+        throw httpError(500, `ดึงโค้ดแล้ว แต่เตรียมฐานข้อมูลไม่ผ่าน ยังไม่รีสตาร์ต: ${String(error.stderr || error.message).trim()}`);
+    }
     const { stdout: newHead } = await runGit(["rev-parse", "HEAD"]);
     await scheduleAppRestart();
 
@@ -182,6 +195,7 @@ async function performUpdate() {
         success: true,
         output: pullOut.trim(),
         newCommit: newHead.trim().slice(0, 7),
+        database,
         restartRequired: true,
         restartScheduled: true,
         previousInstanceId: INSTANCE_ID,

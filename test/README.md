@@ -48,6 +48,12 @@ restart-helper test, not necessary for this suite's application regression check
 - Update availability while login/workspace pages stay open, including normal
   local users, focus/online retries, offline notices, shared version-check cache,
   explicit cancellation and verified restart waiting (mocked installation).
+- Whole-application schema upgrades: the canonical contract, fresh readable
+  backup before additive DDL, post-check, idempotence, original-row preservation,
+  unsafe-change rejection, competing upgrades and complete rollback. Windows
+  bridge fixtures prove failed preparation leaves their original server running
+  and successful preparation permits only their isolated replacement server.
+  See `database/UPGRADES.md` for operational limits and contract regeneration.
 - Atomic restore, including a real failed COPY on the disposable database.
 - Student selection during saves, stale responses and visible save failures.
 - Shared header menu on all 16 workspaces at desktop/mobile widths: no edge

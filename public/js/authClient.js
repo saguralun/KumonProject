@@ -123,12 +123,12 @@ function bindUpdateButton() {
   }
 
   button.addEventListener("click", async () => {
-    if (button.disabled || !await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
+    if (button.disabled || !await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะตรวจฐานข้อมูลและสำรองก่อนปรับส่วนที่ขาด กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
     button.disabled = true;
     button.textContent = "⏳ กำลังอัพเดท...";
 
     try {
-      const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261016-verified-restart");
+      const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261023-schema-update");
       let previousInstanceId = await getRuntimeInstanceId();
       try {
         const response = await fetch("/api/system/update-apply", { method: "POST", headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
@@ -151,7 +151,7 @@ function bindUpdateButton() {
 
   import('./updateMonitor.js?v=20261023-update-anytime').then(({ startUpdateMonitor }) => {
     startUpdateMonitor((data) => {
-      button.title = data.remoteMessage || `commit ${data.remoteCommit}`;
+      button.title = data.preparationRequired ? 'อัปเดตให้เสร็จ: ต้องตรวจและเตรียมฐานข้อมูลก่อนเปิดรุ่นใหม่' : data.remoteMessage || `commit ${data.remoteCommit}`;
       button.classList.toggle('hidden', data.upToDate);
       const toggle = document.querySelector('.app-menu-toggle');
       if (toggle) {

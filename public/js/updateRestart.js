@@ -6,7 +6,7 @@ export async function getRuntimeInstanceId() {
     } catch { return null; }
 }
 
-export async function waitForUpdatedServer(previousInstanceId, { timeoutMs = 60000, intervalMs = 1000 } = {}) {
+export async function waitForUpdatedServer(previousInstanceId, { timeoutMs = 10 * 60000, intervalMs = 1000 } = {}) {
     const deadline = Date.now() + timeoutMs;
     let observedOffline = false;
     do {

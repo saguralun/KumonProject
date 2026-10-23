@@ -163,6 +163,14 @@ export async function runBackupNow() {
     return backups[0];
 }
 
+export async function verifyBackupSnapshot(snapshot, startedAt, run = execFileAsync) {
+    const filename = await resolveDownloadPath(snapshot.filename);
+    const stat = await fsp.stat(filename);
+    if (!stat.size || stat.mtimeMs < startedAt - 1000) throw httpError(500, 'ไม่พบไฟล์สำรองใหม่ที่สมบูรณ์ ยังไม่ปรับฐานข้อมูล');
+    await run(resolvePgBinary('pg_restore', 'PG_RESTORE_PATH'), ['--list', filename],
+        { timeout: 30000, windowsHide: true });
+}
+
 // Restores a `.backup` (pg_dump -Fc) buffer into the live database,
 // replacing its current contents. Deliberately destructive — --clean
 // --if-exists drops existing objects before recreating them from the

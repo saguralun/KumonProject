@@ -41,7 +41,7 @@ loadLanInfo();
 
 import('./updateMonitor.js?v=20261023-update-anytime').then(({ startUpdateMonitor }) => {
   startUpdateMonitor((data) => {
-    els.updateBannerMessage.textContent = data.remoteMessage || `commit ${data.remoteCommit}`;
+    els.updateBannerMessage.textContent = data.preparationRequired ? 'อัปเดตยังไม่เสร็จ ต้องตรวจและเตรียมฐานข้อมูลก่อน' : data.remoteMessage || `commit ${data.remoteCommit}`;
     els.updateBanner.classList.toggle('hidden', data.upToDate);
   }, { isBusy: () => updating });
 }).catch(() => {});
@@ -76,12 +76,12 @@ els.updateButton.addEventListener('click', async () => {
 });
 
 async function updateProgram() {
-  if (!await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
+  if (!await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะตรวจฐานข้อมูลและสำรองก่อนปรับส่วนที่ขาด กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
   updating = true;
   els.updateButton.disabled = els.adminSubmit.disabled = els.guestSubmit.disabled = true;
   try {
-    setMessage('กำลังอัปเดตโปรแกรม...');
-    const { getRuntimeInstanceId, waitForUpdatedServer } = await import('./updateRestart.js?v=20261016-verified-restart');
+    setMessage('กำลังอัปเดตและตรวจฐานข้อมูล หากต้องปรับจะสำรองก่อน กรุณารอ...');
+    const { getRuntimeInstanceId, waitForUpdatedServer } = await import('./updateRestart.js?v=20261023-schema-update');
     let previousInstanceId = await getRuntimeInstanceId();
     try {
       const data = await requestJson('/api/system/update-apply', { method: 'POST', body: JSON.stringify({ confirm: true }) });
