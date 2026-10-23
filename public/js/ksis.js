@@ -1,9 +1,9 @@
-import { setupKsisDraft } from "./reportKsisDraft.js?v=20261023-shared";
+import { setupKsisDraft } from "./reportKsisDraft.js?v=20261023-ws-recovery";
 import { setupKsisMatching } from "./reportKsisMatching.js?v=20261022-workspace";
 import { setupKsisAudit } from "./ksisAudit.js?v=20261023-shared";
 import { setupKsisDesktop } from "./ksisDesktop.js?v=20261023-unified-app";
 import { setupKsisAt } from './ksisAt.js?v=20261023-shared';
-import { createKsisSharedWorkspace } from './ksisSharedWorkspace.js?v=20261023-shared';
+import { createKsisSharedWorkspace } from './ksisSharedWorkspace.js?v=20261023-ws-recovery';
 import { setupKsisAtAudit } from './ksisAtAudit.js?v=20261023-at-audit';
 
 const get = (id) => document.getElementById(id);

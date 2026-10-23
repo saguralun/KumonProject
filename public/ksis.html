@@ -87,6 +87,7 @@
             <label>วิชา<select id="ksisDraftSubject"><option value="ALL">ทุกวิชา (ME / EFL / TRP)</option><option value="ME">ME</option><option value="EFL">EFL</option><option value="TRP">TRP</option></select></label>
             <button type="button" class="secondary-button" id="ksisDraftPreview">เตรียมข้อมูล / อ่านหน้า KSIS ปัจจุบัน</button>
             <button type="button" class="primary-button" id="ksisDraftFill" disabled>กรอกและบันทึกหน้านี้</button>
+            <button type="button" class="secondary-button hidden" id="ksisDraftInspect">ตรวจสถานะหลังแก้ไข</button>
             <button type="button" class="secondary-button hidden" id="ksisDraftAcknowledge">ตรวจและจัดการข้อมูลบน KSIS แล้ว</button>
           </div>
           <div id="ksisDraftSource" class="subtle" role="status">ยังไม่ได้เตรียมข้อมูล</div>
@@ -178,6 +179,6 @@
   <script src="/js/httpUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script type="module" src="/js/ksis.js?v=20261023-single-workspace"></script>
+  <script type="module" src="/js/ksis.js?v=20261023-ws-recovery"></script>
 </body>
 </html>

@@ -54,5 +54,11 @@ test("KSIS actions require Admin/Instructor and localhost; audit rejects invalid
         assert.equal((await state('admin', true)).status, 403);
         const response = await state('admin'); assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
         const body = await response.json(); assert.equal(Number.isInteger(body.revision), true); assert.equal(typeof body.instanceId, 'string');
+        const inspect = (role, lan = false) => fetch(`http://127.0.0.1:${server.address().port}/api/ksis/draft/inspect`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'x-test-role': role, ...(lan ? { 'x-test-lan': '1' } : {}) }, body: '{}'
+        });
+        for (const role of ['guest', 'staff']) assert.equal((await inspect(role)).status, 403);
+        assert.equal((await inspect('admin', true)).status, 403);
+        assert.equal((await inspect('admin')).status, 409);
     } finally { await new Promise((resolve) => server.close(resolve)); }
 });

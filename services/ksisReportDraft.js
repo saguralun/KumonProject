@@ -137,6 +137,25 @@ export async function installKsisDraftGuard(page, { allowBatchSave = false } = {
     const pendingSaves = new Set();
     const saveResults = [];
     const blockedRequests = [];
+    let released = false;
+    let observingManualSaves = false;
+    const trackedSaves = new WeakSet();
+    const trackSave = (request) => {
+        if (!isKsisWsSaveRequest(request.method(), request.url(), request.resourceType()) || trackedSaves.has(request)) return;
+        trackedSaves.add(request);
+        const completion = (async () => {
+            try {
+                const response = await request.response();
+                if (!response) { saveResults.push({ ok: false, status: 0 }); return; }
+                const failure = await response.finished();
+                const body = await response.json().catch(() => null);
+                const rejected = body === false || body?.success === false || body?.Success === false || body?.IsSuccess === false || body?.isSuccess === false || Boolean(body?.error || body?.Error);
+                saveResults.push({ ok: response.ok() && !failure && !rejected, status: response.status() });
+            } catch { saveResults.push({ ok: false, status: 0 }); }
+        })();
+        pendingSaves.add(completion);
+        void completion.finally(() => pendingSaves.delete(completion));
+    };
     await page.evaluate(() => {
         delete document.documentElement.dataset.kumonManualSave;
         delete document.documentElement.dataset.kumonAllowMainSave;
@@ -157,18 +176,7 @@ export async function installKsisDraftGuard(page, { allowBatchSave = false } = {
         const request = requestRoute.request();
         if (isKsisDraftReadRequest(request.method(), request.url(), request.resourceType())) return requestRoute.fallback();
         if (savingEnabled && isKsisWsSaveRequest(request.method(), request.url(), request.resourceType())) {
-            const completion = (async () => {
-                try {
-                    const response = await request.response();
-                    if (!response) { saveResults.push({ ok: false, status: 0 }); return; }
-                    const failure = await response.finished();
-                    const body = await response.json().catch(() => null);
-                    const rejected = body === false || body?.success === false || body?.Success === false || body?.IsSuccess === false || body?.isSuccess === false || Boolean(body?.error || body?.Error);
-                    saveResults.push({ ok: response.ok() && !failure && !rejected, status: response.status() });
-                } catch { saveResults.push({ ok: false, status: 0 }); }
-            })();
-            pendingSaves.add(completion);
-            void completion.finally(() => pendingSaves.delete(completion));
+            trackSave(request);
             return requestRoute.fallback();
         }
         const manual = await page.evaluate(() => document.documentElement.dataset.kumonManualSave === "yes").catch(() => false);
@@ -180,6 +188,7 @@ export async function installKsisDraftGuard(page, { allowBatchSave = false } = {
     await page.route("**/*", route);
     return { blocked: () => blocked, blockedRequests: () => blockedRequests.map((request) => ({ ...request })),
         saveResults: () => saveResults.map((result) => ({ ...result })),
+        pendingSaveCount: () => pendingSaves.size,
         async waitForSaves() {
             let timer;
             try {
@@ -196,7 +205,16 @@ export async function installKsisDraftGuard(page, { allowBatchSave = false } = {
         },
         async endSave() { await page.evaluate(() => { delete document.documentElement.dataset.kumonAllowMainSave; }); },
         async handoff() { savingEnabled = false; await page.evaluate(() => { delete document.documentElement.dataset.kumonFilling; delete document.documentElement.dataset.kumonAllowMainSave; }); },
-        async release() { await page.unroute("**/*", route); await page.evaluate(() => window.__kumonDraftCleanup?.()).catch(() => {}); } };
+        async release() {
+            savingEnabled = false;
+            if (released) return;
+            // Observe manual saves without intercepting or issuing any requests.
+            if (!observingManualSaves) { page.on('request', trackSave); observingManualSaves = true; }
+            await page.unroute("**/*", route);
+            released = true;
+            await page.evaluate(() => window.__kumonDraftCleanup?.()).catch(() => {});
+        },
+        dispose() { page.off('request', trackSave); observingManualSaves = false; } };
 }
 
 export async function saveKsisWsPage(page, guard) {
@@ -471,16 +489,42 @@ export async function applyKsisReportDraft({ userId, previewId, saveAfterFill = 
             result = summarizeKsisDraft(confirmedRows, progress.completedKeys, progress.failedKey, message, progress.notices);
             result.saved = false;
         }
-        finally { if (session.pendingDraft) await guard.handoff(); }
+        // A stopped WS job must not intercept the user's corrections or the next login.
+        finally { await guard.release(); if (!session.pendingDraft) guard.dispose(); }
         result.rows = result.rows.map((row) => progress.savedKeys.includes(row.key) ? { ...row, outcome: "saved" } : row);
         return { ...result, savedCount: progress.savedKeys.length, studentsSaved: new Set(result.rows.filter((row) => row.outcome === "saved").map(ksisDraftStudentKey)).size,
             batchesSaved: progress.batchesSaved, saveRequests: guard.saveResults().length, page: document.page, pendingDraft: session.pendingDraft };
     });
 }
 
+export async function inspectKsisWsDraft(page, session, { acknowledge = false } = {}) {
+    await session.draftGuard?.release();
+    const state = { readOnly: true, refreshed: false, recovered: false, pendingDraft: true, requiresLogin: false };
+    if (session.draftGuard?.pendingSaveCount()) return { ...state, message: 'KSIS ยังไม่ตอบกลับการบันทึก กรุณารอและตรวจผลก่อน ไม่ส่งซ้ำ' };
+    const url = new URL(page.url());
+    const login = url.origin === new URL(REPORT_URL).origin && /^#\/login(?:[/?]|$)/.test(url.hash);
+    if (login && !acknowledge) return { ...state, requiresLogin: true, message: 'KSIS ออกจากระบบแล้ว กรุณาเข้าสู่ระบบและเปิด Report B แล้วกดตรวจสถานะอีกครั้ง ยังไม่ยืนยันว่ารอบเดิมบันทึกสำเร็จ' };
+    if (!login) {
+        if (page.url() !== REPORT_URL) return { ...state, message: 'กรุณาเปิดหน้า Report B ที่ต้องการตรวจ โปรแกรมจะไม่เปลี่ยนหน้าหรือรีเฟรชให้' };
+        const document = await page.evaluate(readKsisDraftDocument);
+        if (document.modalOpen || document.rows.some((row) => row.dirty)) return { ...state, message: 'ยังมีข้อมูลแก้ค้างหรือหน้าต่างย่อยใน KSIS กรุณาบันทึกหรือยกเลิกด้วยตนเอง แล้วกดตรวจสถานะอีกครั้ง' };
+        if (!document.rows.length || !ksisContextPeriod(document.context)) return { ...state, message: 'หน้า Report B ยังโหลดไม่ครบ กรุณารอแล้วตรวจสถานะอีกครั้ง' };
+        state.page = document.page;
+    }
+    if (session.draftGuard?.pendingSaveCount()) return { ...state, message: 'KSIS ยังไม่ตอบกลับการบันทึก กรุณารอและตรวจผลก่อน ไม่ส่งซ้ำ' };
+    session.draftGuard?.dispose?.();
+    session.pendingDraft = false; session.draftGuard = null;
+    return { ...state, requiresLogin: login, recovered: true, pendingDraft: false, acknowledged: acknowledge,
+        message: login ? 'รับทราบว่ายกเลิกงานค้างแล้ว กรุณาเข้าสู่ระบบและเตรียมข้อมูลใหม่ ผลบันทึกรอบเดิมยังไม่ยืนยัน'
+            : 'ไม่พบข้อมูลแก้ค้างในหน้านี้ ปลดล็อกแล้ว กรุณาเตรียมข้อมูลใหม่หรือตรวจ WS เพื่อยืนยันผลบันทึกเดิม' };
+}
+
+export async function inspectKsisReportDraft({ userId, acknowledge = false }) {
+    return withKsisPage({ sourceUrl: REPORT_URL, userId, allowPendingDraft: true, navigate: false }, (page, session) => inspectKsisWsDraft(page, session, { acknowledge }));
+}
+
 export async function acknowledgeKsisReportDraft({ userId }) {
-    return withKsisPage({ sourceUrl: REPORT_URL, userId, allowPendingDraft: true }, async (page, session) => {
-        await session.draftGuard?.release(); session.pendingDraft = false; session.draftGuard = null;
-        return { acknowledged: true };
-    });
+    const result = await inspectKsisReportDraft({ userId, acknowledge: true });
+    if (!result.recovered) throw httpError(409, result.message);
+    return result;
 }

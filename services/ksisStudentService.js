@@ -65,7 +65,7 @@ export function withKsisWorkspacePage(options, action) {
     return withKsisPage({ ...options, requireEmbedded: true }, action);
 }
 
-export async function withKsisPage({ sourceUrl, userId, allowPendingDraft = false, requireCurrentPage = false, requireEmbedded = false }, action) {
+export async function withKsisPage({ sourceUrl, userId, allowPendingDraft = false, requireCurrentPage = false, requireEmbedded = false, navigate = true }, action) {
     const key = Number(userId);
     const session = sessionFor(userId);
     if (requireEmbedded && !session.desktop) throw httpError(409, 'กรุณาเปิด K-sis ในแอปก่อน งานกรอกและตรวจใช้เว็บในหน้าต่างแอปเดียวกันเท่านั้น');
@@ -92,7 +92,7 @@ export async function withKsisPage({ sourceUrl, userId, allowPendingDraft = fals
         const page = session.page;
         if (session.desktop) await session.desktop.focus();
         else await page.bringToFront();
-        if (page.url() !== sourceUrl) {
+        if (navigate && page.url() !== sourceUrl) {
             if (requireCurrentPage) throw httpError(409, 'หน้า KSIS เปลี่ยนหลัง Preview กรุณาเปิดหน้าที่ต้องการและเตรียมข้อมูลใหม่');
             // KSIS autosaves when leaving an entry grid. Never navigate away from untracked edits.
             const dirty = await page.evaluate(() => [...document.querySelectorAll('[data-ng-show*="isDirty"],.modal')]

@@ -26,13 +26,22 @@ export async function runKsisWorkspace(userId, view, action, input, execute) {
         tool.preview = null; tool.result = null; tool.confirmed = []; tool.inspection = null;
         tool.period = { month: Number(input.month), year: Number(input.year) }; tool.subject = input.subject;
     }
+    if (action === 'fill') tool.inspection = null;
     try {
         const result = await execute();
         if (action === 'preview') tool.preview = result.requiresLogin ? null : result;
-        else if (action === 'inspect') tool.inspection = result;
+        else if (action === 'inspect') {
+            tool.inspection = result;
+            if (view === 'draft' && result.readOnly === true && result.recovered === true && result.pendingDraft === false) {
+                tool.pending = false; tool.preview = null; tool.confirmed = [];
+            }
+        }
         else if (action === 'fill' || action === 'read') {
             tool.result = result; tool.preview = null; tool.pending = result.pendingDraft === true;
-        } else if (action === 'acknowledge') tool.pending = false;
+        } else if (action === 'acknowledge') {
+            tool.pending = false;
+            if (view === 'draft') tool.inspection = result;
+        }
         tool.requiresLogin = result.requiresLogin === true;
         return result;
     } catch (error) {

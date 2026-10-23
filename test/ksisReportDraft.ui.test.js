@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import express from "express";
 import { once } from "node:events";
-import { readKsisDraftDocument, planKsisReportDraft, installKsisDraftGuard, fillKsisReportRows, summarizeKsisDraft, fillAndSaveKsisWsBatches, saveKsisWsPage, selectConfirmedKsisDraftRows } from "../services/ksisReportDraft.js";
+import { readKsisDraftDocument, planKsisReportDraft, installKsisDraftGuard, fillKsisReportRows, summarizeKsisDraft, fillAndSaveKsisWsBatches, saveKsisWsPage, selectConfirmedKsisDraftRows, inspectKsisWsDraft } from "../services/ksisReportDraft.js";
 
 function fixture(autoSave = false, { wrongAt = false, clampTime = false, kendoNumbers = false, zunReadPost = false, wsBatchSave = false } = {}) {
     const number = (value, id, change = "") => kendoNumbers
@@ -571,6 +571,71 @@ test("Draft guard blocks a field's unexpected automatic POST and never silently 
         assert.equal(guard.blockedRequests()[0].url, "https://kao.ksis.kumon.com/auto-save");
         assert.equal(writes, 0);
         await guard.handoff(); await guard.release();
+    } finally { await browser.close(); }
+});
+
+test('Stopped WS releases its interception so manual corrections and a new login work without an automatic save', {
+    skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000
+}, async () => {
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage(); const writes = [];
+        await page.route('**/*', (route) => {
+            if (route.request().method() === 'POST') {
+                writes.push(new URL(route.request().url()).pathname);
+                return route.fulfill({ contentType: 'application/json', body: '{"success":true}' });
+            }
+            return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixture(true, { wsBatchSave: true }) });
+        });
+        await page.goto('https://kao.ksis.kumon.com/kth/#/reportbeditgrid');
+        const guard = await installKsisDraftGuard(page, { allowBatchSave: true });
+        const session = { pendingDraft: true, draftGuard: guard };
+        const rows = planKsisReportDraft([{ ID: 1, Subject: 'ME', 'รหัสคุมอง': '7642650000001', CurrentLevel: 'C90', WksUsed: 8, Status1: 'C' }], await page.evaluate(readKsisDraftDocument), { month: 10, year: 2026 }, 'ME', { includeZun: false });
+        await assert.rejects(fillKsisReportRows(page, rows, guard), /ถูกกันไว้/);
+        await guard.release(); await guard.release();
+        assert.deepEqual(writes, []);
+        assert.equal(await page.locator('html').getAttribute('data-kumon-filling'), null);
+        assert.equal((await inspectKsisWsDraft(page, session)).pendingDraft, true);
+        const input = page.locator('tr[data-clrowid="student-me"] td').nth(7).locator('input');
+        await input.fill('9'); await input.press('Tab');
+        await page.waitForFunction(() => document.querySelector('tr[data-clrowid] td:nth-child(8) input').value === '9');
+        const save = page.waitForResponse((response) => response.url().includes('SaveReportBDetailEntryEditItemBatch'));
+        await page.locator('#btnToolbarSave').click(); await save;
+        await page.waitForFunction(() => document.querySelector('[data-ng-show]').style.display === 'none');
+        const count = writes.length;
+        assert.equal((await inspectKsisWsDraft(page, session)).recovered, true);
+        assert.equal(writes.length, count); assert.equal(session.pendingDraft, false);
+        assert.equal(writes.filter((url) => url.includes('SaveReportBDetailEntryEditItemBatch')).length, 1);
+        await page.evaluate(() => { location.hash = '/login'; });
+        const loginResponse = await page.evaluate(async () => (await fetch('/kth/api/login', { method: 'POST' })).ok);
+        assert.equal(loginResponse, true); assert.equal(writes.at(-1), '/kth/api/login');
+    } finally { await browser.close(); }
+});
+
+test('WS recovery waits for a manual save response even when the dirty marker is already hidden', {
+    skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000
+}, async () => {
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage(); let saveRoute, notify, writes = 0;
+        const received = new Promise((resolve) => { notify = resolve; });
+        await page.route('**/*', (route) => {
+            if (route.request().method() === 'POST') { writes++; saveRoute = route; notify(); return; }
+            return route.fulfill({ contentType: 'text/html; charset=utf-8', body: fixture(false, { wsBatchSave: true }) });
+        });
+        await page.goto('https://kao.ksis.kumon.com/kth/#/reportbeditgrid');
+        const guard = await installKsisDraftGuard(page, { allowBatchSave: true });
+        const session = { pendingDraft: true, draftGuard: guard };
+        await guard.release();
+        await page.locator('#btnToolbarSave').click(); await received;
+        assert.equal(guard.pendingSaveCount(), 1);
+        assert.equal((await inspectKsisWsDraft(page, session)).recovered, false);
+        assert.equal(session.pendingDraft, true);
+        const saved = page.waitForResponse((response) => response.url().includes('SaveReportBDetailEntryEditItemBatch'));
+        await saveRoute.fulfill({ contentType: 'application/json', body: '{"success":true}' }); await saved;
+        await guard.waitForSaves();
+        assert.equal((await inspectKsisWsDraft(page, session)).recovered, true);
+        assert.equal(writes, 1); assert.equal(guard.pendingSaveCount(), 0);
     } finally { await browser.close(); }
 });
 

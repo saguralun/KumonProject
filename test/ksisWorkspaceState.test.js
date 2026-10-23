@@ -61,3 +61,21 @@ test('AT audit results use the same per-account workspace without consuming a fi
     assert.equal(state.tools.at.preview.previewId, preview.previewId); assert.equal(state.tools.atAudit.pending, false);
     assert.equal(readKsisWorkspace(910007).tools.atAudit, undefined);
 });
+
+test('WS inspection unlocks only verified recovery, retains batch results and never revives its consumed preview', async () => {
+    const user = 910008, result = { pendingDraft: true, savedCount: 10, rows: [{ key: 'saved', outcome: 'saved' }] };
+    await runKsisWorkspace(user, 'draft', 'preview', input, async () => preview);
+    await runKsisWorkspace(user, 'draft', 'fill', { previewId: preview.previewId }, async () => result);
+    for (const inspection of [{ requiresLogin: true }, { readOnly: true, recovered: false, pendingDraft: true }]) {
+        await runKsisWorkspace(user, 'draft', 'inspect', {}, async () => inspection);
+        assert.equal(readKsisWorkspace(user).tools.draft.pending, true);
+    }
+    await assert.rejects(runKsisWorkspace(user, 'draft', 'inspect', {}, async () => { throw new Error('disconnected'); }));
+    assert.equal(readKsisWorkspace(user).tools.draft.pending, true);
+    await runKsisWorkspace(user, 'draft', 'inspect', {}, async () => ({ readOnly: true, recovered: true, pendingDraft: false }));
+    const state = readKsisWorkspace(user);
+    assert.equal(state.tools.draft.pending, false); assert.equal(state.tools.draft.preview, null);
+    assert.deepEqual(state.tools.draft.result, result); assert.equal(state.busy, false);
+    await runKsisWorkspace(user, 'draft', 'preview', input, async () => ({ ...preview, previewId: 'fresh' }));
+    assert.equal(readKsisWorkspace(user).tools.draft.inspection, null);
+});

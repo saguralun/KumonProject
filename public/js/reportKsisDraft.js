@@ -1,8 +1,9 @@
 export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChange = () => {} }) {
   const get = (id) => document.getElementById(id);
   const read = get("ksisDraftPreview"), fill = get("ksisDraftFill"), acknowledge = get("ksisDraftAcknowledge");
+  const inspect = get('ksisDraftInspect');
   const subject = get("ksisDraftSubject"), source = get("ksisDraftSource"), container = get("ksisDraftRows"), dialog = get("ksisDraftDialog");
-  let preview = null, result = null, busy = false, pending = false, generation = 0;
+  let preview = null, result = null, inspection = null, busy = false, pending = false, generation = 0;
   const confirmedMatches = new Set();
   const eligibleRows = () => (preview?.rows || []).filter((row) => row.ready && (!row.requiresIdentityConfirmation || confirmedMatches.has(row.key)));
   const call = (action, data) => requestJson(`/api/ksis/draft/${action}`, { method: "POST", body: JSON.stringify(data) }).finally(() => { void shared?.refresh(true); });
@@ -12,6 +13,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     read.disabled = busy || pending; subject.disabled = busy || pending;
     fill.disabled = busy || pending || !eligibleRows().length;
     acknowledge.classList.toggle("hidden", !pending); acknowledge.disabled = busy;
+    inspect.classList.toggle('hidden', !pending); inspect.disabled = busy;
     onStateChange({ busy, pending });
   }
   function render() {
@@ -40,7 +42,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   read.addEventListener("click", async () => {
     if (busy || pending) return;
     const requestId = ++generation;
-    busy = true; preview = null; result = null; confirmedMatches.clear(); render();
+    busy = true; preview = null; result = null; inspection = null; confirmedMatches.clear(); render();
     source.textContent = "กำลังอ่าน Report และหน้า KSIS ปัจจุบัน...";
     try {
       const data = await call("preview", { ...getPeriod(), subject: subject.value });
@@ -63,7 +65,7 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   get("ksisDraftCancel").addEventListener("click", () => dialog.close());
   get("ksisDraftConfirm").addEventListener("click", async () => {
     if (busy || pending || !preview) return;
-    dialog.close(); busy = true; render();
+    dialog.close(); busy = true; inspection = null; render();
     setStatus("กำลังกรอก WS และบันทึกทุก 10 คน...");
     try {
       result = await call("fill", { previewId: preview.previewId, saveAfterFill: true,
@@ -71,26 +73,41 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
       pending = result.pendingDraft !== false;
       source.textContent = `${result.stopped ? `${result.error} • ` : ""}กรอกแล้ว ${result.studentsFilled ?? result.filled} คน / ${result.filled} รายวิชา • บันทึกแล้ว ${result.studentsSaved || 0} คน / ${result.savedCount || 0} รายวิชา (${result.batchesSaved || 0} รอบ) • ข้าม A ${result.skipped || 0} รายวิชา${result.filterNotices ? ` • KSIS ยังแสดงข้อความตัวกรองเดิม ${result.filterNotices} รายวิชา` : ""} • หน้า ${result.page} • ${result.saved ? "บันทึกเฉพาะหน้านี้แล้ว" : "ยังไม่ยืนยันผลบันทึกครบทั้งหมด"}`;
       setStatus(result.stopped ? result.error : "กรอกและบันทึก WS ของหน้านี้แล้ว พร้อมให้ตรวจอีกครั้ง", result.stopped ? "error" : "success");
-    } catch (error) { pending = error.message.includes("ค้างใน KSIS"); source.textContent = error.message; setStatus(error.message, "error"); }
+    } catch (error) {
+      try { pending = (await requestJson('/api/ksis/desktop/status')).pendingDraft !== false; }
+      catch { pending = true; }
+      source.textContent = error.message; setStatus(error.message, "error");
+    }
     finally { busy = false; preview = null; render(); }
+  });
+  inspect.addEventListener('click', async () => {
+    if (busy) return;
+    busy = true; buttons();
+    try {
+      inspection = await call('inspect', {}); pending = inspection.pendingDraft !== false;
+      source.textContent = inspection.message; setStatus(inspection.message, pending ? 'error' : 'neutral');
+    } catch (error) { source.textContent = error.message; setStatus(error.message, 'error'); }
+    finally { busy = false; render(); }
   });
   acknowledge.addEventListener("click", async () => {
     if (busy) return;
     if (!window.confirm("ยืนยันว่าตรวจและบันทึก หรือยกเลิกข้อมูลค้างใน KSIS ด้วยตนเองเรียบร้อยแล้วใช่ไหม?")) return;
     busy = true; buttons();
     try {
-      await call("acknowledge", {}); pending = false;
-      source.textContent = "รับทราบแล้ว เปลี่ยนหน้าบน KSIS แล้วเตรียมข้อมูลหน้าถัดไปได้";
+      inspection = await call("acknowledge", {}); pending = false;
+      source.textContent = inspection.message || "รับทราบแล้ว กรุณาเตรียมข้อมูลใหม่";
+      setStatus(source.textContent);
     } catch (error) { setStatus(error.message, "error"); }
     finally { busy = false; buttons(); }
   });
   shared?.subscribe('draft', (state, workspace) => {
     const changed = preview?.previewId !== state.preview?.previewId;
-    preview = state.preview; result = state.result; busy = workspace.busy; pending = state.pending || workspace.connection?.pendingWork === 'WS';
+    preview = state.preview; result = state.result; inspection = state.inspection; busy = workspace.busy;
+    pending = state.pending || (workspace.connection?.pendingDraft === true && workspace.connection?.pendingWork === 'WS');
     confirmedMatches.clear(); for (const key of state.confirmed) confirmedMatches.add(key);
     if (state.subject) subject.value = state.subject;
     if (dialog.open && (changed || busy || pending)) dialog.close();
-    source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : state.requiresLogin ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่' : result ? `${result.error || ''} • บันทึกแล้ว ${result.savedCount || 0} รายวิชา • หน้า ${result.page}` : 'ยังไม่ได้เตรียมข้อมูล');
+    source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : inspection?.message || (state.requiresLogin ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่' : result ? `${result.error || ''} • บันทึกแล้ว ${result.savedCount || 0} รายวิชา • หน้า ${result.page}` : 'ยังไม่ได้เตรียมข้อมูล'));
     if (workspace.active) setStatus(source.textContent, state.error || pending ? 'error' : 'neutral');
     render();
   });

@@ -1,7 +1,7 @@
 import express from "express";
 import { requireStaff } from "../middleware/auth.js";
 import { createSendError } from "./routeErrorHandler.js";
-import { previewKsisReportDraft, applyKsisReportDraft, acknowledgeKsisReportDraft } from "../services/ksisReportDraft.js";
+import { previewKsisReportDraft, applyKsisReportDraft, acknowledgeKsisReportDraft, inspectKsisReportDraft } from "../services/ksisReportDraft.js";
 import { auditKsisWs } from "../services/ksisWsAudit.js";
 import { auditKsisAt } from '../services/ksisAtAudit.js';
 import { KSIS_AT_URL, previewKsisAt, applyKsisAt, acknowledgeKsisAt, inspectKsisAt } from '../services/ksisAtEntry.js';
@@ -27,6 +27,7 @@ export async function handleKsisDraft(req, res) {
         if (req.params.action === "preview") result = await run(() => previewKsisReportDraft({ userId, month: req.body?.month, year: req.body?.year, subject: req.body?.subject }));
         else if (req.params.action === "fill") result = await run(() => applyKsisReportDraft({ userId, previewId: req.body?.previewId, saveAfterFill: req.body?.saveAfterFill === true, confirmedIdentityMatches: req.body?.confirmedIdentityMatches }));
         else if (req.params.action === "acknowledge") result = await run(() => acknowledgeKsisReportDraft({ userId }));
+        else if (req.params.action === "inspect") result = await run(() => inspectKsisReportDraft({ userId }));
         else return res.status(404).json({ success: false, error: "ไม่พบคำสั่ง" });
         res.json({ success: true, ...result });
     } catch (error) { sendError(res, error); }

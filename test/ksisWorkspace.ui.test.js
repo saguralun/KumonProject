@@ -7,6 +7,62 @@ import path from 'node:path';
 import os from 'node:os';
 import { readKsisWorkspace, runKsisWorkspace, confirmKsisWorkspace } from '../services/ksisWorkspaceState.js';
 
+test('WS recovery remains usable after manual fixes or logout, keeps prior save counts and synchronizes connection-only changes', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 25000 }, async () => {
+    const userId = 920003, actions = [];
+    const row = { key: 'test-ws', name: 'เด็ก ทดสอบ', subject: 'ME', kumonId: '7642650000001',
+        before: { level: { value: 'C' }, worksheet: { value: '10' }, used: { value: '0' }, status: { value: 'C' } },
+        desired: { level: 'C', worksheet: 20, used: 2, status: 'C' }, outcome: 'failed' };
+    await runKsisWorkspace(userId, 'draft', 'fill', {}, async () => ({ pendingDraft: true, stopped: true, savedCount: 10, page: 1, error: 'WS used ไม่สำเร็จ', rows: [row] }));
+    let mode = 'login', connection = { pendingDraft: true, pendingWork: 'WS' };
+    const app = express(); app.use(express.json());
+    app.get('/api/auth/me', (_req, res) => res.json({ user: { role: 'admin', displayName: 'Fixture' }, permissions: ['*'] }));
+    app.get('/api/ksis/workspace', (req, res) => res.json({ success: true, ...readKsisWorkspace(userId, req.query.after), connection }));
+    app.post('/api/ksis/draft/inspect', async (req, res) => {
+        actions.push('inspect');
+        const data = await runKsisWorkspace(userId, 'draft', 'inspect', req.body, async () => {
+            const recovered = mode === 'clean';
+            if (recovered) connection = { pendingDraft: false, pendingWork: null };
+            return { readOnly: true, refreshed: false, pendingDraft: !recovered, recovered, requiresLogin: mode === 'login',
+                message: mode === 'login' ? 'KSIS ออกจากระบบแล้ว กรุณาเข้าสู่ระบบ' : mode === 'dirty' ? 'ยังมีข้อมูลแก้ค้าง' : 'ไม่พบข้อมูลแก้ค้าง ปลดล็อกแล้ว' };
+        });
+        res.json({ success: true, ...data });
+    });
+    app.use('/api', (_req, res) => res.json({ success: true })); app.use(express.static('public'));
+    const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage({ viewport: { width: 1440, height: 900 } }), errors = [];
+        page.on('pageerror', (error) => errors.push(error.message));
+        await page.goto(`http://127.0.0.1:${server.address().port}/ksis.html`);
+        await page.locator('#ksisDraftInspect').waitFor();
+        assert.equal(await page.locator('#ksisDraftPreview').isDisabled(), true);
+        await page.locator('#ksisDraftInspect').click();
+        await page.waitForFunction(() => document.getElementById('ksisDraftSource').textContent.includes('ออกจากระบบ'));
+        assert.equal(await page.locator('#ksisDraftInspect').isEnabled(), true);
+        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
+        mode = 'dirty'; await page.locator('#ksisDraftInspect').click();
+        await page.waitForFunction(() => document.getElementById('ksisDraftSource').textContent.includes('ยังมีข้อมูลแก้ค้าง'));
+        assert.equal(await page.locator('#ksisDraftPreview').isDisabled(), true);
+        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ws-recovery-pending.png'), fullPage: true });
+        mode = 'clean'; await page.locator('#ksisDraftInspect').click();
+        await page.waitForFunction(() => !document.getElementById('ksisDraftPreview').disabled);
+        assert.match(await page.locator('#ksisDraftSource').innerText(), /ปลดล็อกแล้ว/);
+        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
+        assert.equal(await page.locator('#reportMonth').isEnabled(), true);
+        assert.equal(await page.locator('#ksisDraftRows tbody tr').count(), 1);
+        assert.equal(readKsisWorkspace(userId).tools.draft.result.savedCount, 10);
+        connection = { pendingDraft: true, pendingWork: 'WS' };
+        await page.waitForFunction(() => document.getElementById('ksisDraftPreview').disabled);
+        connection = { pendingDraft: false, pendingWork: null };
+        await page.waitForFunction(() => !document.getElementById('ksisDraftPreview').disabled);
+        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ws-recovery-desktop.png'), fullPage: true });
+        await page.setViewportSize({ width: 390, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ws-recovery-mobile.png'), fullPage: true });
+        assert.deepEqual(errors, []); assert.deepEqual(actions, ['inspect', 'inspect', 'inspect']);
+    } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
+});
+
 test('Two isolated browser windows share AT preview, identity checks, busy locks and pending results; reads never fill or save', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 35000 }, async () => {
     const app = express(); app.use(express.json()); const userId = 920001;
     app.get('/api/auth/me', (_req, res) => res.json({ user: { role: 'admin', displayName: 'Test' }, permissions: ['*'] }));

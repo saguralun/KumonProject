@@ -164,3 +164,12 @@ test('KSIS navigation refuses untracked dirty edits and never navigates a consum
     await assert.rejects(withKsisPage({ ...options, requireCurrentPage: true }, async () => assert.fail('Must not navigate')), { statusCode: 409 });
     assert.deepEqual(visits, []);
 });
+
+test('Read-only WS recovery observes a logged-out page without navigating, refreshing or clearing AT work', async (t) => {
+    const page = { isClosed: () => false, bringToFront: async () => {}, url: () => 'https://kao.ksis.kumon.com/kth/#/login' };
+    t.mock.method(chromium, 'launchPersistentContext', async () => ({ pages: () => [page], on() {} }));
+    const options = { sourceUrl: 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid', userId: 987657, navigate: false, allowPendingDraft: true };
+    await withKsisPage(options, async (current, session) => { assert.equal(current, page); session.pendingDraft = true; });
+    await withKsisPage(options, async (current, session) => { assert.match(current.url(), /login/); assert.equal(session.pendingDraft, true); session.pendingAt = {}; });
+    await assert.rejects(withKsisPage(options, async () => assert.fail('Must not inspect AT as WS')), { statusCode: 409 });
+});

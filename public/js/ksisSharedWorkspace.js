@@ -16,7 +16,12 @@ export function createKsisSharedWorkspace({ applyContext, setStatus }) {
       const data = await requestJson(`/api/ksis/workspace?after=${force ? -1 : revision}&instance=${encodeURIComponent(instance)}`);
       if (!Number.isInteger(data.revision) || !data.instanceId) return;
       ready = true;
-      if (data.unchanged) return;
+      if (data.unchanged) {
+        if (snapshot && data.connection && data.instanceId === instance && data.revision === revision && JSON.stringify(snapshot.connection) !== JSON.stringify(data.connection)) {
+          snapshot.connection = data.connection; notify();
+        }
+        return;
+      }
       if (data.instanceId === instance && data.revision < revision) return;
       instance = data.instanceId; revision = data.revision; snapshot = data; notify();
     } catch {
