@@ -5,6 +5,7 @@ import fs from "fs/promises";
 import { openSync, closeSync } from "fs";
 import { randomUUID } from "crypto";
 import { httpError } from "./httpError.js";
+import { prepareUpdateWorktree } from './updateWorktreeService.js';
 
 const execFileAsync = promisify(execFile);
 const REPO_DIR = process.cwd();
@@ -127,15 +128,17 @@ async function readRemoteVersion() {
 export async function applyUpdate() {
     if (updateInProgress) throw httpError(409, "กำลังอัพเดทหรือ restart อยู่ กรุณารอให้โปรแกรมเปิดกลับมา");
     updateInProgress = true;
+    const context = {};
     try {
-        return await performUpdate();
+        return await performUpdate(context);
     } catch (error) {
         updateInProgress = false;
+        if (context.fileRecovery?.backupDirectory) error.message += `\nสำรองไฟล์สร้างอัตโนมัติไว้ที่ ${context.fileRecovery.backupDirectory}`;
         throw error;
     }
 }
 
-async function performUpdate() {
+async function performUpdate(context) {
     const { stdout: branchOut } = await runGit(["rev-parse", "--abbrev-ref", "HEAD"]);
     const branch = branchOut.trim();
 
@@ -143,11 +146,7 @@ async function performUpdate() {
         throw httpError(409, `ตอนนี้เครื่องนี้อยู่ branch '${branch}' ไม่ใช่ ${GITHUB_BRANCH} — อัพเดทอัตโนมัติไม่ได้`);
     }
 
-    const { stdout: statusOut } = await runGit(["status", "--porcelain"]);
-
-    if (statusOut.trim()) {
-        throw httpError(409, "มีไฟล์ที่แก้ไขในเครื่องนี้ค้างอยู่ ยังไม่ได้ commit — อัพเดทอัตโนมัติไม่ได้ (กันของที่แก้ไว้หาย)");
-    }
+    context.fileRecovery = await prepareUpdateWorktree({ repoDir: REPO_DIR });
 
     let pullOut;
 
@@ -167,10 +166,11 @@ async function performUpdate() {
     // without a shell (plain "npm" -> ENOENT, "npm.cmd" -> EINVAL; only
     // shell: true actually runs it here). Node's deprecation warning
     // about this option is about unescaped ARGUMENTS being unsafe with
-    // untrusted input; ["install"] is a fixed literal, never derived from
+    // untrusted input; install and --no-save are fixed literals, never derived from
     // anything a caller of applyUpdate() controls.
+    // --no-save keeps this deployment step from editing the versioned lockfile.
     try {
-        await execFileAsync("npm", ["install"], { cwd: REPO_DIR, timeout: 120000, shell: true });
+        await execFileAsync("npm", ["install", "--no-save"], { cwd: REPO_DIR, timeout: 120000, shell: true, windowsHide: true });
     } catch (error) {
         throw httpError(
             500,
@@ -196,6 +196,7 @@ async function performUpdate() {
         output: pullOut.trim(),
         newCommit: newHead.trim().slice(0, 7),
         database,
+        fileRecovery: context.fileRecovery,
         restartRequired: true,
         restartScheduled: true,
         previousInstanceId: INSTANCE_ID,

@@ -159,6 +159,8 @@ body {
 }
 
 .login-message {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
   margin-bottom: 14px;
   border: 1px solid #f0b4aa;
   border-radius: 8px;

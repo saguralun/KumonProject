@@ -48,6 +48,12 @@ restart-helper test, not necessary for this suite's application regression check
 - Update availability while login/workspace pages stay open, including normal
   local users, focus/online retries, offline notices, shared version-check cache,
   explicit cancellation and verified restart waiting (mocked installation).
+- Generated-file update recovery in disposable Git repositories: verified private
+  backups, preserved runtime reports, equivalent lockfile metadata, refused
+  source/staged/dependency changes, backup failures and concurrent edits. A real
+  offline npm fixture checks that deployment does not dirty its lockfile. The
+  standalone Windows recovery download runs against a fake update API only;
+  see `launcher/UPDATE-RECOVERY.md` for its one-time use on older installations.
 - Whole-application schema upgrades: the canonical contract, fresh readable
   backup before additive DDL, post-check, idempotence, original-row preservation,
   unsafe-change rejection, competing upgrades and complete rollback. Windows

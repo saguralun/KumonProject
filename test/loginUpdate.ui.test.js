@@ -23,8 +23,8 @@ test('Login update requires confirmation but no credentials, recovers errors and
             if (pathname === '/api/system/update-apply') {
                 assert.deepEqual(route.request().postDataJSON(), { confirm: true });
                 updates.push(pathname);
-                if (failUpdate) { data = { success: false, error: 'Fixture update unavailable' }; status = 503; }
-                else data = { success: true, previousInstanceId: 'old' };
+                if (failUpdate) { data = { success: false, error: 'Fixture update unavailable\n- public/js/a-very-long-user-modified-source-file-that-must-not-be-overwritten.js' }; status = 503; }
+                else data = { success: true, previousInstanceId: 'old', fileRecovery: { files: [{ path: 'logs/database-upgrade-latest.json' }] } };
             }
             return route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
         });
@@ -43,9 +43,13 @@ test('Login update requires confirmation but no credentials, recovers errors and
         assert.equal(updates.length, 0);
         confirm = true; await page.locator('#loginUpdateButton').click(); await page.locator('#appDialogConfirm').click();
         await page.waitForFunction(() => document.getElementById('loginMessage').textContent.includes('unavailable'));
+        assert.equal(await page.locator('#loginMessage').evaluate(element => getComputedStyle(element).whiteSpace), 'pre-line');
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-update-blocked-files-mobile.png'), fullPage: true });
         for (const id of ['loginUpdateButton', 'adminSubmit', 'guestSubmit']) assert.equal(await page.locator(`#${id}`).isEnabled(), true);
         failUpdate = false; await page.locator('#loginUpdateButton').click(); await page.locator('#appDialogConfirm').click();
         await page.waitForFunction(() => document.getElementById('loginMessage').textContent.includes('กำลังรอ'));
+        assert.match(await page.locator('#loginMessage').textContent(), /สำรองไฟล์สร้างอัตโนมัติแล้ว 1 ไฟล์/);
         assert.equal(await page.locator('#adminSubmit').isDisabled(), true); assert.equal(loads, 1);
         updated = true;
         await page.waitForResponse((response) => response.url().includes('/api/system/update-check'));

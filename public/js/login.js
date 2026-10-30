@@ -76,20 +76,22 @@ els.updateButton.addEventListener('click', async () => {
 });
 
 async function updateProgram() {
-  if (!await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะตรวจฐานข้อมูลและสำรองก่อนปรับส่วนที่ขาด กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
+  if (!await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะตรวจฐานข้อมูลและสำรองก่อนปรับส่วนที่ขาด รวมถึงสำรองไฟล์ที่โปรแกรมสร้างก่อนจัดการไฟล์ค้าง กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
   updating = true;
   els.updateButton.disabled = els.adminSubmit.disabled = els.guestSubmit.disabled = true;
   try {
     setMessage('กำลังอัปเดตและตรวจฐานข้อมูล หากต้องปรับจะสำรองก่อน กรุณารอ...');
     const { getRuntimeInstanceId, waitForUpdatedServer } = await import('./updateRestart.js?v=20261023-schema-update');
     let previousInstanceId = await getRuntimeInstanceId();
+    let recoveredFiles = 0;
     try {
       const data = await requestJson('/api/system/update-apply', { method: 'POST', body: JSON.stringify({ confirm: true }) });
       previousInstanceId = data.previousInstanceId || previousInstanceId;
+      recoveredFiles = Array.isArray(data.fileRecovery?.files) ? data.fileRecovery.files.length : 0;
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
     }
-    setMessage('กำลังรอโปรแกรมเปิดใหม่...');
+    setMessage(`${recoveredFiles ? `สำรองไฟล์สร้างอัตโนมัติแล้ว ${recoveredFiles} ไฟล์ • ` : ''}กำลังรอโปรแกรมเปิดใหม่...`);
     await waitForUpdatedServer(previousInstanceId);
     window.location.reload();
   } finally {

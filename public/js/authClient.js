@@ -123,23 +123,25 @@ function bindUpdateButton() {
   }
 
   button.addEventListener("click", async () => {
-    if (button.disabled || !await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะตรวจฐานข้อมูลและสำรองก่อนปรับส่วนที่ขาด กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
+    if (button.disabled || !await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะตรวจฐานข้อมูลและสำรองก่อนปรับส่วนที่ขาด รวมถึงสำรองไฟล์ที่โปรแกรมสร้างก่อนจัดการไฟล์ค้าง กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
     button.disabled = true;
     button.textContent = "⏳ กำลังอัพเดท...";
 
     try {
       const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261023-schema-update");
       let previousInstanceId = await getRuntimeInstanceId();
+      let recoveredFiles = 0;
       try {
         const response = await fetch("/api/system/update-apply", { method: "POST", headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.success === false) throw new Error(data.error || "อัพเดทไม่สำเร็จ");
         previousInstanceId = data.previousInstanceId || previousInstanceId;
+        recoveredFiles = Array.isArray(data.fileRecovery?.files) ? data.fileRecovery.files.length : 0;
       } catch (error) {
         if (!(error instanceof TypeError)) throw error;
       }
       button.textContent = "กำลังรอโปรแกรมเปิดใหม่...";
-      button.title = "กำลังตรวจว่า server ใหม่พร้อมใช้งาน";
+      button.title = `${recoveredFiles ? `สำรองไฟล์สร้างอัตโนมัติแล้ว ${recoveredFiles} ไฟล์ • ` : ''}กำลังตรวจว่า server ใหม่พร้อมใช้งาน`;
       await waitForUpdatedServer(previousInstanceId);
       window.location.reload();
     } catch (error) {

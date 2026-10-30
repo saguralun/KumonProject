@@ -8,8 +8,13 @@
 # Windows-native scripts should always check out with CRLF regardless of
 # core.autocrlf, since some tools expect it.
 *.bat text eol=crlf
+*.cmd text eol=crlf
 *.ps1 text eol=crlf
 *.vbs text eol=crlf
+
+# The standalone download embeds JavaScript after the batch header. Preserve its
+# exact CRLF bytes in Git too, so GitHub's raw download is executable by cmd.exe.
+launcher/recover-update.cmd -text whitespace=cr-at-eol
 
 # Binary files — never touch line endings in these.
 *.ico binary
