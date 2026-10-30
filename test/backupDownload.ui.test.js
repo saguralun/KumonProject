@@ -8,7 +8,7 @@ import { controlFixture } from './support/controlFixture.js';
 for (const embedded of [false, true]) {
     test(`Backup download keeps the page open, reports permission/file errors, and saves exact bytes (${embedded ? 'desktop' : 'browser'})`, {
         skip: process.env.TEST_BROWSER_UI !== '1', timeout: 30000
-    }, async () => {
+    }, async t => {
         const filename = 'fixture_only_2026-10-30_154550.backup', bytes = Buffer.from([80, 71, 68, 77, 80, 0, 255, 123, 10]);
         let failure = 404;
         const f = await controlFixture('backup', async (req, res) => {
@@ -20,6 +20,14 @@ for (const embedded of [false, true]) {
             }
         }, { embedded });
         const saved = path.join(f.downloadDirectory, filename);
+        const originalCopy = fs.copyFile.bind(fs); let failCopy = false;
+        t.mock.method(fs, 'copyFile', async (...args) => {
+            if (failCopy && String(args[1]).startsWith(f.downloadDirectory + path.sep)) throw Error('Fixture disk unavailable');
+            return originalCopy(...args);
+        });
+        if (embedded) await f.desktop.application.evaluate(({ dialog }) => {
+            dialog.showSaveDialog = async () => { throw Error('A native save dialog must never be opened'); };
+        });
         try {
             const { page } = f, link = page.locator('[data-download-filename]');
             await link.waitFor(); await link.click();
@@ -35,18 +43,14 @@ for (const embedded of [false, true]) {
             if (embedded) {
                 assert.deepEqual(await fs.readFile(saved), bytes);
                 await page.waitForFunction(() => document.getElementById('exportMessage').textContent.includes('บันทึกไฟล์') && document.getElementById('exportMessage').textContent.includes('สำเร็จ'));
-                await f.desktop.application.evaluate(({ dialog }) => { dialog.showSaveDialog = async () => ({ canceled: true }); });
-                await link.click(); await page.waitForFunction(() => document.getElementById('exportMessage').textContent.includes('ยกเลิกการดาวน์โหลด'));
-                await f.downloadsIdle(); assert.deepEqual(await fs.readFile(saved), bytes);
-                assert.equal(await link.getAttribute('aria-disabled'), null);
-                await f.desktop.application.evaluate(({ dialog }) => { dialog.showSaveDialog = async () => { throw Error('Fixture disk unavailable'); }; });
+                failCopy = true;
                 await link.click(); await page.waitForFunction(() => document.getElementById('exportMessage').textContent.includes('Fixture disk unavailable'));
                 assert.equal(await link.getAttribute('aria-disabled'), null);
-                await f.desktop.application.evaluate(({ dialog }, destination) => {
-                    dialog.showSaveDialog = async () => ({ canceled: false, filePath: destination });
-                }, saved);
+                failCopy = false;
                 await link.click(); await page.waitForFunction(() => document.getElementById('exportMessage').textContent.includes('บันทึกไฟล์') && document.getElementById('exportMessage').textContent.includes('สำเร็จ'));
                 await f.downloadsIdle();
+                assert.deepEqual(await fs.readFile(path.join(f.downloadDirectory, filename.replace('.backup', ' (1).backup'))), bytes);
+                assert.deepEqual(await fs.readFile(saved), bytes);
                 await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-backup-download-fixture.png'), fullPage: true });
                 // A saved copy must survive deletion of the controller's temp file
                 // and complete shutdown of the fixture desktop/profile.

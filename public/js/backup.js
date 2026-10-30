@@ -125,7 +125,7 @@ els.listWrap.addEventListener('click', async event => {
       throw new Error(message);
     }
     waitingForDesktop = Boolean(window.kumonDesktop);
-    setExportMessage(waitingForDesktop ? `เลือกที่บันทึกไฟล์ ${filename}` : `เริ่มดาวน์โหลด ${filename} แล้ว`, true);
+    setExportMessage(waitingForDesktop ? `กำลังบันทึก ${filename} ลง Downloads...` : `เริ่มดาวน์โหลด ${filename} แล้ว`, true);
     const anchor = document.createElement('a');
     anchor.href = link.href; anchor.download = filename;
     document.body.appendChild(anchor); anchor.click(); anchor.remove();

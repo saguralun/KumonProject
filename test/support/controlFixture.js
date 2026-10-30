@@ -24,11 +24,7 @@ export async function controlFixture(pageName, handle, { embedded = false } = {}
   const origin = `http://localhost:${server.address().port}`, root = await fs.mkdtemp(path.join(os.tmpdir(), 'kumon-controls-fixture-'));
   let desktop, browser, page;
   if (embedded) {
-    desktop = await createApplicationDesktop({ origin, profileDirectory: root, startPath: `/${pageName}.html`, configureContext: context => context.route('https://**/*', route => route.abort()) });
-    await fs.mkdir(path.join(root, 'saved-downloads'));
-    await desktop.application.evaluate(({ dialog }, directory) => {
-      dialog.showSaveDialog = async (_window, options) => ({ canceled: false, filePath: `${directory}/${options.defaultPath.split(/[\\/]/).pop()}` });
-    }, path.join(root, 'saved-downloads'));
+    desktop = await createApplicationDesktop({ origin, profileDirectory: root, downloadDirectory: path.join(root, 'saved-downloads'), startPath: `/${pageName}.html`, configureContext: context => context.route('https://**/*', route => route.abort()) });
     page = desktop.main;
   } else {
     browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });

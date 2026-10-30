@@ -27,12 +27,14 @@ not silently open another Chrome when that session is missing.
 
 Remote content stays sandboxed with Node disabled and receives no local IPC
 bridge. External popups, unexpected navigation and remote downloads remain
-blocked. Local exports open the main window's native Save As dialog. The
-controller copies its temporary download to the chosen destination before
-reporting success, so that copy survives application shutdown. Cancelled or
-failed saves are not reported as successful. Backup downloads check access and
-file availability with HEAD first, stay on the Backup page, and show the saved
-path or cancellation/error. No extra browser window is opened. Unpaid-list printing uses an
+blocked. Local exports are copied to the operating system's Downloads folder
+before reporting success, so those copies survive application shutdown. Native
+Save As dialogs are not used: Windows shell integrations can leave an invisible
+modal and disable the app. Exclusive copying allocates `(1)`, `(2)` and so on
+when a name exists, without overwriting any prior download. Failed copies are
+not reported as successful. Backup downloads check access and file availability
+with HEAD first, stay on the Backup page, and show the saved path or error.
+No extra browser window is opened. Unpaid-list printing uses an
 isolated, script-disabled print document and the normal print dialog, not a
 second application window. Receipts keep their existing printer service.
 

@@ -16,7 +16,7 @@ async function focusApplication(application) {
     await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
 }
 
-export async function createApplicationDesktop({ origin, profileDirectory, configureContext, cookieHeader, startPath = '/login.html' }) {
+export async function createApplicationDesktop({ origin, profileDirectory, configureContext, cookieHeader, startPath = '/login.html', downloadDirectory }) {
     const startUrl = new URL(startPath, origin);
     if (startUrl.origin !== origin || startUrl.username || startUrl.password) throw httpError(400, 'หน้าเริ่มต้นต้องอยู่ใน KumonDB');
     const application = await _electron.launch({ args: ['--remote-debugging-address=127.0.0.1', DESKTOP_ENTRY], cwd: process.cwd(),
@@ -32,12 +32,8 @@ export async function createApplicationDesktop({ origin, profileDirectory, confi
         });
         if (configureContext) await configureContext(context);
         if (cookieHeader) await context.addCookies([desktopAppCookie(cookieHeader, origin)]);
-        const downloads = installDesktopDownloads({ page: main, origin, choosePath: filename => application.evaluate(async ({ app, BrowserWindow, dialog }, name) => {
-            return dialog.showSaveDialog(BrowserWindow.getAllWindows()[0], {
-                title: 'บันทึกไฟล์จาก KumonDB', defaultPath: `${app.getPath('downloads')}/${name}`,
-                buttonLabel: 'บันทึก', properties: ['showOverwriteConfirmation', 'createDirectory']
-            });
-        }, filename) });
+        const directory = downloadDirectory || await application.evaluate(({ app }) => app.getPath('downloads'));
+        const downloads = installDesktopDownloads({ page: main, origin, directory });
         await main.goto(startUrl.href, { waitUntil: 'domcontentloaded' });
         const accounts = new Map();
         const desktop = { application, context, main, origin,

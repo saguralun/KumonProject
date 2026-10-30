@@ -32,7 +32,7 @@ test('One main window supports login, regular pages, the controlled KSIS view, i
     const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
     const origin = `http://localhost:${server.address().port}`;
     try {
-        desktop = await createApplicationDesktop({ origin, profileDirectory: path.join(root, 'app'), configureContext: (context) => context.route('https://kao.ksis.kumon.com/**', (route) => {
+        desktop = await createApplicationDesktop({ origin, profileDirectory: path.join(root, 'app'), downloadDirectory: path.join(root, 'saved-downloads'), configureContext: (context) => context.route('https://kao.ksis.kumon.com/**', (route) => {
             remoteLoads++;
             return route.fulfill({ contentType: 'text/html', body: '<style>body{background:#e8f7ed;font:24px Arial;padding:24px}</style><h1>KSIS Fixture</h1><input id="draft" value="unsaved fixture"><script>window.fixtureMemory="alive"</script>' });
         }) });
@@ -96,14 +96,11 @@ test('One main window supports login, regular pages, the controlled KSIS view, i
         assert.equal(await page.evaluate(() => localStorage.getItem('fixtureAccount')), 'first');
         assert.equal(await page.locator('#draft').inputValue(), 'fixture pending edit');
         const downloading = main.waitForEvent('download');
-        await application.evaluate(({ dialog }, destination) => {
-            dialog.showSaveDialog = async () => ({ canceled: false, filePath: destination });
-        }, path.join(root, 'chosen-fixture.csv'));
         await main.evaluate(() => { const link = document.createElement('a'); link.href = '/fixture-download.csv'; link.download = 'fixture-only.csv'; link.click(); });
         const download = await downloading;
         assert.equal(download.suggestedFilename(), 'fixture-only.csv');
         await desktop.downloadsIdle();
-        assert.equal(await fs.readFile(path.join(root, 'chosen-fixture.csv'), 'utf8'), 'test,value\n1,2\n');
+        assert.equal(await fs.readFile(path.join(root, 'saved-downloads', 'fixture-only.csv'), 'utf8'), 'test,value\n1,2\n');
         assert.equal(await download.failure(), null); await download.delete();
         // Replace the native print operation: no real printer or print dialog is used.
         await application.evaluate(({ BrowserWindow }) => {
