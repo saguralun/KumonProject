@@ -266,6 +266,7 @@ html[data-role="admin"] [data-admin-only] {
 }
 
 .form-message {
+  overflow-wrap: anywhere;
   margin-top: 10px;
   border: 1px solid #fecaca;
   border-radius: 8px;
@@ -319,6 +320,11 @@ tbody tr:hover {
   min-height: 28px;
   padding: 4px 9px;
   font-size: 12px;
+}
+
+.download-button[aria-disabled="true"] {
+  cursor: wait;
+  opacity: .65;
 }
 
 .empty-state {

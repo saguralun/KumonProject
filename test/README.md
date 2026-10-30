@@ -82,7 +82,10 @@ restart-helper test, not necessary for this suite's application regression check
   browser/Electron workflow tests for Stock Receive/Cut, Opening Schedule,
   Backup/Restore, permissions, table paging, Progress subject races, CD/history,
   Forecast views and valid downloadable Report/Forecast Excel workbooks. The
-  page matrix and operational limits are in `CONTROLS-AUDIT-2026-10-23.md`.
+  desktop download fixtures use a mocked save dialog and real synthetic file
+  copies, verify exact backup bytes after desktop shutdown, and cover cancelled
+  dialogs, failed saves, missing files and permission errors without a live dump.
+  The page matrix and operational limits are in `CONTROLS-AUDIT-2026-10-23.md`.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

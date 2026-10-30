@@ -18,6 +18,7 @@ const setStatus = createStatusSetter(els.statusLine);
 // confirm field is checked against this on every keystroke.
 let expectedDbName = null;
 let restoring = false, backingUp = false;
+const downloading = new Set();
 
 function setExportMessage(text, isSuccess = false) {
   if (!text) {
@@ -76,7 +77,7 @@ function renderBackupList(backups) {
             <td>${formatBytes(backup.sizeBytes)}</td>
             <td>${formatDate(backup.createdAt)}</td>
             <td>
-              <a class="download-button" href="/api/backup/download/${encodeURIComponent(backup.filename)}">⬇️ ดาวน์โหลด</a>
+              <a class="download-button" download="${escapeHtml(backup.filename)}" data-download-filename="${escapeHtml(backup.filename)}" href="/api/backup/download/${encodeURIComponent(backup.filename)}">⬇️ ดาวน์โหลด</a>
             </td>
           </tr>
         `).join("")}
@@ -84,6 +85,56 @@ function renderBackupList(backups) {
     </table>
   `;
 }
+
+function finishDownload(filename) {
+  downloading.delete(filename);
+  for (const link of els.listWrap.querySelectorAll('[data-download-filename]')) {
+    if (link.dataset.downloadFilename === filename) link.removeAttribute('aria-disabled');
+  }
+}
+
+window.addEventListener('kumon:download-state', event => {
+  const state = event.detail;
+  if (!state || !downloading.has(state.filename)) return;
+  if (state.status === 'saved') {
+    finishDownload(state.filename);
+    setExportMessage(`บันทึกไฟล์ ${state.filename} สำเร็จ • ${state.path}`, true);
+  } else if (state.status === 'cancelled' || state.status === 'failed') {
+    finishDownload(state.filename);
+    setExportMessage(state.status === 'cancelled' ? 'ยกเลิกการดาวน์โหลดแล้ว' : `บันทึกไฟล์ไม่สำเร็จ: ${state.error}`);
+  }
+});
+
+els.listWrap.addEventListener('click', async event => {
+  const link = event.target.closest('[data-download-filename]');
+  if (!link) return;
+  event.preventDefault();
+  const filename = link.dataset.downloadFilename;
+  if (downloading.has(filename)) return;
+  downloading.add(filename); link.setAttribute('aria-disabled', 'true');
+  setExportMessage(`กำลังเตรียมดาวน์โหลด ${filename}...`);
+  let waitingForDesktop = false;
+  try {
+    // Validate permission/file availability without loading a potentially large
+    // database archive into renderer memory or navigating away on JSON errors.
+    const response = await fetch(link.href, { method: 'HEAD', credentials: 'same-origin', cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!response.ok || response.redirected || /(?:text\/html|application\/json)/i.test(response.headers.get('content-type') || '')) {
+      const message = response.status === 404 ? 'ไม่พบไฟล์สำรองนี้ กรุณาโหลดรายการใหม่'
+        : [401, 403].includes(response.status) || response.redirected ? 'กรุณาเข้าสู่ระบบด้วยบัญชีที่มีสิทธิ์ดาวน์โหลดไฟล์สำรอง'
+        : `ดาวน์โหลดไฟล์สำรองไม่สำเร็จ (${response.status})`;
+      throw new Error(message);
+    }
+    waitingForDesktop = Boolean(window.kumonDesktop);
+    setExportMessage(waitingForDesktop ? `เลือกที่บันทึกไฟล์ ${filename}` : `เริ่มดาวน์โหลด ${filename} แล้ว`, true);
+    const anchor = document.createElement('a');
+    anchor.href = link.href; anchor.download = filename;
+    document.body.appendChild(anchor); anchor.click(); anchor.remove();
+  } catch (error) {
+    waitingForDesktop = false; setExportMessage(error.name === 'TimeoutError' ? 'ตรวจไฟล์ดาวน์โหลดใช้เวลานานเกินไป กรุณาลองใหม่' : error.message);
+  } finally {
+    if (!waitingForDesktop) finishDownload(filename);
+  }
+});
 
 async function loadBackups() {
   try {

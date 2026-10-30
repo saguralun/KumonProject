@@ -2,6 +2,7 @@ import path from 'node:path';
 import { _electron } from 'playwright-core';
 import { parse } from 'cookie';
 import { httpError } from './httpError.js';
+import { installDesktopDownloads } from './desktopDownloadService.js';
 
 const REPORT_URL = 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid';
 const DESKTOP_ENTRY = path.resolve('desktop/main.cjs');
@@ -31,9 +32,16 @@ export async function createApplicationDesktop({ origin, profileDirectory, confi
         });
         if (configureContext) await configureContext(context);
         if (cookieHeader) await context.addCookies([desktopAppCookie(cookieHeader, origin)]);
+        const downloads = installDesktopDownloads({ page: main, origin, choosePath: filename => application.evaluate(async ({ app, BrowserWindow, dialog }, name) => {
+            return dialog.showSaveDialog(BrowserWindow.getAllWindows()[0], {
+                title: 'บันทึกไฟล์จาก KumonDB', defaultPath: `${app.getPath('downloads')}/${name}`,
+                buttonLabel: 'บันทึก', properties: ['showOverwriteConfirmation', 'createDirectory']
+            });
+        }, filename) });
         await main.goto(startUrl.href, { waitUntil: 'domcontentloaded' });
         const accounts = new Map();
         const desktop = { application, context, main, origin,
+            downloadsIdle: () => downloads.waitForIdle(),
             focus: () => focusApplication(application),
             async assertAppSession(header) {
                 const expected = desktopAppCookie(header, origin).value;

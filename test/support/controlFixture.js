@@ -25,6 +25,10 @@ export async function controlFixture(pageName, handle, { embedded = false } = {}
   let desktop, browser, page;
   if (embedded) {
     desktop = await createApplicationDesktop({ origin, profileDirectory: root, startPath: `/${pageName}.html`, configureContext: context => context.route('https://**/*', route => route.abort()) });
+    await fs.mkdir(path.join(root, 'saved-downloads'));
+    await desktop.application.evaluate(({ dialog }, directory) => {
+      dialog.showSaveDialog = async (_window, options) => ({ canceled: false, filePath: `${directory}/${options.defaultPath.split(/[\\/]/).pop()}` });
+    }, path.join(root, 'saved-downloads'));
     page = desktop.main;
   } else {
     browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
@@ -35,8 +39,9 @@ export async function controlFixture(pageName, handle, { embedded = false } = {}
   page.on('pageerror', error => errors.push(error.message));
   page.setDefaultTimeout(5000);
   await page.evaluate(() => { window.confirm = () => { throw Error('Native confirmation forbidden'); }; window.prompt = () => { throw Error('Native prompt forbidden'); }; });
-  return { page, origin, requests, errors,
-    writes: () => requests.filter(request => request.method !== 'GET'),
+  return { page, origin, requests, errors, desktop,
+    downloadsIdle: () => desktop?.downloadsIdle(), downloadDirectory: path.join(root, 'saved-downloads'),
+    writes: () => requests.filter(request => !['GET', 'HEAD'].includes(request.method)),
     choose: async accepted => { await page.locator(accepted ? '#appDialogConfirm' : '#appDialogCancel').click(); },
     close: async () => {
       await desktop?.application.close(); await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));

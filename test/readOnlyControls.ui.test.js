@@ -63,6 +63,7 @@ for (const embedded of [false, true]) {
       const waiting = f.page.waitForEvent('download'); await f.page.locator(`#${id}`).click(); const item = await waiting;
       const buffer = await fs.readFile(await item.path()); assert.ok(buffer.length > 0);
       if (excel) { const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(buffer); assert.ok(workbook.worksheets.length > 0); }
+      await f.downloadsIdle();
       await item.delete();
     };
     try {

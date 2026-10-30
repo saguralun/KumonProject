@@ -82,7 +82,7 @@ for (const embedded of [false, true]) {
       const { page } = f;
       await page.locator('#backupListWrap a').waitFor();
       const downloading = page.waitForEvent('download'); await page.locator('#backupListWrap a').click(); const download = await downloading;
-      assert.equal(download.suggestedFilename(), 'fixture.backup'); await download.delete();
+      assert.equal(download.suggestedFilename(), 'fixture.backup'); await f.downloadsIdle(); await download.delete();
       await page.locator('#runBackupButton').click(); await page.waitForFunction(() => document.getElementById('exportMessage').textContent.includes('สำเร็จ'));
       await page.locator('#importFile').setInputFiles({ name: 'fixture.backup', mimeType: 'application/octet-stream', buffer: Buffer.from('synthetic fixture only') });
       await page.locator('#importConfirmText').fill('wrong'); assert.equal(await page.locator('#importSubmit').isDisabled(), true);
