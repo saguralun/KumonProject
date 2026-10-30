@@ -34,11 +34,12 @@ test('Login update requires confirmation but no credentials, recovers errors and
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
         await page.locator('#loginUpdateButton').click();
         await page.locator('#appActionDialog').waitFor();
-        assert.match(await page.locator('#appDialogMessage').textContent(), /สำรองก่อนปรับส่วนที่ขาด/);
+        assert.match(await page.locator('#appDialogMessage').textContent(), /สำรองไฟล์ที่โปรแกรมสร้าง/);
+        assert.doesNotMatch(await page.locator('#appDialogMessage').textContent(), /ตรวจฐานข้อมูล|ปรับส่วนที่ขาด/);
         assert.equal(await page.locator('#appDialogMessage').evaluate(element => element.scrollWidth <= element.clientWidth), true);
         const dialogBounds = await page.locator('#appActionDialog').boundingBox();
         assert.ok(dialogBounds.x >= 0 && dialogBounds.y >= 0 && dialogBounds.x + dialogBounds.width <= 390 && dialogBounds.y + dialogBounds.height <= 844);
-        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-schema-update-confirmation-mobile.png'), fullPage: true });
+        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-update-confirmation-mobile.png'), fullPage: true });
         await page.locator('#appDialogCancel').click();
         assert.equal(updates.length, 0);
         confirm = true; await page.locator('#loginUpdateButton').click(); await page.locator('#appDialogConfirm').click();

@@ -13,8 +13,7 @@ import { saveWorksheetEntries } from '../services/worksheetService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
 import { applyEnrollmentStatusAction } from '../services/studentService.js';
-import { preparePaymentDatabase, paymentDatabaseStatus, prepareApplicationDatabase } from '../services/databaseUpgradeService.js';
-import { readSchemaSnapshot, inspectApplicationSchema, loadSchemaContract } from '../services/databaseSchema.js';
+import { paymentDatabaseStatus } from '../services/databaseStatusService.js';
 
 const run = promisify(execFile);
 const enabled = process.platform === 'win32' && process.env.TEST_ISOLATED_PG === '1';
@@ -49,86 +48,13 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
         for (const name of ['001_create_master_tables.sql', '002_insert_master_data.sql', '003_create_transaction_tables.sql']) {
             await database.query(await fs.readFile(path.join('database', name), 'utf8'));
         }
-        if (process.env.TEST_EXPORT_SCHEMA_CONTRACT === '1') {
-            // Generated only from the verified disposable cluster, never from this machine's live data.
-            const contract = await readSchemaSnapshot(database);
-            // Preserve the original IN syntax: round-tripping the deparsed ANY casts changes its catalog representation.
-            contract.tables.find(table => table.name === 'worksheet_forecast_average').constraints
-                .find(item => item.name === 'ck_worksheet_forecast_average_scope').createDefinition = "CHECK (source_scope IN ('2Y', 'ALL'))";
-            await fs.writeFile('database/schema-contract.json', JSON.stringify(contract, null, 2) + '\n');
-            return;
-        }
-        await t.test('The approved schema contract matches the current canonical schema without branch data', async () => {
-            const expected = await loadSchemaContract(), actual = await readSchemaSnapshot(database);
-            assert.equal((await inspectApplicationSchema(database)).ready, true);
-            // Compare the remaining catalog exactly; the finite scope check may
-            // be deparsed differently by supported PostgreSQL releases.
-            const scope = snapshot => snapshot.tables.find(table => table.name === 'worksheet_forecast_average').constraints.find(item => item.name === 'ck_worksheet_forecast_average_scope');
-            scope(expected).definition = scope(actual).definition;
-            // PG18 additionally catalogs NOT NULL constraints; nullability is
-            // already compared exactly in the column metadata on both releases.
-            for (const table of actual.tables) table.constraints = table.constraints.filter(item => item.type !== 'n');
-            for (const table of expected.tables) for (const constraint of table.constraints) delete constraint.createDefinition;
-            for (const snapshot of [expected, actual]) for (const fn of snapshot.functions) fn.definition = fn.definition.replace(/\s+/g, ' ').trim();
-            assert.deepEqual(actual, expected);
-        });
-        await t.test('Restored equivalent scope checks need no DDL or backup; genuinely different values remain blocked with original rows intact', async () => {
-            const constraint = 'ck_worksheet_forecast_average_scope';
-            const row = (await database.query(`INSERT INTO kumon.worksheet_forecast_average
-                (subject_id,level_master_id,worksheet_packet_no,source_scope,student_count)
-                SELECT subject_id,level_master_id,1,'2Y',7 FROM kumon.level_master ORDER BY level_master_id LIMIT 1 RETURNING *`)).rows[0];
-            const change = async definition => database.query(`ALTER TABLE kumon.worksheet_forecast_average DROP CONSTRAINT ${constraint}, ADD CONSTRAINT ${constraint} ${definition}`);
-            const unchanged = async () => {
-                assert.deepEqual((await database.query('SELECT * FROM kumon.worksheet_forecast_average WHERE worksheet_forecast_average_id=$1', [row.worksheet_forecast_average_id])).rows[0], row);
-            };
-            try {
-                for (const definition of [
-                    "CHECK (source_scope::text = ANY (ARRAY['2Y'::text, 'ALL'::text]))",
-                    "CHECK (source_scope IN ('ALL', '2Y'))",
-                    "CHECK (((source_scope)::text = ANY ((ARRAY['2Y'::varchar, 'ALL'::varchar])::text[])))"
-                ]) {
-                    await change(definition);
-                    const before = await readSchemaSnapshot(database);
-                    const result = await prepareApplicationDatabase({ database, backup: async () => { throw Error('Equivalent constraints must not trigger a backup or repair'); }, report: async () => {} });
-                    assert.deepEqual(result, { ready: true, applied: false, changes: [] });
-                    assert.deepEqual(await readSchemaSnapshot(database), before); await unchanged();
-                }
-                await change("CHECK (source_scope IN ('2Y', 'ALL', 'OTHER'))");
-                const before = await readSchemaSnapshot(database);
-                await assert.rejects(prepareApplicationDatabase({ database, backup: async () => { throw Error('Conflicts must stop before backup'); }, report: async () => {} }), error => error.statusCode === 409 && error.message.includes('OTHER') && error.message.includes('คาดหวัง'));
-                assert.deepEqual(await readSchemaSnapshot(database), before); await unchanged();
-            } finally {
-                await change("CHECK (source_scope IN ('2Y', 'ALL'))");
-                await database.query('DELETE FROM kumon.worksheet_forecast_average WHERE worksheet_forecast_average_id=$1', [row.worksheet_forecast_average_id]);
-            }
-        });
         const migration = await fs.readFile('database/004_payment_status_provenance.sql', 'utf8');
         await t.test('Payment migration upgrades a legacy schema and is safe to apply twice', async () => {
             await database.query('ALTER TABLE kumon.billing_detail DROP COLUMN inserted_status_history_id, DROP COLUMN payment_status_updated_at');
             await database.query(migration); await database.query(migration);
             const columns = await database.query(`SELECT column_name FROM information_schema.columns WHERE table_schema='kumon' AND table_name='billing_detail' AND column_name IN ('inserted_status_history_id','payment_status_updated_at')`);
             assert.equal(columns.rows.length, 2);
-        });
-        await t.test('Admin schema preparation refuses failed backups, saves a real disposable dump before DDL and is idempotent', async () => {
-            await database.query('ALTER TABLE kumon.billing_detail DROP COLUMN inserted_status_history_id, DROP COLUMN payment_status_updated_at');
-            await assert.rejects(preparePaymentDatabase({ database, backup: async () => { throw new Error('fixture backup failed'); } }), /fixture backup failed/);
-            assert.equal((await paymentDatabaseStatus(database)).ready, false);
-            await assert.rejects(preparePaymentDatabase({ database, backup: async () => ({ filename: 'empty.backup', sizeBytes: 0 }) }), { statusCode: 500 });
-            assert.equal((await paymentDatabaseStatus(database)).ready, false);
-            let backups = 0;
-            const snapshot = path.join(root, 'before-payment-upgrade.backup');
-            const backup = async () => {
-                backups++;
-                assert.equal((await paymentDatabaseStatus(database)).ready, false);
-                await run(path.join(bin, 'pg_dump.exe'), ['-h', '127.0.0.1', '-p', String(port), '-U', username, '-d', 'postgres', '-Fc', '-f', snapshot], { env: environment, windowsHide: true, timeout: 30000 });
-                return { filename: path.basename(snapshot), sizeBytes: (await fs.stat(snapshot)).size };
-            };
-            const result = await preparePaymentDatabase({ database, backup });
-            assert.equal(result.ready, true); assert.equal(result.applied, true); assert.equal(backups, 1);
-            const listing = await run(path.join(bin, 'pg_restore.exe'), ['--list', snapshot], { env: environment, windowsHide: true, timeout: 10000 });
-            assert.match(listing.stdout, /TABLE DATA kumon billing_detail/);
-            assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.billing')).rows[0].n, 0);
-            assert.equal((await preparePaymentDatabase({ database, backup })).applied, false); assert.equal(backups, 1);
+            assert.equal((await paymentDatabaseStatus(database)).ready, true);
         });
         const statuses = new Map((await database.query('SELECT status_code,status_id FROM kumon.status_master')).rows.map((row) => [row.status_code, row.status_id]));
         const ws = (await database.query(`SELECT wm.worksheet_master_id,wm.worksheet_no,wm.level_master_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id WHERE lm.subject_id=1 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1`)).rows[0];
@@ -260,68 +186,6 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             await database.query(`CREATE OR REPLACE FUNCTION restore_probe.allowed(integer) RETURNS boolean LANGUAGE sql IMMUTABLE AS 'SELECT TRUE'; INSERT INTO restore_probe.items VALUES(2);`);
             await assert.rejects(restoreBackupFile({ executable: path.join(bin, 'pg_restore.exe'), host: '127.0.0.1', port, user: username, dbName: 'postgres', tempFile: archive, env: environment }));
             assert.deepEqual((await database.query('SELECT id FROM restore_probe.items ORDER BY id')).rows.map((row) => row.id), [1, 2]);
-        });
-        await t.test('Whole-app upgrades repair missing structures after a real backup, preserve all existing rows and are idempotent', async () => {
-            assert.equal((await inspectApplicationSchema(database)).ready, true);
-            const before = (await database.query(`SELECT
-                (SELECT jsonb_agg(to_jsonb(t) ORDER BY t.student_id) FROM student t) AS students,
-                (SELECT jsonb_agg(to_jsonb(t) ORDER BY t.billing_id) FROM billing t) AS receipts,
-                (SELECT jsonb_agg(to_jsonb(t) ORDER BY t.enrollment_id) FROM enrollment t) AS enrollments`)).rows[0];
-            await database.query(`ALTER TABLE student DROP COLUMN remark;
-                ALTER TABLE billing_detail DROP COLUMN payment_status_updated_at;
-                DROP TABLE worksheet_forecast_average;
-                DROP TABLE stock_receive;
-                DROP INDEX idx_session_expire;
-                DROP FUNCTION fn_get_level_master_id(varchar,varchar);
-                ALTER TABLE stock ALTER COLUMN quantity DROP DEFAULT;
-                ALTER TABLE student DROP CONSTRAINT fk_student_gender;`);
-            const broken = await inspectApplicationSchema(database);
-            assert.deepEqual(broken.blockers, []); assert.equal(broken.ready, false);
-            const report = async () => {};
-            await assert.rejects(prepareApplicationDatabase({ database, report, backup: async () => { throw Error('fixture whole backup failed'); } }), /fixture whole backup failed/);
-            assert.equal((await inspectApplicationSchema(database)).ready, false);
-            let backups = 0;
-            const archive = path.join(root, 'before-whole-upgrade.backup');
-            const backup = async () => {
-                backups++;
-                assert.equal((await inspectApplicationSchema(database)).ready, false);
-                await run(path.join(bin, 'pg_dump.exe'), ['-h','127.0.0.1','-p',String(port),'-U',username,'-d','postgres','-Fc','-f',archive], { env: environment, windowsHide: true });
-                return { filename: path.basename(archive), sizeBytes: (await fs.stat(archive)).size };
-            };
-            const result = await prepareApplicationDatabase({ database, backup, report });
-            assert.equal(result.applied, true); assert.equal(result.ready, true); assert.equal(backups, 1);
-            assert.ok(result.changes.some(item => item.kind === 'function')); assert.ok(result.changes.some(item => item.kind === 'table'));
-            assert.match((await run(path.join(bin, 'pg_restore.exe'), ['--list',archive], { windowsHide: true })).stdout, /TABLE DATA kumon student/);
-            assert.equal((await inspectApplicationSchema(database)).ready, true);
-            assert.equal((await prepareApplicationDatabase({ database, backup, report })).applied, false); assert.equal(backups, 1);
-            const after = (await database.query(`SELECT
-                (SELECT jsonb_agg(to_jsonb(t) ORDER BY t.student_id) FROM student t) AS students,
-                (SELECT jsonb_agg(to_jsonb(t) ORDER BY t.billing_id) FROM billing t) AS receipts,
-                (SELECT jsonb_agg(to_jsonb(t) ORDER BY t.enrollment_id) FROM enrollment t) AS enrollments`)).rows[0];
-            assert.deepEqual(after, before);
-        });
-        await t.test('Whole-app upgrades reject unknown historical values, type conflicts and competing upgrades without changing data', async () => {
-            const report = async () => {}, backup = async () => assert.fail('Unsafe structure must stop before backup or DDL');
-            await database.query('ALTER TABLE student DROP COLUMN first_name');
-            await assert.rejects(prepareApplicationDatabase({ database, backup, report }), /first_name/);
-            assert.equal((await database.query(`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_schema='kumon' AND table_name='student' AND column_name='first_name'`)).rows[0].n, 0);
-            await database.query("ALTER TABLE student ADD COLUMN first_name varchar(100) NOT NULL DEFAULT 'Fixture'; ALTER TABLE student ALTER COLUMN first_name DROP DEFAULT");
-            await database.query('ALTER TABLE student ALTER COLUMN mobile TYPE varchar(30)');
-            await assert.rejects(prepareApplicationDatabase({ database, backup, report }), /mobile/);
-            await database.query('ALTER TABLE student ALTER COLUMN mobile TYPE varchar(20)');
-            const holder = await database.connect();
-            try {
-                await holder.query('SELECT pg_advisory_lock(76401,2)');
-                await assert.rejects(prepareApplicationDatabase({ database, backup, report }), { statusCode: 409 });
-            } finally { await holder.query('SELECT pg_advisory_unlock(76401,2)'); holder.release(); }
-        });
-        await t.test('A failing added uniqueness constraint rolls back every earlier whole-app repair and retains duplicate rows for manual review', async () => {
-            await database.query(`ALTER TABLE student DROP COLUMN remark; ALTER TABLE stock DROP CONSTRAINT uq_stock;
-                INSERT INTO stock(stock_type_id,master_id,quantity) SELECT stock_type_id,master_id,quantity FROM stock LIMIT 1`);
-            const count = (await database.query('SELECT count(*)::int AS n FROM stock')).rows[0].n;
-            await assert.rejects(prepareApplicationDatabase({ database, report: async () => {}, backup: async () => ({ filename: 'fixture.backup', sizeBytes: 10 }) }), /unique|ซ้ำ|uq_stock/i);
-            assert.equal((await database.query(`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_schema='kumon' AND table_name='student' AND column_name='remark'`)).rows[0].n, 0);
-            assert.equal((await database.query('SELECT count(*)::int AS n FROM stock')).rows[0].n, count);
         });
     } finally {
         await database?.end();

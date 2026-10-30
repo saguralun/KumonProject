@@ -28,7 +28,6 @@ const els = {
     receiptMessage: document.getElementById('receiptMessage'),
     receiptConfirmDialog: document.getElementById('receiptConfirmDialog'),
     receiptConfirmMessage: document.getElementById('receiptConfirmMessage'),
-    receiptPrepareDatabase: document.getElementById('receiptPrepareDatabase'),
     receiptModalSubtitle: document.getElementById("receiptModalSubtitle"),
     receiptClose: document.getElementById("receiptClose"),
     receiptPaymentControls: document.getElementById("receiptPaymentControls"),
@@ -47,7 +46,6 @@ const state = {
     receipt: null,
     paymentMethods: [],
     isReceivingPayment: false,
-    isPreparingDatabase: false,
     isCancellingPayment: false,
     isPrintingReceipt: false,
     receiptPrintUsed: false,
@@ -559,7 +557,7 @@ function renderReceipt(receipt) {
     els.receiptPaymentControls.classList.toggle("hidden", hasBilling);
     els.receiptSubjectPicker.classList.toggle("hidden", hasBilling);
     els.receiptReceivePayment.classList.toggle("hidden", hasBilling);
-    els.receiptReceivePayment.disabled = hasBilling || state.isReceivingPayment || state.isPreparingDatabase || !receipt.receiptDetails?.length;
+    els.receiptReceivePayment.disabled = hasBilling || state.isReceivingPayment || !receipt.receiptDetails?.length;
     els.receiptReceivePayment.textContent = receipt.billingId ? "✅ รับเงินแล้ว" : "💵 รับเงิน";
     renderReceiptSubjectPicker(receipt);
     const { name: studentNamePart, nickname: studentNicknamePart } = splitNickname(receipt.studentName);
@@ -742,7 +740,7 @@ function confirmReceiptAction(message) {
 }
 
 async function receivePayment() {
-    if (!state.selectedRow || !state.receipt || state.isReceivingPayment || state.isPreparingDatabase) {
+    if (!state.selectedRow || !state.receipt || state.isReceivingPayment) {
         return;
     }
 
@@ -768,7 +766,7 @@ async function receivePayment() {
     if (!await confirmReceiptAction(confirmMessage)) {
         return;
     }
-    if (state.isReceivingPayment || state.isPreparingDatabase) return;
+    if (state.isReceivingPayment) return;
     if (state.receipt !== receipt || state.selectedRow !== selectedRow
         || String(payload.paymentMethodId) !== String(els.receiptPaymentMethod.value || receipt.paymentMethodId)
         || payload.selectedEnrollmentIds.join(',') !== selectedReceiptEnrollmentIds().join(',')) {
@@ -1100,20 +1098,6 @@ async function printUnpaidList() {
 }
 
 function bindEvents() {
-    els.receiptPrepareDatabase.addEventListener('click', async () => {
-        if (els.receiptPrepareDatabase.disabled || !await confirmReceiptAction('สำรองฐานข้อมูลและเตรียมโครงสร้างใบเสร็จใช่ไหม? ไม่รับเงิน ไม่สร้างบิล และไม่แก้ยอดเดิม')) return;
-        els.receiptPrepareDatabase.disabled = true;
-        state.isPreparingDatabase = true;
-        if (state.receipt) renderReceipt(state.receipt);
-        setReceiptMessage('กำลังสำรองและเตรียมฐานข้อมูล กรุณารอ...', 'neutral');
-        try {
-            const result = await requestJson('/api/system/database/prepare', { method: 'POST', body: JSON.stringify({ confirm: true }) });
-            if (!result.ready) throw new Error('ฐานข้อมูลยังไม่พร้อม ยังไม่ได้รับเงิน');
-            els.receiptPrepareDatabase.classList.add('hidden');
-            setReceiptMessage(`ฐานข้อมูลพร้อมแล้ว${result.backup ? ` • สำรอง ${result.backup}` : ''} • ยังไม่ได้รับเงิน กรุณาตรวจวิชาและกดรับเงินอีกครั้ง`, 'success');
-        } catch (error) { setReceiptMessage(error.message); }
-        finally { state.isPreparingDatabase = false; els.receiptPrepareDatabase.disabled = false; if (state.receipt) renderReceipt(state.receipt); }
-    });
     [
         els.billingMonth,
         els.billingYear
@@ -1191,9 +1175,6 @@ function init() {
     syncQuickFilterButtons();
     loadPaymentStatus();
     checkPrinterStatus();
-    void requestJson('/api/system/database/status').then((status) => {
-        els.receiptPrepareDatabase.classList.toggle('hidden', status.required !== true);
-    }).catch(() => {});
 }
 
 init();

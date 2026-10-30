@@ -54,16 +54,13 @@ restart-helper test, not necessary for this suite's application regression check
   offline npm fixture checks that deployment does not dirty its lockfile. The
   standalone Windows recovery download runs against a fake update API only;
   see `launcher/UPDATE-RECOVERY.md` for its one-time use on older installations.
-- Whole-application schema upgrades: the canonical contract, fresh readable
-  backup before additive DDL, post-check, idempotence, original-row preservation,
-  unsafe-change rejection, competing upgrades and complete rollback. Windows
-  bridge fixtures prove failed preparation leaves their original server running
-  and successful preparation permits only their isolated replacement server.
-  Forecast CHECK fixtures cover IN/ANY and text/varchar dump/restore variants
-  without any repair, preserve existing rows, and reject genuinely changed
-  allowed values. Run the isolated fixture with `TEST_PG_BIN` pointing to each
-  supported installed PostgreSQL release to check its catalog representation.
-  See `database/UPGRADES.md` for operational limits and contract regeneration.
+- Code-only updates: complete injected pull/install/restart flow without a
+  database connection, inert legacy entry points for the first transition,
+  removed preparation API, ignored historical schema reports and retry after
+  installation/restart failure. Windows fixtures restart only their disposable
+  server despite a poisoned legacy preparation script, and refuse a changed
+  runtime identity. Manual receipt migration fixtures and read-only Payment
+  safety guards remain covered; updates never apply DDL.
 - Atomic restore, including a real failed COPY on the disposable database.
 - Student selection during saves, stale responses and visible save failures.
 - Shared header menu on all 16 workspaces at desktop/mobile widths: no edge

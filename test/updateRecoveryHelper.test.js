@@ -84,7 +84,7 @@ for (const status of [401, 403]) {
         const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
         try {
             await fs.writeFile(path.join(f.repo, '.env'), `PORT=${server.address().port}`);
-            await assert.rejects(f.run('--yes'), error => error.stderr.includes('บัญชี Admin') && error.stderr.includes('ขั้นตอนเตรียมฐานข้อมูลยังไม่ได้เริ่ม') && error.stderr.includes(`(${status})`));
+            await assert.rejects(f.run('--yes'), error => error.stderr.includes('บัญชี Admin') && error.stderr.includes('ยังไม่ได้อัปเดตโปรแกรม') && error.stderr.includes(`(${status})`));
             assert.equal(calls, 1); assert.equal(await f.git('status', '--porcelain'), '');
             assert.equal(await fs.readFile(path.join(f.repo, 'server.js'), 'utf8'), '// fixture original source\n');
         } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }

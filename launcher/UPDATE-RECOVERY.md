@@ -2,8 +2,8 @@
 
 The update action checks pending Git files before downloading a release. Older
 versions refused every pending file, including their own untracked
-`logs/database-upgrade-latest.json`. That report is written by database
-preparation; creating the report does not itself change a table or a column.
+`logs/database-upgrade-latest.json`. Older database preparation wrote that
+report; creating the report did not itself change a table or a column.
 
 The updater now inspects each pending path before pulling code:
 
@@ -26,8 +26,8 @@ Tracked generated files are restored only at their verified paths. Untracked
 generated files stay in place and receive exact local Git exclude entries so
 older update handlers can continue. No blanket stash, clean or hard reset is
 used. Environment credentials and application data are not copied into this
-file archive. Database backup remains a separate verified step in the existing
-[database update flow](../database/UPGRADES.md).
+file archive. Normal database Backup remains available separately. Program
+updates no longer inspect or alter schema; see [database structures](../database/UPGRADES.md).
 
 Future log output is ignored by the committed `logs/` rule. Deployment installs
 use `npm install --no-save` to avoid changing the versioned lockfile.
@@ -43,8 +43,9 @@ application/KSIS work before confirming its update dialog.
 The helper embeds the same recovery implementation and needs no npm packages.
 It inspects first, asks before making changes, backs up only verified generated
 files, then calls the running application's existing confirmed update action
-once. That action downloads the release, installs dependencies, prepares the
-database safely and restarts. The helper verifies that a new server instance
+once. That action downloads the release, installs dependencies and restarts.
+Retired preparation entry points only bridge the older running handler and
+perform no database work. The helper verifies that a new server instance
 responds. It does not perform a SQL migration, payment or KSIS write itself.
 Unknown changes remain blocked and named for review.
 

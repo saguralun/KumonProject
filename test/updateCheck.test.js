@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process';
 
 test('Version checks share a bounded cache and retry failures without installing or changing data', async t => {
   let now = 0, calls = 0, valid = true;
-    t.mock.method(fs, 'readFile', async () => '{"ready":true}');
+  t.mock.method(fs, 'readFile', async () => assert.fail('Version checks must not read database reports'));
   t.mock.method(Date, 'now', () => now);
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls++;
@@ -24,14 +24,14 @@ test('Version checks share a bounded cache and retry failures without installing
   assert.equal((await checkForUpdate()).checked, true); assert.equal(calls, 3);
 });
 
-test('A failed database preparation keeps Update available even when the pulled commit is current', async t => {
+test('Historical failed database reports cannot block a current version', async t => {
     const { checkForUpdate: freshCheck } = await import('../services/updateService.js?retry-fixture');
     const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim();
-    let ready = false;
-    t.mock.method(fs, 'readFile', async () => JSON.stringify({ ready }));
+    let reads = 0;
+    t.mock.method(fs, 'readFile', async () => { reads++; return JSON.stringify({ ready: false, error: 'Historical schema error' }); });
     t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({ sha: head, commit: { message: 'Current version' } }) }));
-    const blocked = await freshCheck();
-    assert.equal(blocked.checked, true); assert.equal(blocked.upToDate, false); assert.equal(blocked.preparationRequired, true);
-    ready = true;
-    const prepared = await freshCheck(); assert.equal(prepared.upToDate, true); assert.equal(prepared.preparationRequired, false);
+    const current = await freshCheck();
+    assert.equal(current.checked, true); assert.equal(current.upToDate, true);
+    assert.equal(current.retryRequired, false); assert.equal(current.preparationRequired, undefined);
+    assert.equal(reads, 0);
 });

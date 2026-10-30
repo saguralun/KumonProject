@@ -4,7 +4,7 @@ import { applyUpdate, checkForUpdate, getRuntimeStatus } from "../services/updat
 import { requireAdmin, requirePermission } from "../middleware/auth.js";
 import { requireUpdateAccess } from '../middleware/updateAccess.js';
 import { mainDesktop } from '../services/appDesktop.js';
-import { paymentDatabaseStatus, prepareApplicationDatabase } from '../services/databaseUpgradeService.js';
+import { paymentDatabaseStatus } from '../services/databaseStatusService.js';
 import {
     createOpeningSchedule,
     deleteOpeningSchedule,
@@ -61,12 +61,6 @@ router.post("/update-apply", requireUpdateAccess, async (req, res) => {
 
 router.get('/database/status', requireAdmin, async (_req, res) => {
     try { res.set('Cache-Control', 'no-store').json({ success: true, ...(await paymentDatabaseStatus()) }); }
-    catch (error) { sendError(res, error); }
-});
-
-router.post('/database/prepare', requireAdmin, async (req, res) => {
-    if (req.body?.confirm !== true) return res.status(400).json({ success: false, error: 'กรุณายืนยันสำรองและเตรียมฐานข้อมูลก่อน' });
-    try { res.json({ success: true, ...(await prepareApplicationDatabase()) }); }
     catch (error) { sendError(res, error); }
 });
 

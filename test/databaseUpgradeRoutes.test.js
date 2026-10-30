@@ -5,7 +5,7 @@ import { once } from 'node:events';
 import pool from '../config/db.js';
 import systemRoutes from '../routes/systemRoutes.js';
 
-test('Database preparation requires Admin plus explicit confirmation and status checks never run DDL', async (t) => {
+test('The retired preparation endpoint is absent for all roles; optional Admin diagnostics remain read-only', async (t) => {
     const queries = [];
     t.mock.method(pool, 'query', async (sql) => { queries.push(sql); return { rows: [{ column_name: 'inserted_status_history_id' }, { column_name: 'payment_status_updated_at' }] }; });
     t.mock.method(pool, 'connect', () => assert.fail('No migration authorized in this test'));
@@ -17,12 +17,13 @@ test('Database preparation requires Admin plus explicit confirmation and status 
         const call = (role, method, action, body) => fetch(`http://127.0.0.1:${server.address().port}/api/system/database/${action}`, {
             method, headers: { 'Content-Type': 'application/json', ...(role ? { 'x-role': role } : {}) }, ...(method === 'POST' ? { body: JSON.stringify(body) } : {})
         });
-        assert.equal((await call(null, 'POST', 'prepare', { confirm: true })).status, 401);
+        for (const role of [null, 'guest', 'staff', 'instructor', 'admin']) {
+            assert.equal((await call(role, 'POST', 'prepare', { confirm: true })).status, 404);
+        }
+        assert.equal((await call(null, 'GET', 'status')).status, 401);
         for (const role of ['guest', 'staff', 'instructor']) {
-            assert.equal((await call(role, 'POST', 'prepare', { confirm: true })).status, 403);
             assert.equal((await call(role, 'GET', 'status')).status, 403);
         }
-        assert.equal((await call('admin', 'POST', 'prepare', {})).status, 400);
         assert.equal(queries.length, 0);
         const response = await call('admin', 'GET', 'status');
         assert.equal(response.headers.get('cache-control'), 'no-store');

@@ -1,11 +1,9 @@
-import pool from '../config/db.js';
-import { prepareApplicationDatabase } from '../services/databaseUpgradeService.js';
-
-try {
-    if (process.argv[2] !== '--update') throw new Error('Use the confirmed program update or database preparation action');
-    const result = await prepareApplicationDatabase();
-    process.stdout.write(JSON.stringify(result) + '\n');
-} catch (error) {
-    process.stderr.write(`เตรียมฐานข้อมูลไม่สำเร็จ: ${error.message}\n`);
+// An older running updater calls this newly downloaded file once before restart.
+// The automatic database preparation feature has been retired; importing no
+// application/database modules keeps this compatibility step entirely inert.
+if (process.argv[2] === '--update') {
+    process.stdout.write(JSON.stringify({ ready: true, applied: false, retired: true }) + '\n');
+} else {
+    process.stderr.write('Automatic database preparation has been retired.\n');
     process.exitCode = 1;
-} finally { await pool.end(); }
+}

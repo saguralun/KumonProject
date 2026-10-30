@@ -78,10 +78,7 @@ export async function checkForUpdate() {
         }).finally(() => { updateCheckPending = null; });
     }
     const result = updateCheckPending ? await updateCheckPending : updateCheckCache;
-    const report = await fs.readFile(path.join(REPO_DIR, 'logs', 'database-upgrade-latest.json'), 'utf8')
-        .then(JSON.parse).catch(() => null);
-    const preparationRequired = updateNeedsRetry || report?.ready === false;
-    return { ...result, upToDate: result.checked && preparationRequired ? false : result.upToDate, preparationRequired };
+    return { ...result, upToDate: result.checked && updateNeedsRetry ? false : result.upToDate, retryRequired: updateNeedsRetry };
 }
 
 async function readRemoteVersion() {
@@ -138,20 +135,26 @@ export async function applyUpdate() {
     }
 }
 
-async function performUpdate(context) {
-    const { stdout: branchOut } = await runGit(["rev-parse", "--abbrev-ref", "HEAD"]);
+// Injectable steps let tests exercise the entire update sequence without pulling
+// this checkout, installing packages, stopping the real app or opening a database.
+export async function performUpdate(context = {}, steps = {}) {
+    const git = steps.runGit || runGit;
+    const recover = steps.recoverFiles || (() => prepareUpdateWorktree({ repoDir: REPO_DIR }));
+    const install = steps.install || (() => execFileAsync("npm", ["install", "--no-save"], { cwd: REPO_DIR, timeout: 120000, shell: true, windowsHide: true }));
+    const restart = steps.restart || scheduleAppRestart;
+    const { stdout: branchOut } = await git(["rev-parse", "--abbrev-ref", "HEAD"]);
     const branch = branchOut.trim();
 
     if (branch !== GITHUB_BRANCH) {
         throw httpError(409, `ตอนนี้เครื่องนี้อยู่ branch '${branch}' ไม่ใช่ ${GITHUB_BRANCH} — อัพเดทอัตโนมัติไม่ได้`);
     }
 
-    context.fileRecovery = await prepareUpdateWorktree({ repoDir: REPO_DIR });
+    context.fileRecovery = await recover();
 
     let pullOut;
 
     try {
-        ({ stdout: pullOut } = await runGit(["pull", "origin", GITHUB_BRANCH, "--ff-only"]));
+        ({ stdout: pullOut } = await git(["pull", "origin", GITHUB_BRANCH, "--ff-only"]));
         updateNeedsRetry = true;
     } catch (error) {
         throw httpError(500, `git pull ไม่สำเร็จ: ${error.message}`);
@@ -170,7 +173,7 @@ async function performUpdate(context) {
     // anything a caller of applyUpdate() controls.
     // --no-save keeps this deployment step from editing the versioned lockfile.
     try {
-        await execFileAsync("npm", ["install", "--no-save"], { cwd: REPO_DIR, timeout: 120000, shell: true, windowsHide: true });
+        await install();
     } catch (error) {
         throw httpError(
             500,
@@ -178,24 +181,13 @@ async function performUpdate(context) {
         );
     }
 
-    // Use the newly pulled code, not modules cached by the old running server.
-    let database;
-    try {
-        const prepared = await execFileAsync(process.execPath, ['scripts/prepare-database.js', '--update'],
-            { cwd: REPO_DIR, timeout: 10 * 60 * 1000, windowsHide: true });
-        database = JSON.parse(prepared.stdout.trim().split(/\r?\n/).at(-1));
-        if (!database.ready) throw new Error('ฐานข้อมูลยังไม่พร้อม');
-    } catch (error) {
-        throw httpError(500, `ดึงโค้ดแล้ว แต่เตรียมฐานข้อมูลไม่ผ่าน ยังไม่รีสตาร์ต: ${String(error.stderr || error.message).trim()}`);
-    }
-    const { stdout: newHead } = await runGit(["rev-parse", "HEAD"]);
-    await scheduleAppRestart();
+    const { stdout: newHead } = await git(["rev-parse", "HEAD"]);
+    await restart();
 
     return {
         success: true,
         output: pullOut.trim(),
         newCommit: newHead.trim().slice(0, 7),
-        database,
         fileRecovery: context.fileRecovery,
         restartRequired: true,
         restartScheduled: true,

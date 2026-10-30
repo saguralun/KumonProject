@@ -25,28 +25,10 @@ try {
     $originalRuntime = Read-Runtime
     if (-not $originalRuntime.instanceId -or $originalRuntime.processId -ne $ServerPid) { throw "Cannot identify the original server; nothing was stopped" }
     Write-RestartLog "READY oldPid=$ServerPid port=$Port"
-    # Bridge older updaters: this helper is loaded from the newly pulled files.
-    # A failed preflight must leave the old server running, never start unprepared code.
-    $prepareScript = Join-Path $ProjectDir "scripts\prepare-database.js"
-    if (Test-Path -LiteralPath $prepareScript) {
-        $logDir = Split-Path -Parent $StatusPath
-        $stamp = Get-Date -Format "yyyyMMdd-HHmmss-fff"
-        $prepare = Start-Process -FilePath $NodePath -ArgumentList "scripts/prepare-database.js --update" `
-            -WorkingDirectory $ProjectDir -WindowStyle Hidden -PassThru `
-            -RedirectStandardOutput (Join-Path $logDir "database-$stamp.log") `
-            -RedirectStandardError (Join-Path $logDir "database-$stamp-error.log")
-        $null = $prepare.Handle
-        if (-not $prepare.WaitForExit(600000)) {
-            Stop-Process -Id $prepare.Id -Force -ErrorAction SilentlyContinue
-            throw "Database preparation timed out; old server was not stopped"
-        }
-        if ($prepare.ExitCode -ne 0) { throw "Database preparation failed; check database-$stamp-error.log. Old server was not stopped" }
-        Write-RestartLog "DATABASE_READY"
-    }
     Start-Sleep -Seconds 2
 
     $runtimeBeforeStop = Read-Runtime
-    if ($runtimeBeforeStop.instanceId -ne $originalRuntime.instanceId -or $runtimeBeforeStop.processId -ne $ServerPid) { throw "Original server changed during preparation; nothing was stopped" }
+    if ($runtimeBeforeStop.instanceId -ne $originalRuntime.instanceId -or $runtimeBeforeStop.processId -ne $ServerPid) { throw "Original server changed before restart; nothing was stopped" }
     $oldProcess = Get-Process -Id $ServerPid -ErrorAction SilentlyContinue
     if ($oldProcess) {
         if ($oldProcess.Path -ne $NodePath) { throw "Refusing to stop a different executable" }
