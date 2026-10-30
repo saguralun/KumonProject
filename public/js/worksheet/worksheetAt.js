@@ -8,7 +8,30 @@ import { worksheetApi } from "./worksheetApi.js";
 import { updateSecondaryActions } from "./worksheetPreview.js";
 import { loadEnrollmentContext } from "./worksheet.js";
 
+let pendingAtSave = null;
+let atModalRevision = 0;
+
+function captureContext() {
+    return { context: state.context, requestId: state.contextRequestId };
+}
+
+function isCurrentContext(scope) {
+    return state.context === scope.context && state.contextRequestId === scope.requestId && !state.isLoadingContext;
+}
+
+async function refreshCompletedContext(scope, enrollmentId) {
+    if (!isCurrentContext(scope)) return false;
+    const refresh = loadEnrollmentContext(enrollmentId);
+    const requestId = state.contextRequestId;
+    await refresh;
+    // The loader catches its own failures. A successful refresh must replace
+    // the context, and a newer navigation must retain its own status/result.
+    return state.contextRequestId === requestId && !state.isLoadingContext
+        && state.context !== scope.context && Number(state.context?.enrollment.enrollmentId) === Number(enrollmentId);
+}
+
 export function setAtPass(isPass) {
+    if (pendingAtSave) return;
     state.atModal.isPass = Boolean(isPass);
     els.atPassControl.querySelectorAll("[data-at-pass]").forEach((button) => {
         button.classList.toggle(
@@ -37,7 +60,7 @@ function isAtFormReady() {
 }
 
 export function updateAtSaveState() {
-    els.atSaveButton.disabled = !isAtFormReady();
+    els.atSaveButton.disabled = Boolean(pendingAtSave) || !isAtFormReady();
 }
 
 function focusAndSelect(input) {
@@ -49,6 +72,7 @@ function focusAndSelect(input) {
 }
 
 export function moveAtFocus(event, nextElement) {
+    if (pendingAtSave) { event.preventDefault(); return; }
     if (event.key !== "Enter" && event.key !== "Tab") {
         return;
     }
@@ -62,6 +86,7 @@ export function moveAtFocus(event, nextElement) {
 }
 
 export function changeAtGroup(delta) {
+    if (pendingAtSave) return;
     const current = Number.parseInt(els.atGroup.value, 10);
     const baseValue = Number.isInteger(current) ? current : 1;
     const nextValue = Math.min(5, Math.max(1, baseValue + delta));
@@ -96,12 +121,17 @@ export function fillAtFormFromSource({
     source,
     edit = false
 }) {
+    if (pendingAtSave || !state.context || state.isLoadingContext) return;
+    atModalRevision++;
     const enrollment = state.context.enrollment;
     const latestAttempt = source?.latestAttempt || null;
     const attempt = edit ? source : latestAttempt;
 
     state.atModal.editingAtUsedId = edit ? source.atUsedId : null;
     state.atModal.source = source;
+    state.atModal.enrollmentId = enrollment.enrollmentId;
+    state.atModal.expectedAtMasterId = source.atMasterId;
+    state.atModal.expectedLevelMasterId = edit ? source.levelMasterId : enrollment.currentLevelMasterId;
     els.atEnrollmentId.value = enrollment.enrollmentId;
     els.atSubject.value = enrollment.subjectCode;
     els.atLevel.value = edit
@@ -123,7 +153,7 @@ export function fillAtFormFromSource({
 }
 
 export function openAtModal({ editLatest = false } = {}) {
-    if (!state.context) {
+    if (!state.context || pendingAtSave || state.isLoadingContext || state.isSaving || state.isCompletingZun || state.isCompletingLevel) {
         return;
     }
 
@@ -162,6 +192,7 @@ export function openAtModal({ editLatest = false } = {}) {
 }
 
 export function closeAtModal() {
+    if (pendingAtSave) return;
     els.atModal.classList.add("hidden");
 }
 
@@ -193,26 +224,39 @@ function validateAtForm() {
 export async function saveAtCompletion(event) {
     event.preventDefault();
 
-    if (!state.context) {
+    if (!state.context || pendingAtSave || state.isLoadingContext || state.isSaving || state.isCompletingZun || state.isCompletingLevel) {
         return;
     }
 
+    const scope = captureContext();
+    const modal = state.atModal;
+    const revision = atModalRevision;
+    const enrollmentId = modal.enrollmentId;
+    const isCurrent = () => isCurrentContext(scope) && state.atModal === modal && atModalRevision === revision
+        && modal.enrollmentId === enrollmentId;
+    if (Number(enrollmentId) !== Number(scope.context.enrollment.enrollmentId)) return;
+    let controls;
     try {
         const values = validateAtForm();
-
-        els.atSaveButton.disabled = true;
-        const result = await worksheetApi.saveAtCompletion({
-            enrollmentId: state.context.enrollment.enrollmentId,
-            atUsedId: state.atModal.editingAtUsedId,
+        const payload = {
+            enrollmentId,
+            atUsedId: modal.editingAtUsedId,
+            expectedAtMasterId: modal.expectedAtMasterId,
+            expectedLevelMasterId: modal.expectedLevelMasterId,
             atDate: els.atDate.value,
             score: values.score,
             usedTime: values.usedTime,
             atGroup: values.atGroup,
-            isPass: state.atModal.isPass
-        });
+            isPass: modal.isPass
+        };
+        pendingAtSave = scope;
+        controls = [...els.atForm.querySelectorAll("input, button, select, textarea")].map(control => [control, control.disabled]);
+        for (const [control] of controls) control.disabled = true;
+        const result = await worksheetApi.saveAtCompletion(payload);
 
-        closeAtModal();
-        await loadEnrollmentContext(result.enrollmentId);
+        if (!isCurrent()) return;
+        els.atModal.classList.add("hidden");
+        if (!await refreshCompletedContext(scope, enrollmentId)) return;
         setStatus(
             result.isPass
                 ? (result.nextLevelMasterId ? "บันทึก AT ผ่าน และเลื่อน level แล้ว" : "บันทึก AT ผ่านแล้ว")
@@ -220,33 +264,41 @@ export async function saveAtCompletion(event) {
             "success"
         );
     } catch (error) {
-        setStatus(error.message, "error");
+        if (isCurrent()) setStatus(error.message, "error");
     } finally {
-        els.atSaveButton.disabled = false;
+        if (pendingAtSave === scope) {
+            pendingAtSave = null;
+            for (const [control, disabled] of controls || []) control.disabled = disabled;
+        }
+        updateAtSaveState();
     }
 }
 
 export async function completeZunLevel() {
-    if (!state.context || state.isCompletingZun || els.completeZunLevel.disabled) {
+    if (!state.context || pendingAtSave || state.isSaving || state.isLoadingContext || state.isCompletingLevel || state.isCompletingZun || els.completeZunLevel.disabled) {
         return;
     }
 
+    const scope = captureContext();
+    const enrollmentId = scope.context.enrollment.enrollmentId;
+    const expectedZunLevelMasterId = scope.context.enrollment.currentZunLevelMasterId ?? null;
     state.isCompletingZun = true;
     updateSecondaryActions();
     setStatus("กำลังจบ Zun Level...");
 
     try {
         const result = await worksheetApi.completeZunLevel({
-            enrollmentId: state.context.enrollment.enrollmentId
+            enrollmentId,
+            expectedZunLevelMasterId
         });
         const message = result.isFinal
             ? "จบ Zun แล้ว และล้าง Zun level เป็นว่าง"
             : `เปลี่ยน Zun เป็น ${result.nextZunLevelCode} แล้ว`;
 
-        await loadEnrollmentContext(result.enrollmentId);
+        if (!await refreshCompletedContext(scope, enrollmentId)) return;
         setStatus(message, "success");
     } catch (error) {
-        setStatus(error.message, "error");
+        if (isCurrentContext(scope)) setStatus(error.message, "error");
     } finally {
         state.isCompletingZun = false;
         updateSecondaryActions();
@@ -254,11 +306,12 @@ export async function completeZunLevel() {
 }
 
 export async function completeWorksheetLevelWithoutAt() {
-    if (!state.context || state.isCompletingLevel || els.completeWsLevel.disabled) {
+    if (!state.context || pendingAtSave || state.isLoadingContext || state.isCompletingZun || state.isCompletingLevel || els.completeWsLevel.disabled) {
         return;
     }
 
     const context = state.context;
+    const scope = captureContext();
     const completion = context.completionState?.freeLevelCompletion;
 
     if (!completion?.canComplete) {
@@ -268,7 +321,7 @@ export async function completeWorksheetLevelWithoutAt() {
     if (!await confirmAction(`จบ Level ${completion.currentLevelCode} และเลื่อนเป็น ${completion.nextLevelCode} ใช่ไหม?`)) {
         return;
     }
-    if (state.context !== context || state.isCompletingLevel || state.isSaving) return;
+    if (!isCurrentContext(scope) || pendingAtSave || state.isCompletingZun || state.isCompletingLevel || state.isSaving) return;
 
     state.isCompletingLevel = true;
     updateSecondaryActions();
@@ -276,14 +329,14 @@ export async function completeWorksheetLevelWithoutAt() {
 
     try {
         const result = await worksheetApi.completeWorksheetLevel({
-            enrollmentId: context.enrollment.enrollmentId
+            enrollmentId: context.enrollment.enrollmentId,
+            expectedMainLevelMasterId: completion.currentLevelMasterId
         });
 
-        if (state.context !== context) return;
-        await loadEnrollmentContext(result.enrollmentId);
+        if (!await refreshCompletedContext(scope, context.enrollment.enrollmentId)) return;
         setStatus(`จบ ${result.previousLevelCode} แล้ว และเปลี่ยนเป็น ${result.nextLevelCode}`, "success");
     } catch (error) {
-        setStatus(error.message, "error");
+        if (isCurrentContext(scope)) setStatus(error.message, "error");
     } finally {
         state.isCompletingLevel = false;
         updateSecondaryActions();

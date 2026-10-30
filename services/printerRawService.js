@@ -142,7 +142,7 @@ export function formatTimeDisplay(dateTimeText) {
     return `${hours}:${minutes}`;
 }
 
-export function buildAsciiTestPayload() {
+function buildAsciiTestPayload() {
     const now = new Date();
 
     // Thai text is rendered as a bitmap and printed as a picture — this

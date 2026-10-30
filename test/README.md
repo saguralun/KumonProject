@@ -45,6 +45,9 @@ restart-helper test, not necessary for this suite's application regression check
 - WS connection-pool saturation, rollback, delete/date-edit transactions.
 - Stock locking, missing balances, concurrent cuts and late arrivals.
 - Account revocation, role changes, update authorization and Opening Schedule.
+- Concurrent last-Admin changes across deactivate/demote/upsert, and permission
+  cache reads racing revocation. Both unit fixtures and a disposable PostgreSQL
+  check protect the final active Admin.
 - Update availability while login/workspace pages stay open, including normal
   local users, focus/online retries, offline notices, shared version-check cache,
   explicit cancellation and verified restart waiting (mocked installation).
@@ -63,6 +66,17 @@ restart-helper test, not necessary for this suite's application regression check
   safety guards remain covered; updates never apply DDL.
 - Atomic restore, including a real failed COPY on the disposable database.
 - Student selection during saves, stale responses and visible save failures.
+- Student profile/history and enrollment saves cannot replace a later selection;
+  Add Student duplicate-check failures stay visible. Users refreshes cannot
+  overwrite a permission change that completed while their response was pending.
+- Displayed main/Zun/AT context is checked under enrollment locks. Tests cover
+  concurrent stale submissions, historical AT edits, digital KC completion and
+  appending to a delivery order while Process owns its parent lock.
+- Backup publication runs the real script against a fake dump executable:
+  partial, empty, missing and interrupted output never becomes a completed backup,
+  and filename collisions preserve the earlier archive. No real dump is run.
+- A helper error after READY releases only its own Update attempt; unknown
+  status never permits a concurrent updater.
 - Shared header menu on all 16 workspaces at desktop/mobile widths: no edge
   handle, full-width workspace, click-outside/Escape close, keyboard focus trap,
   permission visibility and menu state reset after navigation. The first paint
@@ -79,7 +93,9 @@ restart-helper test, not necessary for this suite's application regression check
   waits for synthetic manual login without reloading typed input, and resumes
   reading without applying or saving. Fixtures cover cancellation, expiry,
   account/token isolation, stale opens, dirty forms and competing WS/AT drafts.
-- All 17 pages' declared button wiring and shared in-app confirmations, plus
+- All 17 pages' declared button wiring is checked against each page's own loaded
+  scripts and recursive imports; local scripts, styles and image assets must
+  resolve. Shared in-app confirmations are covered alongside
   browser/Electron workflow tests for Stock Receive/Cut, Opening Schedule,
   Backup/Restore, permissions, table paging, Progress subject races, CD/history,
   Forecast views and valid downloadable Report/Forecast Excel workbooks. The
@@ -88,6 +104,12 @@ restart-helper test, not necessary for this suite's application regression check
   after desktop shutdown, safe duplicate naming under concurrent downloads,
   failed saves/retries, missing files and permission errors without a live dump.
   The page matrix and operational limits are in `CONTROLS-AUDIT-2026-10-23.md`.
+- The single Migration engine is exercised in browser and Electron: every
+  module Preview/Import button, dependency rules, cancellation, failed imports,
+  retries and out-of-order pagination use synthetic endpoints only. The obsolete
+  first engine and initial cards have been removed; live fallback data adapters
+  remain. Shared WS/AT confirmation scopes are invalidated if another window
+  changes eligible identities before approval.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

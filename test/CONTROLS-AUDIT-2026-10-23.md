@@ -1,5 +1,8 @@
 # Application Controls Audit: 2026-10-23
 
+The original audit below is retained as history. See the 2026-10-30 follow-up
+at the end for the current cleanup and regression checks.
+
 ## Scope And Safety
 
 Reviewed all 17 application pages, including Migration and Login. The static
@@ -98,3 +101,48 @@ layering/focus and the new workflows before this combined run.
 JavaScript syntax checks passed for 110 application/service/route/desktop files.
 `git diff --check` passed. The inventory artifact is generated in the system
 temporary directory as `kumondb-button-inventory.json`, not production data.
+
+## Follow-up: 2026-10-30
+
+The inventory now follows each page's actual script/import graph and verifies
+local assets. A reference in an unrelated page can no longer satisfy a button's
+wiring check. Static declarations and dynamic controls remain distinct: all ten
+Migration modules' actual Preview/Import controls are exercised in browser and
+Electron against synthetic endpoints, including failure, retry, cancellation,
+dependency rules, and reversed pagination responses.
+
+Repairs add specific coverage for:
+
+- Student selection during saves/deletes, obsolete profile/history replies,
+  visible duplicate-check failures, and history-date edits after navigation.
+- Permission refreshes racing a grant save, stale authorization caches, and
+  concurrent deactivate/demote/upsert attempts against the final active Admin.
+- Expected main/Zun/AT context checked while holding the enrollment lock,
+  concurrent stale AT submissions, valid historical edits, and digital KC final
+  packets enabling completion without physical stock consumption.
+- DO appends racing Process, and Backup publishing only completed output without
+  overwriting a same-second archive or pruning backups on a failed dump.
+- Update helper errors after READY allowing a safe retry in the surviving
+  original process, and WS/AT approvals being invalidated when another window
+  changes the selected identities.
+- Shared JSON requests retaining their content type when adding headers.
+
+Removed the unused launcher splash, superseded Migration renderer/static cards,
+and worksheet CSS selectors without any markup/rendering consumers. Seven
+internally used helpers/constants are private rather than unnecessary exports.
+Migration markup, styles, and the single live preview engine are separate files;
+styles and the existing workflow are retained. Compatibility entrypoints for
+older updaters/clients and manually invoked operational scripts remain supported.
+
+All changes are code and isolated test fixtures. No real receipt, stock,
+student, migration import, restore, KSIS save or application restart is used as
+a button test. Live printer output and external KSIS availability remain outside
+the synthetic checks.
+
+Final follow-up run: **409 tests, 408 passed, 0 failed, 1 skipped**, in
+443 seconds, with browser/Electron UI and isolated PostgreSQL enabled. The
+separately opted-in Windows restart test stayed disabled. Application syntax
+checks covered 136 files; changed Student/Worksheet modules were checked again
+after their final edits. `git diff --check` passed. The refreshed static
+inventory covers 17 pages and 220 declared controls; dynamic Migration controls
+and other generated row/pagination/dialog actions are covered by workflows.

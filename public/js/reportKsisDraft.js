@@ -5,10 +5,14 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   const reset = get('ksisDraftReset');
   const subject = get("ksisDraftSubject"), source = get("ksisDraftSource"), container = get("ksisDraftRows"), dialog = get("ksisDraftDialog");
   let preview = null, result = null, inspection = null, busy = false, pending = false, generation = 0;
+  let confirmation = null;
   let automaticallyChecked = null;
   let active = false;
   const confirmedMatches = new Set();
   const eligibleRows = () => (preview?.rows || []).filter((row) => row.ready && (!row.requiresIdentityConfirmation || confirmedMatches.has(row.key)));
+  const confirmationScope = () => JSON.stringify([preview?.previewId, preview?.period, preview?.subject, preview?.page,
+    eligibleRows().map(row => [row.key, row.enrollmentId, row.desired]), [...confirmedMatches].sort()]);
+  dialog.addEventListener('close', () => { if (!dialog.open) confirmation = null; });
   const call = (action, data) => requestJson(`/api/ksis/draft/${action}`, { method: "POST", body: JSON.stringify(data) }).finally(() => { void shared?.refresh(true); });
   const text = (value) => escapeHtml(String(value ?? ""));
   const subjectLabel = (value) => value === "ALL" ? "ทุกวิชา (ME / EFL / TRP)" : value;
@@ -65,6 +69,8 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   for (const id of ["reportMonth", "reportYear"]) get(id).addEventListener("change", invalidate);
   fill.addEventListener("click", () => {
     if (!preview || busy || pending) return;
+    confirmation = { scope: confirmationScope(), payload: { previewId: preview.previewId, saveAfterFill: true,
+      confirmedIdentityMatches: eligibleRows().filter(row => row.requiresIdentityConfirmation).map(row => ({ enrollmentId: row.enrollmentId, key: row.key })) } };
     get("ksisDraftConfirmText").textContent = `กรอกและบันทึก ${eligibleRows().length} รายวิชา • ยืนยันคู่ชื่อแล้ว ${eligibleRows().filter((row) => row.requiresIdentityConfirmation).length} รายวิชา • ${subjectLabel(preview.subject)} • ${preview.period.month}/${preview.period.year} • หน้า KSIS ${preview.page}`;
     get("ksisDraftConfirmScope").textContent = "กรอกระดับ หน้าปัจจุบัน WS used และ ST1 เท่านั้น • ไม่กรอก Zun/AT/DT • ข้ามสถานะ A • KC ใช้ WS used = 1 • บันทึกทุก 10 คน โดยรวมทุกวิชาของเด็กคนเดียวกัน • ท้ายหน้าไม่ครบ 10 คนก็บันทึก • ไม่เปลี่ยนหน้าอัตโนมัติ";
     dialog.showModal();
@@ -72,11 +78,14 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
   get("ksisDraftCancel").addEventListener("click", () => dialog.close());
   get("ksisDraftConfirm").addEventListener("click", async () => {
     if (busy || pending || !preview) return;
+    const approved = confirmation;
+    if (!approved || approved.scope !== confirmationScope()) {
+      dialog.close(); setStatus('รายการ WS เปลี่ยนระหว่างยืนยัน กรุณาตรวจ Preview และยืนยันใหม่', 'error'); return;
+    }
     dialog.close(); busy = true; inspection = null; render();
     setStatus("กำลังกรอก WS และบันทึกทุก 10 คน...");
     try {
-      result = await call("fill", { previewId: preview.previewId, saveAfterFill: true,
-        confirmedIdentityMatches: eligibleRows().filter((row) => row.requiresIdentityConfirmation).map((row) => ({ enrollmentId: row.enrollmentId, key: row.key })) });
+      result = await call("fill", approved.payload);
       pending = result.pendingDraft !== false;
       source.textContent = `${result.stopped ? `${result.error} • ` : ""}กรอกแล้ว ${result.studentsFilled ?? result.filled} คน / ${result.filled} รายวิชา • บันทึกแล้ว ${result.studentsSaved || 0} คน / ${result.savedCount || 0} รายวิชา (${result.batchesSaved || 0} รอบ) • ข้าม A ${result.skipped || 0} รายวิชา${result.filterNotices ? ` • KSIS ยังแสดงข้อความตัวกรองเดิม ${result.filterNotices} รายวิชา` : ""} • หน้า ${result.page} • ${result.saved ? "บันทึกเฉพาะหน้านี้แล้ว" : "ยังไม่ยืนยันผลบันทึกครบทั้งหมด"}`;
       setStatus(result.stopped ? result.error : "กรอกและบันทึก WS ของหน้านี้แล้ว พร้อมให้ตรวจอีกครั้ง", result.stopped ? "error" : "success");
@@ -129,10 +138,12 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     pending = state.pending || (workspace.connection?.pendingDraft === true && workspace.connection?.pendingWork === 'WS');
     confirmedMatches.clear(); for (const key of state.confirmed) confirmedMatches.add(key);
     if (state.subject) subject.value = state.subject;
-    if (dialog.open && (changed || busy || pending)) dialog.close();
+    const scopeChanged = dialog.open && confirmation?.scope !== confirmationScope();
+    if (dialog.open && (changed || busy || pending || scopeChanged)) dialog.close();
     source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : inspection?.message || (state.requiresLogin ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่' : result ? `${result.error || ''} • บันทึกแล้ว ${result.savedCount || 0} รายวิชา • หน้า ${result.page}` : 'ยังไม่ได้เตรียมข้อมูล'));
     if (workspace.active) setStatus(source.textContent, state.error || pending ? 'error' : 'neutral');
     render();
+    if (scopeChanged) setStatus('รายการ WS เปลี่ยนระหว่างยืนยัน กรุณาตรวจ Preview และยืนยันใหม่', 'error');
     const attempt = result?.attemptId || JSON.stringify([result?.error, result?.page, result?.savedCount, result?.rows?.map((row) => row.key)]);
     if (active && pending && !busy && automaticallyChecked !== attempt) {
       automaticallyChecked = attempt;

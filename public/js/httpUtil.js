@@ -3,12 +3,11 @@
 // global the same way they read `fetch`/`document`, no import needed).
 // This one function body used to be copy-pasted into 12 different files.
 async function requestJson(url, options = {}, fallbackMessage = "Request failed") {
+    const headers = new Headers(options.headers);
+    if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
     const response = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...(options.headers || {})
-        },
-        ...options
+        ...options,
+        headers
     });
     const data = await response.json().catch(() => ({}));
 

@@ -5,10 +5,14 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
   const get = (id) => document.getElementById(id);
   const source = get('ksisAtSource'), container = get('ksisAtRows'), subject = get('ksisAtSubject'), dialog = get('ksisAtDialog');
   let preview = null, result = null, busy = false, pending = false, inspection = null;
+  let confirmation = null;
   const confirmed = new Set();
   const text = (value) => escapeHtml(String(value ?? ''));
   const call = (action, data = {}) => requestJson(`/api/ksis/at/${action}`, { method: 'POST', body: JSON.stringify(data) }).finally(() => { void shared?.refresh(true); });
   const eligible = () => (preview?.rows || []).filter((row) => row.outcome === 'ready' && (!row.requiresIdentityConfirmation || confirmed.has(row.id)));
+  const confirmationScope = () => JSON.stringify([preview?.previewId, preview?.period, preview?.subject, preview?.page,
+    eligible().map(row => [row.id, row.desired]), [...confirmed].sort()]);
+  dialog.addEventListener('close', () => { if (!dialog.open) confirmation = null; });
   function controls() {
     for (const id of ['ksisAtOpen', 'ksisAtPreview', 'ksisAtSubject']) get(id).disabled = busy || pending;
     get('ksisAtFill').disabled = busy || pending || !preview || !eligible().length;
@@ -82,15 +86,20 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
   get('ksisAtPreview').addEventListener('click', () => prepare('preview'));
   get('ksisAtFill').addEventListener('click', () => {
     if (busy || pending || !preview || !eligible().length) return;
+    confirmation = { scope: confirmationScope(), payload: { previewId: preview.previewId, confirmSave: true, confirmedIdentityMatches: [...confirmed] } };
     get('ksisAtConfirmText').textContent = `${preview.subject} • ${preview.period.month}/${preview.period.year} • หน้า ${preview.page} • ${eligible().length} ผลสอบ`;
     dialog.showModal();
   });
   get('ksisAtCancel').addEventListener('click', () => dialog.close());
   get('ksisAtConfirm').addEventListener('click', async () => {
     if (busy || pending || !preview || !eligible().length) return;
+    const approved = confirmation;
+    if (!approved || approved.scope !== confirmationScope()) {
+      dialog.close(); setStatus('รายการ AT เปลี่ยนระหว่างยืนยัน กรุณาตรวจ Preview และยืนยันใหม่', 'error'); return;
+    }
     dialog.close(); busy = true; render(); setStatus('กำลังกรอกและบันทึก AT ทีละผลสอบ...');
     try {
-      result = await call('fill', { previewId: preview.previewId, confirmSave: true, confirmedIdentityMatches: [...confirmed] });
+      result = await call('fill', approved.payload);
       pending = result.pendingDraft === true; source.textContent = result.message;
       setStatus(result.message, pending ? 'error' : 'success');
     } catch (error) {
@@ -117,9 +126,11 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
     confirmed.clear(); for (const key of state.confirmed) confirmed.add(key);
     if (state.subject) subject.value = state.subject;
     inspection = state.inspection || null;
-    if (dialog.open && (changed || busy || pending)) dialog.close();
+    const scopeChanged = dialog.open && confirmation?.scope !== confirmationScope();
+    if (dialog.open && (changed || busy || pending || scopeChanged)) dialog.close();
     source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : state.requiresLogin ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่' : result?.message || (preview ? `${preview.context} • ${preview.subject} • หน้า ${preview.page} • ${preview.rows.length} ผลสอบใน Report` : 'ยังไม่ได้เตรียม AT'));
     if (workspace.active) setStatus(source.textContent, state.error || pending ? 'error' : 'neutral');
     render();
+    if (scopeChanged) setStatus('รายการ AT เปลี่ยนระหว่างยืนยัน กรุณาตรวจ Preview และยืนยันใหม่', 'error');
   });
 }

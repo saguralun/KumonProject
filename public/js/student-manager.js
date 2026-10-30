@@ -139,6 +139,39 @@ export const state = {
 };
 
 let resumeTarget = null, resumeBusy = false;
+let studentMutationBusy = false, profileLoading = false, profileLoadFailed = false;
+let profileRequest = 0, studentsRequest = 0, historyRequest = 0;
+const pendingCdReturns = new Set();
+
+function syncStudentControls() {
+    const blocked = studentMutationBusy || profileLoading || profileLoadFailed;
+    const enrollment = selectedEnrollment();
+    els.studentSearch.disabled = els.statusFilter.disabled = studentMutationBusy;
+    els.studentForm.inert = els.enrollmentForm.inert = blocked;
+    els.addStudentForm.inert = els.addEnrollmentForm.inert = studentMutationBusy;
+    els.newStudentButton.disabled = els.saveStudentButton.disabled = blocked;
+    els.saveEnrollmentButton.disabled = blocked || !enrollment;
+    els.deleteEnrollmentButton.disabled = blocked || !enrollment?.canDeleteEnrollment;
+    els.enrollmentAbsentButton.disabled = els.enrollmentOtButton.disabled = blocked || enrollment?.statusGroup1Code !== 'C';
+    els.enrollmentResumeButton.disabled = blocked || !['A', 'OT'].includes(enrollment?.statusGroup1Code);
+    els.enrollmentCompleterButton.disabled = blocked || !enrollment?.canComplete || enrollment?.statusGroup1Code === 'CP';
+    for (const button of [els.addStudentSave, els.addStudentCancel, els.addStudentClose,
+        els.addEnrollmentSave, els.addEnrollmentCancel, els.addEnrollmentClose]) button.disabled = studentMutationBusy;
+    els.newEnrollmentButton.disabled = blocked || !state.selectedStudentId || (state.profile?.enrollments || []).length >= 3;
+    els.deleteStudentButton.disabled = blocked || !state.selectedStudentId || Boolean(state.profile?.enrollments?.length);
+    for (const button of els.studentList.querySelectorAll('button')) button.disabled = studentMutationBusy;
+    for (const button of els.enrollmentTabs.querySelectorAll('button')) button.disabled = blocked;
+    for (const button of els.historyTabs.querySelectorAll('button')) button.disabled = blocked;
+    for (const button of els.historyTableWrap.querySelectorAll('button')) {
+        const pendingCd = button.dataset.returnCdId && pendingCdReturns.has(`${state.selectedStudentId}:${button.dataset.returnCdId}`);
+        button.disabled = blocked || Boolean(pendingCd);
+    }
+}
+
+function setStudentMutationBusy(value) {
+    studentMutationBusy = value;
+    syncStudentControls();
+}
 
 function renderStudentList() {
     if (!state.students.length) {
@@ -156,6 +189,7 @@ function renderStudentList() {
                 <div class="student-item-name">${escapeHtml(student.displayName)}</div>
             </button>
         `).join("");
+    syncStudentControls();
 }
 
 function scrollSelectedStudentIntoView() {
@@ -165,12 +199,14 @@ function scrollSelectedStudentIntoView() {
 }
 
 async function loadStudents() {
+    const requestId = ++studentsRequest;
     const params = new URLSearchParams({
         query: els.studentSearch.value,
         status: els.statusFilter.value,
         limit: "120"
     });
     const data = await requestJson(`/api/students/search?${params.toString()}`);
+    if (requestId !== studentsRequest || params.get('query') !== els.studentSearch.value || params.get('status') !== els.statusFilter.value) return;
 
     state.students = data.rows || [];
     renderStudentList();
@@ -316,6 +352,7 @@ function renderEnrollmentTabs() {
         els.enrollmentForm.classList.add("hidden");
         els.enrollmentEmpty.classList.remove("hidden");
         els.enrollmentEmpty.textContent = "กด + Subject เพื่อเพิ่มวิชาแรก";
+        syncStudentControls();
         return;
     }
 
@@ -346,6 +383,7 @@ function renderEnrollmentTabs() {
     els.enrollmentActionBar.classList.toggle("hidden", !(canLeave || canResume || canComplete || canDeleteEnrollment));
     els.enrollmentSubtitle.textContent = `${active.subjectCode} • ${active.currentLevelCode}${active.currentZunLevelCode ? ` • Zun ${active.currentZunLevelCode}` : ""}${active.isKumonConnect ? " • KC" : ""} • ${active.statusGroup1Name}`;
     fillEnrollmentForm(active);
+    syncStudentControls();
 }
 
 function updateDeleteStudentButton() {
@@ -353,7 +391,7 @@ function updateDeleteStudentButton() {
     const canDeleteStudent = Boolean(state.selectedStudentId && enrollmentCount === 0);
 
     els.deleteStudentButton.classList.toggle("hidden", !canDeleteStudent);
-    els.deleteStudentButton.disabled = !canDeleteStudent;
+    els.deleteStudentButton.disabled = studentMutationBusy || profileLoading || profileLoadFailed || !canDeleteStudent;
 }
 
 function renderProfile() {
@@ -374,30 +412,48 @@ function renderProfile() {
     updateDeleteStudentButton();
     renderEnrollmentTabs();
     renderStudentList();
+    syncStudentControls();
 }
 
 async function loadProfile(studentId, {
     preferredEnrollmentId = null
 } = {}) {
+    if (studentMutationBusy) return;
+    const requestId = ++profileRequest;
+    profileLoading = true;
+    profileLoadFailed = false;
+    historyRequest++;
+    els.historyTableWrap.innerHTML = `<div class="empty-state">กำลังโหลดข้อมูลเด็ก...</div>`;
+    syncStudentControls();
     setStatus("กำลังโหลดข้อมูลเด็ก...");
-    const data = await requestJson(`/api/students/${encodeURIComponent(studentId)}`);
+    try {
+        const data = await requestJson(`/api/students/${encodeURIComponent(studentId)}`);
+        if (requestId !== profileRequest) return;
 
-    state.selectedStudentId = data.student.studentId;
-    state.profile = {
-        student: data.student,
-        enrollments: data.enrollments || []
-    };
-    const preferredEnrollment = state.profile.enrollments.find((enrollment) =>
-        Number(enrollment.enrollmentId) === Number(preferredEnrollmentId)
-    );
+        state.selectedStudentId = data.student.studentId;
+        state.profile = {
+            student: data.student,
+            enrollments: data.enrollments || []
+        };
+        const preferredEnrollment = state.profile.enrollments.find((enrollment) =>
+            Number(enrollment.enrollmentId) === Number(preferredEnrollmentId)
+        );
 
-    state.selectedEnrollmentId = preferredEnrollment?.enrollmentId
-        || state.profile.enrollments[0]?.enrollmentId
-        || null;
-    state.isNewEnrollment = false;
-    renderProfile();
-    await loadHistory();
-    setStatus("พร้อมแก้ไข");
+        state.selectedEnrollmentId = preferredEnrollment?.enrollmentId
+            || state.profile.enrollments[0]?.enrollmentId
+            || null;
+        state.isNewEnrollment = false;
+        renderProfile();
+        await loadHistory();
+        if (requestId === profileRequest) setStatus("พร้อมแก้ไข");
+    } catch (error) {
+        if (requestId === profileRequest) {
+            profileLoadFailed = Number(state.profile?.student?.studentId) !== Number(studentId);
+            throw error;
+        }
+    } finally {
+        if (requestId === profileRequest) { profileLoading = false; syncStudentControls(); }
+    }
 }
 
 function startNewStudent() {
@@ -405,6 +461,7 @@ function startNewStudent() {
 }
 
 function openAddStudentModal() {
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
     const form = els.addStudentForm;
 
     form.reset();
@@ -423,6 +480,7 @@ function openAddStudentModal() {
 }
 
 function closeAddStudentModal() {
+    if (studentMutationBusy) return;
     resetKsisImport();
     els.addStudentModal.classList.add("hidden");
     state.addStudentValidationActive = false;
@@ -432,15 +490,15 @@ function closeAddStudentModal() {
 
 async function saveNewStudent(event) {
     event.preventDefault();
-    await checkAddStudentDuplicateNow();
-    if (!validateAddStudentForm()) {
-        return;
-    }
-
-    setAddStudentMessage("กำลังเพิ่ม student...");
-    els.addStudentSave.disabled = true;
-
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
+    setStudentMutationBusy(true);
     try {
+        await checkAddStudentDuplicateNow();
+        // Validation focuses the first invalid field; release inert before it runs.
+        setStudentMutationBusy(false);
+        if (!validateAddStudentForm()) return;
+        setStudentMutationBusy(true);
+        setAddStudentMessage("กำลังเพิ่ม student...");
         const payload = readForm(els.addStudentForm);
         const data = await requestJson("/api/students", {
             method: "POST",
@@ -453,7 +511,11 @@ async function saveNewStudent(event) {
             enrollments: data.enrollments || []
         };
         state.selectedEnrollmentId = null;
-        closeAddStudentModal();
+        resetKsisImport();
+        els.addStudentModal.classList.add("hidden");
+        state.addStudentValidationActive = false;
+        state.addStudentDuplicate = null;
+        setAddStudentMessage();
         renderProfile();
         // A brand-new student has no enrollments yet, so the current status
         // filter (e.g. "Active") would hide them from the sidebar list even
@@ -468,12 +530,14 @@ async function saveNewStudent(event) {
     } catch (error) {
         setAddStudentMessage(error.message, "error");
     } finally {
-        els.addStudentSave.disabled = false;
+        setStudentMutationBusy(false);
     }
 }
 
 async function deleteSelectedStudent() {
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
     const student = state.profile?.student;
+    const studentId = state.selectedStudentId, requestId = profileRequest;
     const hasEnrollment = (state.profile?.enrollments || []).length > 0;
 
     if (!student || hasEnrollment) {
@@ -483,17 +547,19 @@ async function deleteSelectedStudent() {
 
     const ok = await confirmAction(`ลบ student #${student.studentId} ${student.displayName} ใช่ไหม?`);
 
-    if (!ok) {
+    if (!ok || studentMutationBusy || profileLoading || profileLoadFailed || requestId !== profileRequest
+        || state.selectedStudentId !== studentId || state.profile?.student !== student || state.profile.enrollments?.length) {
         return;
     }
 
-    els.deleteStudentButton.disabled = true;
+    setStudentMutationBusy(true);
     setStatus("กำลังลบ student...");
 
     try {
-        await requestJson(`/api/students/${encodeURIComponent(student.studentId)}`, {
+        await requestJson(`/api/students/${encodeURIComponent(studentId)}`, {
             method: "DELETE"
         });
+        if (requestId !== profileRequest || state.selectedStudentId !== studentId) return;
         state.selectedStudentId = null;
         state.selectedEnrollmentId = null;
         state.profile = null;
@@ -514,18 +580,22 @@ async function deleteSelectedStudent() {
     } catch (error) {
         setStatus(error.message, "error");
     } finally {
+        setStudentMutationBusy(false);
         updateDeleteStudentButton();
     }
 }
 
 async function saveStudent(event) {
     event.preventDefault();
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
+    const studentId = state.selectedStudentId;
+    setStudentMutationBusy(true);
     setStatus("กำลังบันทึก student...");
 
     try {
         const payload = readForm(els.studentForm);
-        const data = state.selectedStudentId
-            ? await requestJson(`/api/students/${encodeURIComponent(state.selectedStudentId)}`, {
+        const data = studentId
+            ? await requestJson(`/api/students/${encodeURIComponent(studentId)}`, {
                 method: "PUT",
                 body: JSON.stringify(payload)
             })
@@ -544,11 +614,14 @@ async function saveStudent(event) {
         setStatus("บันทึก student แล้ว");
     } catch (error) {
         setStatus(error.message, "error");
+    } finally {
+        setStudentMutationBusy(false);
     }
 }
 
 async function saveEnrollment(event) {
     event.preventDefault();
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
 
     if (!state.selectedStudentId) {
         setStatus("กรุณาบันทึก Student ก่อน", "error");
@@ -556,6 +629,8 @@ async function saveEnrollment(event) {
     }
 
     setStatus("กำลังบันทึก enrollment...");
+    const studentId = state.selectedStudentId;
+    setStudentMutationBusy(true);
 
     try {
         const payload = readForm(els.enrollmentForm);
@@ -564,7 +639,7 @@ async function saveEnrollment(event) {
         // "1:ZI1") — same as the "+ Subject" modal — so it needs the same
         // unwrap back to a plain level_master id before it's sent.
         payload.currentZunLevelMasterId = resolveAddZunLevelId(payload.currentZunLevelMasterId);
-        const endpoint = `/api/students/${encodeURIComponent(state.selectedStudentId)}/enrollments/${encodeURIComponent(payload.enrollmentId)}`;
+        const endpoint = `/api/students/${encodeURIComponent(studentId)}/enrollments/${encodeURIComponent(payload.enrollmentId)}`;
         const data = await requestJson(endpoint, {
             method: "PUT",
             body: JSON.stringify(payload)
@@ -578,6 +653,8 @@ async function saveEnrollment(event) {
         setStatus("บันทึก enrollment แล้ว");
     } catch (error) {
         setStatus(error.message, "error");
+    } finally {
+        setStudentMutationBusy(false);
     }
 }
 
@@ -602,6 +679,7 @@ function runEnrollmentStatusAction(action) { openEnrollmentStatusDialog(action);
 function runEnrollmentResumeAction() { openEnrollmentStatusDialog('resume'); }
 
 function openEnrollmentStatusDialog(action) {
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
     const enrollment = selectedEnrollment();
 
     if (!state.selectedStudentId || !enrollment) {
@@ -635,8 +713,11 @@ async function saveEnrollmentStatusAction(event) {
         return;
     }
     const { studentId, enrollmentId, action } = resumeTarget;
+    const requestId = profileRequest;
     const label = enrollmentActionLabels[action];
     const resumeDate = els.enrollmentResumeDate.value;
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
+    setStudentMutationBusy(true);
     resumeBusy = true;
     els.enrollmentResumeSave.disabled = els.enrollmentResumeCancel.disabled = els.enrollmentResumeDate.disabled = true;
     els.enrollmentResumeError.classList.add('hidden');
@@ -653,6 +734,7 @@ async function saveEnrollmentStatusAction(event) {
                 })
             }
         );
+        if (requestId !== profileRequest || state.selectedStudentId !== studentId || state.selectedEnrollmentId !== enrollmentId) return;
         saved = true;
         els.enrollmentResumeDialog.close(); resumeTarget = null;
         state.profile = data.profile;
@@ -670,11 +752,14 @@ async function saveEnrollmentStatusAction(event) {
         resumeBusy = false;
         els.enrollmentResumeSave.disabled = els.enrollmentResumeCancel.disabled = false;
         els.enrollmentResumeDate.disabled = action !== 'resume';
+        setStudentMutationBusy(false);
     }
 }
 
 async function deleteSelectedEnrollment() {
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
     const enrollment = selectedEnrollment();
+    const studentId = state.selectedStudentId, requestId = profileRequest;
 
     if (!state.selectedStudentId || !enrollment) {
         setStatus("กรุณาเลือก enrollment ก่อน", "error");
@@ -683,18 +768,20 @@ async function deleteSelectedEnrollment() {
 
     const ok = await confirmAction(`ลบ ${enrollment.subjectCode} enrollment #${enrollment.enrollmentId} ใช่ไหม?`);
 
-    if (!ok) {
+    if (!ok || studentMutationBusy || profileLoading || profileLoadFailed || requestId !== profileRequest
+        || state.selectedStudentId !== studentId || selectedEnrollment() !== enrollment) {
         return;
     }
 
-    els.deleteEnrollmentButton.disabled = true;
+    setStudentMutationBusy(true);
     setStatus("กำลังลบ subject...");
 
     try {
         const data = await requestJson(
-            `/api/students/${encodeURIComponent(state.selectedStudentId)}/enrollments/${encodeURIComponent(enrollment.enrollmentId)}`,
+            `/api/students/${encodeURIComponent(studentId)}/enrollments/${encodeURIComponent(enrollment.enrollmentId)}`,
             { method: "DELETE" }
         );
+        if (requestId !== profileRequest || state.selectedStudentId !== studentId || selectedEnrollment() !== enrollment) return;
         state.profile = data.profile;
         state.selectedEnrollmentId = data.profile.enrollments[0]?.enrollmentId || null;
         renderProfile();
@@ -706,7 +793,7 @@ async function deleteSelectedEnrollment() {
     } catch (error) {
         setStatus(error.message, "error");
     } finally {
-        els.deleteEnrollmentButton.disabled = false;
+        setStudentMutationBusy(false);
     }
 }
 
@@ -781,12 +868,16 @@ function renderHistoryTable(data) {
             </tbody>
         </table>
     `;
+    syncStudentControls();
 }
 
 async function returnCd(button) {
-    if (button.disabled || !state.selectedStudentId) return;
+    if (button.disabled || studentMutationBusy || profileLoading || profileLoadFailed || !state.selectedStudentId) return;
     const studentId = state.selectedStudentId;
+    const requestId = profileRequest;
     const cdUsedId = Number(button.dataset.returnCdId);
+    const pendingKey = `${studentId}:${cdUsedId}`;
+    if (pendingCdReturns.has(pendingKey)) return;
     const stockProcessed = button.dataset.stockProcessed === "true";
     const receivedCd = button.dataset.cpcd === "true";
     if (!await confirmAction(!receivedCd
@@ -794,10 +885,14 @@ async function returnCd(button) {
         : stockProcessed
         ? "เอา CD คืนและยกเลิกรายการให้ CD นี้ใช่ไหม? ระบบจะคืนสต็อก 1 แผ่นด้วย"
         : "เอา CD คืนและยกเลิกรายการให้ CD นี้ใช่ไหม? รายการนี้ยังไม่ตัดสต็อก จึงไม่เพิ่มสต็อก")) return;
+    if (studentMutationBusy || profileLoading || profileLoadFailed || requestId !== profileRequest
+        || state.selectedStudentId !== studentId || pendingCdReturns.has(pendingKey)) return;
+    pendingCdReturns.add(pendingKey);
     button.disabled = true;
+    syncStudentControls();
     try {
         const data = await requestJson(`/api/students/${encodeURIComponent(studentId)}/history/cd/${encodeURIComponent(cdUsedId)}`, { method: "DELETE" });
-        if (state.selectedStudentId === studentId) {
+        if (state.selectedStudentId === studentId && requestId === profileRequest) {
             await loadProfile(studentId, { preferredEnrollmentId: state.selectedEnrollmentId });
             await loadHistory();
         }
@@ -806,7 +901,8 @@ async function returnCd(button) {
     } catch (error) {
         setStatus(error.message, "error");
     } finally {
-        button.disabled = false;
+        pendingCdReturns.delete(pendingKey);
+        syncStudentControls();
     }
 }
 
@@ -862,29 +958,43 @@ async function deleteStatusHistoryEntry(enrollmentStatusId) {
 }
 
 async function loadHistory() {
+    const requestId = ++historyRequest;
     if (!state.selectedStudentId) {
         return;
     }
+    const studentId = state.selectedStudentId, enrollmentId = state.selectedEnrollmentId, type = state.historyType;
+    const isCurrent = () => requestId === historyRequest && studentId === state.selectedStudentId
+        && enrollmentId === state.selectedEnrollmentId && type === state.historyType;
 
     els.historySubtitle.textContent = "กำลังโหลด...";
+    els.historyTableWrap.innerHTML = `<div class="empty-state">กำลังโหลดประวัติ...</div>`;
     updateWsGraphButtonVisibility();
     const params = new URLSearchParams({
-        type: state.historyType
+        type
     });
 
-    if (state.selectedEnrollmentId) {
-        params.set("enrollmentId", String(state.selectedEnrollmentId));
+    if (enrollmentId) {
+        params.set("enrollmentId", String(enrollmentId));
     }
 
-    const data = await requestJson(
-        `/api/students/${encodeURIComponent(state.selectedStudentId)}/history?${params.toString()}`
-    );
+    try {
+        const data = await requestJson(
+            `/api/students/${encodeURIComponent(studentId)}/history?${params.toString()}`
+        );
+        if (!isCurrent()) return;
 
-    els.historySubtitle.textContent = `ล่าสุด ${data.rows.length} รายการ`;
-    renderHistoryTable(data);
+        els.historySubtitle.textContent = `ล่าสุด ${data.rows.length} รายการ`;
+        renderHistoryTable(data);
+    } catch (error) {
+        if (isCurrent()) {
+            els.historyTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+            throw error;
+        }
+    }
 }
 
 function startNewEnrollment() {
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
     if (!state.selectedStudentId) {
         return;
     }
@@ -899,6 +1009,7 @@ function startNewEnrollment() {
 }
 
 function closeAddEnrollmentModal() {
+    if (studentMutationBusy) return;
     els.addEnrollmentModal.classList.add("hidden");
     state.addEnrollmentValidationActive = false;
     setAddEnrollmentMessage();
@@ -906,6 +1017,7 @@ function closeAddEnrollmentModal() {
 
 async function saveNewEnrollment(event) {
     event.preventDefault();
+    if (studentMutationBusy || profileLoading || profileLoadFailed) return;
 
     if (!state.selectedStudentId) {
         return;
@@ -938,20 +1050,25 @@ async function saveNewEnrollment(event) {
     };
 
     setAddEnrollmentMessage("กำลังเพิ่มวิชา...");
-    els.addEnrollmentSave.disabled = true;
+    const studentId = state.selectedStudentId;
+    const requestId = profileRequest;
+    setStudentMutationBusy(true);
 
     try {
         const data = await requestJson(
-            `/api/students/${encodeURIComponent(state.selectedStudentId)}/enrollments`,
+            `/api/students/${encodeURIComponent(studentId)}/enrollments`,
             {
                 method: "POST",
                 body: JSON.stringify(payload)
             }
         );
+        if (requestId !== profileRequest || state.selectedStudentId !== studentId) return;
 
         state.profile = data.profile;
         state.selectedEnrollmentId = data.enrollmentId;
-        closeAddEnrollmentModal();
+        els.addEnrollmentModal.classList.add("hidden");
+        state.addEnrollmentValidationActive = false;
+        setAddEnrollmentMessage();
         renderProfile();
         await loadStudents();
         await loadHistory();
@@ -960,7 +1077,7 @@ async function saveNewEnrollment(event) {
     } catch (error) {
         setAddEnrollmentMessage(error.message, "error");
     } finally {
-        els.addEnrollmentSave.disabled = false;
+        setStudentMutationBusy(false);
     }
 }
 
@@ -1105,6 +1222,7 @@ function bindEvents() {
         });
     });
     els.enrollmentTabs.addEventListener("click", (event) => {
+        if (studentMutationBusy || profileLoading || profileLoadFailed) return;
         const button = event.target.closest("[data-enrollment-id]");
 
         if (!button) {
@@ -1127,6 +1245,7 @@ function bindEvents() {
         });
     });
     els.historyTabs.addEventListener("click", (event) => {
+        if (studentMutationBusy || profileLoading || profileLoadFailed) return;
         const button = event.target.closest("[data-history]");
 
         if (!button) {
@@ -1141,6 +1260,7 @@ function bindEvents() {
         loadHistory().catch((error) => setStatus(error.message, "error"));
     });
     els.historyTableWrap.addEventListener("click", (event) => {
+        if (studentMutationBusy || profileLoading || profileLoadFailed) return;
         const returnCdButton = event.target.closest("[data-return-cd-id]");
         if (returnCdButton) {
             returnCd(returnCdButton);

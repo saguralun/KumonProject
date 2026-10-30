@@ -6,24 +6,32 @@ import { httpError } from "./httpError.js";
 // the Users page, so a load-once-then-cache beats a DB round trip on every
 // permission-gated request. invalidateCache() is called after every write.
 let permissionCache = null;
+let permissionCacheVersion = 0;
 
 async function loadPermissionCache() {
-    const result = await pool.query(`SELECT role_code, permission_key FROM role_permission`);
-    const cache = new Map();
+    while (!permissionCache) {
+        const version = permissionCacheVersion;
+        const result = await pool.query(`SELECT role_code, permission_key FROM role_permission`);
+        // A grant write may have committed while this read was in flight. Neither
+        // install nor authorize from its obsolete snapshot; read the new version.
+        if (version !== permissionCacheVersion) continue;
+        const cache = new Map();
 
-    result.rows.forEach((row) => {
-        if (!cache.has(row.role_code)) {
-            cache.set(row.role_code, new Set());
-        }
+        result.rows.forEach((row) => {
+            if (!cache.has(row.role_code)) {
+                cache.set(row.role_code, new Set());
+            }
 
-        cache.get(row.role_code).add(row.permission_key);
-    });
+            cache.get(row.role_code).add(row.permission_key);
+        });
 
-    permissionCache = cache;
-    return cache;
+        permissionCache = cache;
+    }
+    return permissionCache;
 }
 
 function invalidateCache() {
+    permissionCacheVersion++;
     permissionCache = null;
 }
 

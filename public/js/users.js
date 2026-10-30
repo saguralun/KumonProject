@@ -21,6 +21,8 @@ const state = {
   grants: new Map() // role_code -> Set<permission_key>
 };
 const savingPermissionRoles = new Set();
+const permissionRevisions = new Map();
+let usersLoadRequest = 0;
 
 const NAV_GROUP_LABELS = {
   management: "จัดการ",
@@ -102,6 +104,9 @@ function populateRoleSelect(select, currentValue) {
 }
 
 async function loadAll() {
+  const requestId = ++usersLoadRequest;
+  const revisions = new Map(permissionRevisions);
+  const pendingRoles = new Set(savingPermissionRoles);
   els.tableWrap.innerHTML = `<div class="empty-state">กำลังโหลด...</div>`;
   els.matrixWrap.innerHTML = `<div class="empty-state">กำลังโหลด...</div>`;
 
@@ -110,22 +115,31 @@ async function loadAll() {
       requestJson("/api/users"),
       requestJson("/api/roles")
     ]);
+    if (requestId !== usersLoadRequest) return;
 
     state.roles = rolesData.roles;
     state.permissions = rolesData.permissions;
-    state.grants = new Map();
+    const grants = new Map();
     rolesData.grants.forEach((grant) => {
-      if (!state.grants.has(grant.role_code)) {
-        state.grants.set(grant.role_code, new Set());
+      if (!grants.has(grant.role_code)) {
+        grants.set(grant.role_code, new Set());
       }
-      state.grants.get(grant.role_code).add(grant.permission_key);
+      grants.get(grant.role_code).add(grant.permission_key);
     });
+    for (const role of state.roles) {
+      const code = role.role_code;
+      if (pendingRoles.has(code) || savingPermissionRoles.has(code) || revisions.get(code) !== permissionRevisions.get(code)) {
+        grants.set(code, new Set(state.grants.get(code) || []));
+      }
+    }
+    state.grants = grants;
 
-    populateRoleSelect(els.createRoleSelect);
+    populateRoleSelect(els.createRoleSelect, els.createRoleSelect.value);
     renderUsers(usersData.users);
     els.listSubtitle.textContent = `${usersData.users.length} บัญชี`;
     renderPermissionMatrix();
   } catch (error) {
+    if (requestId !== usersLoadRequest) return;
     els.tableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.matrixWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
   }
@@ -326,6 +340,7 @@ async function handlePermissionToggle(checkbox) {
   }
 
   savingPermissionRoles.add(roleCode);
+  permissionRevisions.set(roleCode, (permissionRevisions.get(roleCode) || 0) + 1);
   for (const input of els.matrixWrap.querySelectorAll('input[data-role-code]')) if (input.dataset.roleCode === roleCode) input.disabled = true;
 
   try {

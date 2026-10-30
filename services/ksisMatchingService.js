@@ -10,7 +10,7 @@ const fullName = (student) => `${student.firstName} ${student.lastName}`.trim();
 const snapshot = (student) => JSON.stringify([student.firstName, student.lastName, student.birthDate,
     student.enrollments.map((enrollment) => [enrollment.id, enrollment.kumonId || ""]).sort((a, b) => a[0] - b[0])]);
 
-export async function loadKsisMatchingStudents(client = pool) {
+async function loadKsisMatchingStudents(client = pool) {
     const { rows } = await client.query(`SELECT s.student_id AS "studentId", s.first_name AS "firstName", s.last_name AS "lastName",
         s.birth_date::text AS "birthDate", COALESCE(jsonb_agg(jsonb_build_object('id', e.enrollment_id,
             'subject', sm.subject_code, 'kumonId', e.kumon_student_id) ORDER BY e.enrollment_id)

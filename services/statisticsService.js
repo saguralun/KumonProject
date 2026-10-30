@@ -33,9 +33,9 @@ const TABLE_SCHEMA = "kumon";
 // than these 7 combined some months, so stacking it into the same bar
 // would swallow the in/out segments the chart is actually about. It's
 // reported as a separate `current` field per year instead (see below).
-export const STATUS_CODES = ["N", "IT", "EO", "R", "A", "OT", "CP"];
+const STATUS_CODES = ["N", "IT", "EO", "R", "A", "OT", "CP"];
 
-export const STATUS_LABELS = {
+const STATUS_LABELS = {
     N: "New Enrolment",
     IT: "Incoming Transfer",
     EO: "Enrolling Other Subject",

@@ -7,15 +7,39 @@ const GUEST_PIN = process.env.GUEST_PIN || "";
 // Any role_master row is a valid account role EXCEPT "guest" — guest isn't
 // a DB account at all (shared PIN + free-text display name, see
 // verifyGuestLogin), so it can never be assigned to a real app_user row.
-async function assertAssignableRole(roleCode) {
+async function assertAssignableRole(roleCode, client) {
     if (roleCode === "guest") {
         throw httpError(400, `role "guest" กำหนดให้บัญชีจริงไม่ได้ (guest ล็อกอินด้วย PIN ไม่ใช่บัญชี)`);
     }
 
-    const result = await pool.query(`SELECT 1 FROM role_master WHERE role_code = $1`, [roleCode]);
+    const result = await client.query(`SELECT 1 FROM role_master WHERE role_code = $1`, [roleCode]);
 
     if (!result.rows[0]) {
         throw httpError(400, `ไม่พบ role "${roleCode}" — เพิ่ม role นี้ในหน้า Users ก่อน`);
+    }
+}
+
+async function withAccountWrite(action) {
+    const client = await pool.connect();
+    let transaction = false, releaseError;
+    try {
+        await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
+        transaction = true;
+        // All account mutation paths share this lock, including CLI upserts.
+        // Count/check/write must see the preceding writer's committed admins.
+        await client.query('LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE');
+        const result = await action(client);
+        await client.query('COMMIT');
+        transaction = false;
+        return result;
+    } catch (error) {
+        if (transaction) {
+            try { await client.query('ROLLBACK'); }
+            catch (rollbackError) { releaseError = rollbackError; }
+        }
+        throw error;
+    } finally {
+        client.release(releaseError);
     }
 }
 
@@ -103,39 +127,40 @@ export async function upsertAccount({ username, password, displayName, role = "a
         throw httpError(400, "username และ password ห้ามว่าง");
     }
 
-    await assertAssignableRole(normalizedRole);
+    // Hash before taking the account lock; bcrypt need not block other writes.
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    return withAccountWrite(async client => {
+        await assertAssignableRole(normalizedRole, client);
+        if (normalizedRole !== "admin") {
+            const existing = await client.query(
+                `SELECT user_id, role, is_active FROM app_user WHERE username = $1`,
+                [normalizedUsername]
+            );
 
-    if (normalizedRole !== "admin") {
-        const existing = await pool.query(
-            `SELECT user_id, role, is_active FROM app_user WHERE username = $1`,
-            [normalizedUsername]
-        );
+            if (existing.rows[0]?.role === "admin" && existing.rows[0]?.is_active) {
+                const remaining = await countOtherActiveAdmins(client, existing.rows[0].user_id);
 
-        if (existing.rows[0]?.role === "admin" && existing.rows[0]?.is_active) {
-            const remaining = await countOtherActiveAdmins(pool, existing.rows[0].user_id);
-
-            if (remaining === 0) {
-                throw httpError(400, "เปลี่ยน role ไม่ได้ เพราะเป็น Admin คนสุดท้ายที่ยัง active อยู่");
+                if (remaining === 0) {
+                    throw httpError(400, "เปลี่ยน role ไม่ได้ เพราะเป็น Admin คนสุดท้ายที่ยัง active อยู่");
+                }
             }
         }
-    }
 
-    const passwordHash = await bcrypt.hash(String(password), 10);
+        const result = await client.query(
+            `INSERT INTO app_user (username, password_hash, display_name, role)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (username) DO UPDATE
+               SET password_hash = EXCLUDED.password_hash,
+                   display_name = EXCLUDED.display_name,
+                   role = EXCLUDED.role,
+                   is_active = TRUE,
+                   updated_at = CURRENT_TIMESTAMP
+             RETURNING user_id, username, display_name, role`,
+            [normalizedUsername, passwordHash, normalizedDisplayName, normalizedRole]
+        );
 
-    const result = await pool.query(
-        `INSERT INTO app_user (username, password_hash, display_name, role)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (username) DO UPDATE
-           SET password_hash = EXCLUDED.password_hash,
-               display_name = EXCLUDED.display_name,
-               role = EXCLUDED.role,
-               is_active = TRUE,
-               updated_at = CURRENT_TIMESTAMP
-         RETURNING user_id, username, display_name, role`,
-        [normalizedUsername, passwordHash, normalizedDisplayName, normalizedRole]
-    );
-
-    return result.rows[0];
+        return result.rows[0];
+    });
 }
 
 export async function listAccounts() {
@@ -160,58 +185,61 @@ async function countOtherActiveAdmins(client, excludedUserId) {
 }
 
 export async function setAccountActive(userId, isActive) {
-    if (!isActive) {
-        const remaining = await countOtherActiveAdmins(pool, userId);
-        const target = await pool.query(`SELECT role FROM app_user WHERE user_id = $1`, [userId]);
+    return withAccountWrite(async client => {
+        if (!isActive) {
+            const target = await client.query(`SELECT role, is_active FROM app_user WHERE user_id = $1`, [userId]);
 
-        if (target.rows[0]?.role === "admin" && remaining === 0) {
-            throw httpError(400, "ปิดใช้งานไม่ได้ เพราะเป็น Admin คนสุดท้ายที่ยัง active อยู่");
+            if (target.rows[0]?.role === "admin" && target.rows[0]?.is_active && await countOtherActiveAdmins(client, userId) === 0) {
+                throw httpError(400, "ปิดใช้งานไม่ได้ เพราะเป็น Admin คนสุดท้ายที่ยัง active อยู่");
+            }
         }
-    }
 
-    const result = await pool.query(
-        `UPDATE app_user
-         SET is_active = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $1
-         RETURNING user_id, username, display_name, role, is_active`,
-        [userId, Boolean(isActive)]
-    );
+        const result = await client.query(
+            `UPDATE app_user
+             SET is_active = $2, updated_at = CURRENT_TIMESTAMP
+             WHERE user_id = $1
+             RETURNING user_id, username, display_name, role, is_active`,
+            [userId, Boolean(isActive)]
+        );
 
-    if (!result.rows[0]) {
-        throw httpError(404, "ไม่พบบัญชีนี้");
-    }
+        if (!result.rows[0]) {
+            throw httpError(404, "ไม่พบบัญชีนี้");
+        }
 
-    return result.rows[0];
+        return result.rows[0];
+    });
 }
 
 export async function updateAccountRole(userId, role) {
     const normalizedRole = String(role || "").trim();
 
-    await assertAssignableRole(normalizedRole);
+    return withAccountWrite(async client => {
+        await assertAssignableRole(normalizedRole, client);
 
-    if (normalizedRole !== "admin") {
-        const current = await pool.query(`SELECT role, is_active FROM app_user WHERE user_id = $1`, [userId]);
+        if (normalizedRole !== "admin") {
+            const current = await client.query(`SELECT role, is_active FROM app_user WHERE user_id = $1`, [userId]);
 
-        if (current.rows[0]?.role === "admin" && current.rows[0]?.is_active) {
-            const remaining = await countOtherActiveAdmins(pool, userId);
+            if (current.rows[0]?.role === "admin" && current.rows[0]?.is_active) {
+                const remaining = await countOtherActiveAdmins(client, userId);
 
-            if (remaining === 0) {
-                throw httpError(400, "เปลี่ยน role ไม่ได้ เพราะเป็น Admin คนสุดท้ายที่ยัง active อยู่");
+                if (remaining === 0) {
+                    throw httpError(400, "เปลี่ยน role ไม่ได้ เพราะเป็น Admin คนสุดท้ายที่ยัง active อยู่");
+                }
             }
         }
-    }
 
-    const result = await pool.query(
-        `UPDATE app_user
-         SET role = $2, updated_at = CURRENT_TIMESTAMP
-         WHERE user_id = $1
-         RETURNING user_id, username, display_name, role, is_active`,
-        [userId, normalizedRole]
-    );
+        const result = await client.query(
+            `UPDATE app_user
+             SET role = $2, updated_at = CURRENT_TIMESTAMP
+             WHERE user_id = $1
+             RETURNING user_id, username, display_name, role, is_active`,
+            [userId, normalizedRole]
+        );
 
-    if (!result.rows[0]) {
-        throw httpError(404, "ไม่พบบัญชีนี้");
-    }
+        if (!result.rows[0]) {
+            throw httpError(404, "ไม่พบบัญชีนี้");
+        }
 
-    return result.rows[0];
+        return result.rows[0];
+    });
 }

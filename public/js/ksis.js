@@ -1,8 +1,8 @@
-import { setupKsisDraft } from "./reportKsisDraft.js?v=20261023-all-actions";
+import { setupKsisDraft } from "./reportKsisDraft.js?v=20261030-project-audit";
 import { setupKsisMatching } from "./reportKsisMatching.js?v=20261022-workspace";
 import { setupKsisAudit } from "./ksisAudit.js?v=20261023-shared";
 import { setupKsisDesktop } from "./ksisDesktop.js?v=20261023-all-actions";
-import { setupKsisAt } from './ksisAt.js?v=20261023-all-actions';
+import { setupKsisAt } from './ksisAt.js?v=20261030-project-audit';
 import { createKsisSharedWorkspace } from './ksisSharedWorkspace.js?v=20261023-empty-state-recovery';
 import { setupKsisAtAudit } from './ksisAtAudit.js?v=20261023-at-audit';
 

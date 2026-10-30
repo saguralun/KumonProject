@@ -297,7 +297,6 @@ h1 {
 .student-strip,
 .input-panel,
 .preview-panel,
-.secondary-actions,
 .history-panel {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -319,7 +318,6 @@ h1 {
 .student-strip,
 .input-panel,
 .preview-panel,
-.secondary-actions,
 .history-panel {
   /* Without this, nothing actually clips a child to this card's rounded
      border — .history-table-wrap/.worksheet-packet-summary handle their
@@ -1169,25 +1167,6 @@ html[data-role="staff"] [data-staff-up] {
   padding: 4px 7px;
 }
 
-.secondary-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 8px;
-  box-shadow: none;
-}
-
-.secondary-actions button {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  border-radius: 7px;
-  padding: 0 13px;
-  font-weight: 600;
-}
-
 .button-icon {
   display: inline-flex;
   width: 18px;
@@ -1336,26 +1315,6 @@ html[data-role="staff"] [data-staff-up] {
   left: 0;
   border-radius: 6px 6px 3px 3px;
   background: linear-gradient(180deg, var(--ws-graph-top), var(--ws-graph-bottom));
-}
-
-.packet-summary-table {
-  width: 100%;
-  min-width: 0;
-  border-collapse: collapse;
-}
-
-.packet-summary-table th,
-.packet-summary-table td {
-  border-bottom: 1px solid var(--line);
-  padding: 4px 5px;
-  text-align: right;
-  white-space: nowrap;
-  font-size: 11px;
-}
-
-.packet-summary-table th:first-child,
-.packet-summary-table td:first-child {
-  text-align: left;
 }
 
 .history-table {
@@ -1784,10 +1743,6 @@ html[data-role="staff"] [data-staff-up] {
 
   .pattern-button {
     min-height: 38px;
-  }
-
-  .secondary-actions {
-    flex-wrap: wrap;
   }
 
   .at-student-grid,

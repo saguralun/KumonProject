@@ -12,7 +12,7 @@ const REPO_DIR = process.cwd();
 const GITHUB_REPO = "saguralun/KumonProject";
 const GITHUB_BRANCH = "main";
 const INSTANCE_ID = randomUUID();
-let updateInProgress = false;
+let updateInProgress = null;
 let updateCheckPending;
 let updateCheckCache;
 let updateCheckExpires = 0;
@@ -22,7 +22,7 @@ export function getRuntimeStatus() {
     return { instanceId: INSTANCE_ID, processId: process.pid };
 }
 
-export async function scheduleAppRestart() {
+async function launchRestartHelper() {
     const restartPath = path.join(REPO_DIR, "launcher", "restart-hidden.vbs");
     const statusPath = path.join(REPO_DIR, "logs", `restart-${process.pid}.log`);
     await fs.mkdir(path.dirname(statusPath), { recursive: true });
@@ -49,13 +49,47 @@ export async function scheduleAppRestart() {
         closeSync(outputFd);
     }
     child.unref();
+    return { child, readStatus: () => fs.readFile(statusPath, 'utf8').catch(() => '') };
+}
+
+function restartDelay(milliseconds, background = false) {
+    return new Promise(resolve => {
+        const timer = setTimeout(resolve, milliseconds);
+        if (background) timer.unref();
+    });
+}
+
+async function monitorRestartFailure(readStatus, wait, onFailure) {
+    // READY precedes the helper's safety checks and Stop-Process. If those
+    // fail, this original process is still alive and may safely allow a retry.
+    // A missing/unchanged log is not proof of failure: keep the guard then.
+    for (let attempt = 0; attempt < 1200; attempt++) {
+        await wait(100, true);
+        const status = await readStatus();
+        if (status.includes('ERROR')) {
+            onFailure();
+            return;
+        }
+        if (status.includes('SUCCESS')) return;
+    }
+}
+
+export async function scheduleAppRestart({ onFailure = () => {} } = {}, steps = {}) {
+    const wait = steps.wait || restartDelay;
+    const { child, readStatus } = await (steps.launch || launchRestartHelper)();
     // Confirm that PowerShell actually entered the helper before reporting a restart.
     for (let attempt = 0; attempt < 100; attempt++) {
-        const status = await fs.readFile(statusPath, "utf8").catch(() => "");
+        const status = await readStatus();
         if (status.includes("ERROR")) throw httpError(500, "เริ่มตัว restart ไม่สำเร็จ ตรวจ logs/restart-*.log");
-        if (status.includes("READY")) return;
+        if (status.includes("READY")) {
+            const completion = monitorRestartFailure(readStatus, wait, onFailure);
+            // Observing the log must never produce an unhandled rejection or
+            // authorize a second updater on an unknown monitoring failure.
+            void completion.catch(() => {});
+            return { completion };
+        }
         if (child.exitCode !== null && child.exitCode !== 0) throw httpError(500, `ตัว restart หยุดทำงาน (exit ${child.exitCode}) ตรวจ logs/restart-helper-*.log`);
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await wait(100);
     }
     throw httpError(500, "อัพเดทโค้ดแล้ว แต่ตัว restart ไม่ตอบรับ กรุณาเปิดผ่าน start-kumondb.bat ใหม่ และตรวจ logs/restart-*.log");
 }
@@ -122,14 +156,20 @@ async function readRemoteVersion() {
     }
 }
 
-export async function applyUpdate() {
+export async function applyUpdate(steps = {}) {
     if (updateInProgress) throw httpError(409, "กำลังอัพเดทหรือ restart อยู่ กรุณารอให้โปรแกรมเปิดกลับมา");
-    updateInProgress = true;
     const context = {};
+    updateInProgress = context;
+    context.onRestartFailure = () => {
+        if (updateInProgress === context) {
+            updateNeedsRetry = true;
+            updateInProgress = null;
+        }
+    };
     try {
-        return await performUpdate(context);
+        return await performUpdate(context, steps);
     } catch (error) {
-        updateInProgress = false;
+        if (updateInProgress === context) updateInProgress = null;
         if (context.fileRecovery?.backupDirectory) error.message += `\nสำรองไฟล์สร้างอัตโนมัติไว้ที่ ${context.fileRecovery.backupDirectory}`;
         throw error;
     }
@@ -182,7 +222,7 @@ export async function performUpdate(context = {}, steps = {}) {
     }
 
     const { stdout: newHead } = await git(["rev-parse", "HEAD"]);
-    await restart();
+    await restart({ onFailure: context.onRestartFailure });
 
     return {
         success: true,

@@ -713,7 +713,7 @@ export async function getIncompleteWorksheetStudents({ regularPage = 1, kcPage =
     };
 }
 
-export async function getActiveStudentEnrollments(studentId) {
+async function getActiveStudentEnrollments(studentId) {
     const result = await pool.query(`
         SELECT
             e.enrollment_id,
@@ -754,7 +754,7 @@ export async function getActiveStudentEnrollments(studentId) {
     return result.rows.map(mapEnrollment);
 }
 
-export async function getWorksheetOptions(levelMasterId) {
+async function getWorksheetOptions(levelMasterId) {
     if (!levelMasterId) {
         return [];
     }
@@ -1127,7 +1127,7 @@ async function getLevelCompletionState(enrollment, client = pool) {
                 WHERE wu.enrollment_id = $1
                   AND wm.level_master_id = $2
                   AND wm.worksheet_no = 191
-                  AND wu.cpws = TRUE
+                  AND (wu.cpws = TRUE OR $5::boolean)
             ) AS can_complete_ws_level,
             CASE
                 WHEN $3::smallint IS NULL THEN FALSE
@@ -1139,7 +1139,7 @@ async function getLevelCompletionState(enrollment, client = pool) {
                     WHERE wu.enrollment_id = $1
                       AND wm.level_master_id = $3
                       AND wm.worksheet_no = 91
-                      AND wu.cpws = TRUE
+                      AND (wu.cpws = TRUE OR $5::boolean)
                 )
             END AS can_complete_zun_level,
             at_master.at_master_id,
@@ -1159,7 +1159,8 @@ async function getLevelCompletionState(enrollment, client = pool) {
         enrollment.enrollmentId,
         enrollment.currentLevelMasterId,
         enrollment.currentZunLevelMasterId,
-        enrollment.subjectId
+        enrollment.subjectId,
+        enrollment.isKumonConnect === true
     ]);
     const row = result.rows[0] || {};
     const atMasterId = row.at_master_id || null;
@@ -1267,7 +1268,9 @@ async function getLevelCompletionState(enrollment, client = pool) {
         atCompletion: {
             canComplete: canCompleteWsLevel,
             hasWorksheet191,
-            bypassWorksheet191: Boolean(enrollment.isKumonConnect && !hasWorksheet191),
+            // The UI's packet graph counts physical CPWS only. Digital evidence
+            // must not turn off the KC bypass after packet 191 is saved.
+            bypassWorksheet191: Boolean(enrollment.isKumonConnect),
             hasAtMaster: Boolean(atMasterId),
             hasPassed,
             atMasterId,
@@ -1639,6 +1642,29 @@ async function insertWorksheetRecords(client, records) {
     return result.rows.map(mapHistoryRow);
 }
 
+function assertExpectedId(payload, field, actual, { nullable = false } = {}) {
+    // Omitted fields retain compatibility with already-open older clients.
+    // Explicit null is meaningful for Zun: no Zun was shown when preparing the form.
+    if (!Object.hasOwn(payload, field)) return;
+    const value = payload[field];
+    const expected = value === null && nullable ? null : Number(value);
+    if (!(value === null && nullable)
+        && ((typeof value !== "number" && typeof value !== "string")
+            || !Number.isSafeInteger(expected) || expected < 1)) {
+        throw httpError(400, `${field} ไม่ถูกต้อง`);
+    }
+    if (expected !== (actual == null ? null : Number(actual))) {
+        throw httpError(409, "ระดับหรือแบบทดสอบเปลี่ยนหลังเปิดฟอร์ม กรุณาโหลดข้อมูลใหม่ก่อนบันทึก");
+    }
+}
+
+async function lockEnrollmentRow(client, enrollmentId) {
+    // Lock before reading joined masters/eligibility, so a waiter reads a fresh
+    // statement snapshot after another transaction advances the enrollment.
+    const result = await client.query(`SELECT enrollment_id FROM ${TABLE_SCHEMA}.enrollment WHERE enrollment_id = $1 FOR UPDATE`, [enrollmentId]);
+    if (!result.rows[0]) throw httpError(404, "ไม่พบ enrollment");
+}
+
 export async function saveWorksheetEntries(payload) {
     const enrollmentId = Number(payload?.enrollmentId);
 
@@ -1654,6 +1680,8 @@ export async function saveWorksheetEntries(payload) {
 
     const enrollment = mapEnrollment(rawEnrollment);
     const receiveDate = assertIsoDate(payload.receiveDate, "Receive date");
+    assertExpectedId(payload, "expectedMainLevelMasterId", enrollment.currentLevelMasterId);
+    assertExpectedId(payload, "expectedZunLevelMasterId", enrollment.currentZunLevelMasterId, { nullable: true });
     const pattern = patternFromCode(payload.patternCode);
     const [mainOptions, zunOptions] = await Promise.all([
         getWorksheetOptions(enrollment.currentLevelMasterId),
@@ -1700,6 +1728,19 @@ export async function saveWorksheetEntries(payload) {
 
     try {
         await client.query("BEGIN");
+
+        await lockEnrollmentRow(client, enrollmentId);
+        const lockedEnrollment = await getEnrollmentRow(enrollmentId, { client });
+        if (!lockedEnrollment) throw httpError(409, "Enrollment ไม่ได้ใช้งานแล้ว กรุณาโหลดข้อมูลใหม่");
+        assertExpectedId(payload, "expectedMainLevelMasterId", lockedEnrollment.current_level_master_id);
+        assertExpectedId(payload, "expectedZunLevelMasterId", lockedEnrollment.current_zun_level_master_id, { nullable: true });
+        // Even legacy clients cannot write records built from a snapshot that
+        // changed between the initial reads and acquisition of this lock.
+        if (Number(lockedEnrollment.current_level_master_id) !== Number(enrollment.currentLevelMasterId)
+            || (lockedEnrollment.current_zun_level_master_id ?? null) !== (enrollment.currentZunLevelMasterId ?? null)
+            || (lockedEnrollment.is_kumon_connect === true) !== enrollment.isKumonConnect) {
+            throw httpError(409, "ข้อมูล Enrollment เปลี่ยนระหว่างบันทึก กรุณาโหลดข้อมูลใหม่");
+        }
 
         const savedRecords = await insertWorksheetRecords(client, records);
 
@@ -1886,6 +1927,8 @@ async function getCurrentAtMaster(client, enrollmentId) {
             level.next_level_master_id,
             next_level.level_code AS next_level_code
         FROM ${TABLE_SCHEMA}.enrollment e
+        JOIN ${TABLE_SCHEMA}.status_master status
+            ON status.status_id = e.current_status_group1_id
         JOIN ${TABLE_SCHEMA}.subject_master subject
             ON subject.subject_id = e.subject_id
         JOIN ${TABLE_SCHEMA}.level_master level
@@ -1896,8 +1939,9 @@ async function getCurrentAtMaster(client, enrollmentId) {
             ON at_master.subject_id = e.subject_id
            AND at_master.level_master_id = e.current_level_master_id
         WHERE e.enrollment_id = $1
+          AND status.status_code = ANY($2::text[])
         FOR UPDATE OF e
-    `, [enrollmentId]);
+    `, [enrollmentId, ACTIVE_STATUS_CODES]);
 
     return result.rows[0] || null;
 }
@@ -1985,6 +2029,7 @@ export async function saveAtCompletion(payload) {
     try {
         await client.query("BEGIN");
 
+        await lockEnrollmentRow(client, enrollmentId);
         let savedAtUsedId = atUsedId;
         let levelMasterId = null;
         let nextLevelMasterId = null;
@@ -1999,6 +2044,8 @@ export async function saveAtCompletion(payload) {
                 throw httpError(404, "ไม่พบ AT record ของ enrollment นี้");
             }
 
+            assertExpectedId(payload, "expectedAtMasterId", attempt.at_master_id);
+            assertExpectedId(payload, "expectedLevelMasterId", attempt.level_master_id);
             validateAtValues({
                 score,
                 usedTime,
@@ -2059,6 +2106,8 @@ export async function saveAtCompletion(payload) {
                 throw httpError(400, "Level ปัจจุบันไม่มี AT master");
             }
 
+            assertExpectedId(payload, "expectedAtMasterId", atMaster.at_master_id);
+            assertExpectedId(payload, "expectedLevelMasterId", atMaster.current_level_master_id);
             validateAtValues({
                 score,
                 usedTime,
@@ -2142,6 +2191,7 @@ export async function completeWorksheetLevelWithoutAt(payload) {
     try {
         await client.query("BEGIN");
 
+        await lockEnrollmentRow(client, enrollmentId);
         const result = await client.query(`
             SELECT
                 e.enrollment_id,
@@ -2157,7 +2207,7 @@ export async function completeWorksheetLevelWithoutAt(payload) {
                     WHERE wu.enrollment_id = e.enrollment_id
                       AND wm.level_master_id = e.current_level_master_id
                       AND wm.worksheet_no = 191
-                      AND wu.cpws = TRUE
+                      AND (wu.cpws = TRUE OR COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE))
                 ) AS has_worksheet_191,
                 EXISTS (
                     SELECT 1
@@ -2182,6 +2232,7 @@ export async function completeWorksheetLevelWithoutAt(payload) {
             throw httpError(404, "ไม่พบ enrollment ที่ยังใช้งานอยู่");
         }
 
+        assertExpectedId(payload, "expectedMainLevelMasterId", row.current_level_master_id);
         if (!FREE_COMPLETION_LEVEL_CODES.includes(row.current_level_code)) {
             throw httpError(400, "Level นี้ต้องสอบ AT ตามปกติ");
         }
@@ -2241,6 +2292,7 @@ export async function completeZunLevel(payload) {
     try {
         await client.query("BEGIN");
 
+        await lockEnrollmentRow(client, enrollmentId);
         const result = await client.query(`
             SELECT
                 e.enrollment_id,
@@ -2256,7 +2308,7 @@ export async function completeZunLevel(payload) {
                     WHERE wu.enrollment_id = e.enrollment_id
                       AND wm.level_master_id = e.current_zun_level_master_id
                       AND wm.worksheet_no = 91
-                      AND wu.cpws = TRUE
+                      AND (wu.cpws = TRUE OR COALESCE((to_jsonb(e)->>'is_kumon_connect')::boolean, FALSE))
                 ) AS can_complete_zun_level
             FROM ${TABLE_SCHEMA}.enrollment e
             JOIN ${TABLE_SCHEMA}.status_master status
@@ -2275,6 +2327,7 @@ export async function completeZunLevel(payload) {
             throw httpError(404, "ไม่พบ enrollment ที่ยังใช้งานอยู่");
         }
 
+        assertExpectedId(payload, "expectedZunLevelMasterId", row.current_zun_level_master_id, { nullable: true });
         if (!row.current_zun_level_master_id) {
             throw httpError(400, "Enrollment นี้ไม่มี Zun level ให้จบ");
         }

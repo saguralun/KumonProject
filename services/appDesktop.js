@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { createApplicationDesktop } from './ksisDesktop.js';
 import { httpError } from './httpError.js';
 
-export function appDesktopProfileDirectory() {
+function appDesktopProfileDirectory() {
     const project = createHash('sha256').update(process.cwd()).digest('hex').slice(0, 12);
     return path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'share'), 'KumonDB', 'desktop', project);
 }

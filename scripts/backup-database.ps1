@@ -20,6 +20,8 @@ $ErrorActionPreference = "Stop"
 
 $ProjectDir = Split-Path -Parent $PSScriptRoot
 $LogFile = Join-Path $ProjectDir "backups\backup.log"
+$TemporaryBackupFile = $null
+$PreviousPgPassword = $env:PGPASSWORD
 
 function Write-Log {
     param([string]$Message)
@@ -98,6 +100,9 @@ try {
 
     $Timestamp = Get-Date -Format "yyyy-MM-dd_HHmmss"
     $BackupFile = Join-Path $BackupDir "$DbName`_$Timestamp.backup"
+    # Same directory/volume for atomic publication. This name cannot match the
+    # completed .backup files listed by the app or selected for retention.
+    $TemporaryBackupFile = Join-Path $BackupDir (".$DbName`_$Timestamp." + [guid]::NewGuid().ToString('N') + ".tmp")
 
     Write-Log "Starting backup of '$DbName' -> $BackupFile"
 
@@ -106,15 +111,20 @@ try {
     # documented way to pass this non-interactively.
     $env:PGPASSWORD = $DbPassword
 
-    & $PgDumpPath -h $DbHost -p $DbPort -U $DbUser -d $DbName -Fc -f $BackupFile
+    & $PgDumpPath -h $DbHost -p $DbPort -U $DbUser -d $DbName -Fc -f $TemporaryBackupFile
 
     if ($LASTEXITCODE -ne 0) {
         throw "pg_dump exited with code $LASTEXITCODE"
     }
 
-    $env:PGPASSWORD = $null
+    $size = (Get-Item -LiteralPath $TemporaryBackupFile).Length
+    if ($size -le 0) { throw "pg_dump produced an empty backup" }
+    # File.Move refuses an existing destination, including a simultaneous dump
+    # completed in this same second. Never overwrite a previously good backup.
+    [System.IO.File]::Move($TemporaryBackupFile, $BackupFile)
+    $TemporaryBackupFile = $null
 
-    $sizeMb = [math]::Round((Get-Item $BackupFile).Length / 1MB, 2)
+    $sizeMb = [math]::Round($size / 1MB, 2)
     Write-Log "Backup succeeded: $BackupFile ($sizeMb MB)"
 
     # --- 5) Clean up old backups in $BackupDir ------------------------------
@@ -129,7 +139,7 @@ try {
         Select-Object -Skip $KeepCount
 
     foreach ($old in $oldBackups) {
-        Remove-Item $old.FullName -Force
+        Remove-Item -LiteralPath $old.FullName -Force
         Write-Log "Deleted old backup: $($old.Name)"
     }
 
@@ -138,4 +148,10 @@ try {
 catch {
     Write-Log "BACKUP FAILED: $($_.Exception.Message)"
     exit 1
+}
+finally {
+    $env:PGPASSWORD = $PreviousPgPassword
+    if ($TemporaryBackupFile -and (Test-Path -LiteralPath $TemporaryBackupFile)) {
+        Remove-Item -LiteralPath $TemporaryBackupFile -Force
+    }
 }

@@ -67,6 +67,7 @@ let contextGeneration = 0;
 export async function loadEnrollmentContext(enrollmentId) {
     if (state.isSaving) return;
     const generation = ++contextGeneration;
+    state.contextRequestId = generation;
     state.isLoadingContext = true;
     updatePreview();
     setStatus("กำลังโหลดข้อมูลเด็ก...");
@@ -214,6 +215,8 @@ async function saveEntries() {
 
     const payload = {
         enrollmentId: state.context.enrollment.enrollmentId,
+        expectedMainLevelMasterId: state.context.enrollment.currentLevelMasterId,
+        expectedZunLevelMasterId: state.context.enrollment.currentZunLevelMasterId ?? null,
         receiveDate: els.receiveDate.value,
         patternCode: state.patternCode,
         mainWorksheetNos: readWorksheetNosFromDom("main"),
@@ -324,7 +327,7 @@ async function deleteHistoryRecord(worksheetUsedId) {
 }
 
 async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
-    if (!state.context || !worksheetUsedId || !worksheetDate) {
+    if (!state.context || state.isSaving || state.isLoadingContext || input.disabled || !worksheetUsedId || !worksheetDate) {
         return;
     }
 
@@ -342,14 +345,17 @@ async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
     }
 
     input.disabled = true;
+    const context = state.context, generation = contextGeneration;
+    const isCurrent = () => state.context === context && generation === contextGeneration;
     setStatus("กำลังแก้วันที่...");
 
     try {
         const result = await worksheetApi.updateEntryDate({
-            enrollmentId: state.context.enrollment.enrollmentId,
+            enrollmentId: context.enrollment.enrollmentId,
             worksheetUsedId: recordId,
             worksheetDate
         });
+        if (!isCurrent()) return;
 
         state.context.completionState = result.completionState || state.context.completionState;
         state.context.worksheetProgress = result.worksheetProgress || state.context.worksheetProgress;
@@ -357,11 +363,13 @@ async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
         state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
         state.worksheetPacketSummary = state.context.worksheetPacketSummary;
         await refreshHistory();
+        if (!isCurrent()) return;
         renderWorksheetProgress();
         renderWorksheetPacketSummary(state.worksheetPacketSummary);
         updateSecondaryActions();
         setStatus("แก้วันที่แล้ว", "success");
     } catch (error) {
+        if (!isCurrent()) return;
         input.value = row.worksheetDate;
         input.disabled = false;
         setStatus(error.message, "error");

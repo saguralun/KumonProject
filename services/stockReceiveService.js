@@ -324,7 +324,7 @@ export async function createDeliveryOrder(type, payload) {
         await client.query("BEGIN");
 
         const existing = await client.query(
-            `SELECT stock_do_id, is_stock_processed FROM ${TABLE_SCHEMA}.stock_do WHERE do_no = $1`,
+            `SELECT stock_do_id, is_stock_processed FROM ${TABLE_SCHEMA}.stock_do WHERE do_no = $1 FOR UPDATE`,
             [doNo]
         );
         const existingDo = existing.rows[0];

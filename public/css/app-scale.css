@@ -206,8 +206,7 @@ html[data-role="instructor"] [data-ksis-link].is-granted { display: block !impor
   }
 
   .worksheet-page .search-band,
-  .worksheet-page .student-strip,
-  .worksheet-page .secondary-actions {
+  .worksheet-page .student-strip {
     padding: 5px 7px !important;
   }
 
