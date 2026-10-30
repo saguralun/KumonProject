@@ -1,6 +1,6 @@
 const path = require('node:path');
 const { app, BrowserWindow, WebContentsView, ipcMain, session } = require('electron');
-const { appOrigin, isKsisUrl, isWorkspaceUrl, isAppUrl, clampBounds } = require('./security.cjs');
+const { appOrigin, isKsisUrl, isWorkspaceUrl, isAppUrl, isStudentManagerUrl, clampBounds } = require('./security.cjs');
 
 const origin = appOrigin(process.env.KUMON_APP_ORIGIN);
 if (!process.env.KUMON_DESKTOP_PROFILE || !path.isAbsolute(process.env.KUMON_DESKTOP_PROFILE)) throw new Error('Missing isolated desktop profile');
@@ -10,14 +10,19 @@ app.setName(unified ? 'KumonDB' : 'KumonDB K-sis');
 app.setAppUserModelId('KumonDB.Desktop');
 let window, ksis, bounds = null, visible = false;
 let activeAccount = null, printing = false, ready = false;
+let studentPreview = null;
 const accountViews = new Map();
 const securePreferences = { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true };
+
+function isKsisSurface(url) {
+  return isWorkspaceUrl(url, origin) || Boolean(studentPreview && studentPreview.userId === activeAccount && isStudentManagerUrl(url, origin));
+}
 
 function layout() {
   if (!window || window.isDestroyed() || !ksis || ksis.webContents.isDestroyed()) return;
   const size = window.getContentBounds();
   const rect = clampBounds(bounds, size);
-  const show = visible && (!unified || activeAccount !== null) && rect && rect.width > 0 && rect.height > 0 && isWorkspaceUrl(window.webContents.getURL(), origin);
+  const show = visible && (!unified || activeAccount !== null) && rect && rect.width > 0 && rect.height > 0 && isKsisSurface(window.webContents.getURL());
   const wasVisible = ksis.getVisible();
   ksis.setVisible(Boolean(show));
   if (show) { ksis.setBounds(rect); if (!wasVisible) ksis.webContents.invalidate(); }
@@ -25,7 +30,7 @@ function layout() {
 
 function trustedSender(event, workspaceOnly = true) {
   return window && event.sender === window.webContents && event.senderFrame === window.webContents.mainFrame
-    && (workspaceOnly ? isWorkspaceUrl(event.senderFrame.url, origin) : isAppUrl(event.senderFrame.url, origin));
+    && (workspaceOnly ? isKsisSurface(event.senderFrame.url) : isAppUrl(event.senderFrame.url, origin));
 }
 
 function secureRemoteSession(remoteSession) {
@@ -59,6 +64,16 @@ module.exports.activateKsisAccount = async ({ userId, profileDirectory }) => {
   return { userId };
 };
 module.exports.activeKsisAccount = () => activeAccount;
+module.exports.setStudentPreview = ({ userId, previewId, enabled }) => {
+  if (enabled) {
+    if (!unified || userId !== activeAccount || typeof previewId !== 'string') throw new Error('Invalid student preview');
+    studentPreview = { userId, previewId };
+  } else if (studentPreview?.userId === userId && studentPreview.previewId === previewId) {
+    studentPreview = null;
+    if (window && isStudentManagerUrl(window.webContents.getURL(), origin)) visible = false;
+  }
+  layout();
+};
 module.exports.isReady = () => ready;
 app.kumonDesktopController = module.exports;
 

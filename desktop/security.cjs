@@ -22,6 +22,11 @@ function isAppUrl(value, origin) {
   catch { return false; }
 }
 
+function isStudentManagerUrl(value, origin) {
+  try { const url = new URL(value); return url.origin === origin && url.pathname === '/student-manager.html' && !url.username && !url.password; }
+  catch { return false; }
+}
+
 function clampBounds(value, size) {
   if (!value || !['x', 'y', 'width', 'height'].every((key) => Number.isFinite(value[key]))) return null;
   const x = Math.max(0, Math.min(size.width, Math.round(value.x)));
@@ -29,4 +34,4 @@ function clampBounds(value, size) {
   return { x, y, width: Math.max(0, Math.min(size.width - x, Math.round(value.width))), height: Math.max(0, Math.min(size.height - y, Math.round(value.height))) };
 }
 
-module.exports = { appOrigin, isKsisUrl, isWorkspaceUrl, isAppUrl, clampBounds };
+module.exports = { appOrigin, isKsisUrl, isWorkspaceUrl, isAppUrl, isStudentManagerUrl, clampBounds };

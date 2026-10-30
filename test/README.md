@@ -78,6 +78,10 @@ restart-helper test, not necessary for this suite's application regression check
 - Report calculations, KSIS identity matching, WS/AT previews and audits,
   guarded saves, pagination, shared embedded workspace and responsive layout
   using synthetic fixtures.
+- Automatic student Preview opens the same embedded KSIS view beside the form,
+  waits for synthetic manual login without reloading typed input, and resumes
+  reading without applying or saving. Fixtures cover cancellation, expiry,
+  account/token isolation, stale opens, dirty forms and competing WS/AT drafts.
 - All 17 pages' declared button wiring and shared in-app confirmations, plus
   browser/Electron workflow tests for Stock Receive/Cut, Opening Schedule,
   Backup/Restore, permissions, table paging, Progress subject races, CD/history,

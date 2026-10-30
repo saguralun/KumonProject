@@ -732,6 +732,24 @@ html[data-role="instructor"] .hidden,
   box-shadow: var(--shadow-lg);
 }
 
+.student-modal-dialog.ksis-preview-open {
+  width: min(1740px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: minmax(400px, .9fr) minmax(440px, 1.1fr);
+  height: calc(100vh - 40px);
+  overflow: hidden;
+}
+.ksis-preview-open .student-modal-form { min-width: 0; overflow: auto; }
+.ksis-preview-open .copy-address-tool { grid-template-columns: minmax(0, 1fr) auto; }
+.student-ksis-pane { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 12px; border-left: 1px solid var(--line); }
+.student-ksis-header { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.student-ksis-slot { min-height: 200px; flex: 1; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
+@media (max-width: 900px) {
+  .student-modal-dialog.ksis-preview-open { display: block; overflow: auto; }
+  .ksis-preview-open .student-modal-form { overflow: visible; }
+  .student-ksis-pane { height: 65vh; border-left: 0; border-top: 1px solid var(--line); }
+}
+
 .ws-graph-dialog {
   display: grid;
   gap: 12px;

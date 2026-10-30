@@ -25,6 +25,18 @@ take over the open main window. Logging out revokes its active KSIS binding.
 Student-link import reuses an already opened main-app KSIS session and does
 not silently open another Chrome when that session is missing.
 
+The Add Student Preview button can attach the signed-in account's KSIS view
+directly beside the existing form. It opens only the requested student link,
+waits for the user to log into KSIS manually, and polls the same view without
+reloading the login form. After login it returns to the requested student page
+and displays a selectable Preview. It neither applies fields nor saves a student
+automatically. The separate Apply and Save actions remain explicit user choices.
+Cancelling, closing the form, changing the link or leaving the page cancels that
+preview; polling expires after five minutes. Existing WS/AT drafts, dirty KSIS
+forms and competing KSIS tasks block navigation. Account checks and per-preview
+tokens prevent a stale cancellation from hiding a newer user's view. The remote
+view is authorized on the Students page only while that preview is active.
+
 Remote content stays sandboxed with Node disabled and receives no local IPC
 bridge. External popups, unexpected navigation and remote downloads remain
 blocked. Local exports are copied to the operating system's Downloads folder

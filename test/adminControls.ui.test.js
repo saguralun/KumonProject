@@ -35,12 +35,14 @@ for (const embedded of [false, true]) {
 
   test(`Role permission controls serialize a role's changes and restore failed toggles (${embedded ? 'desktop' : 'browser'})`, { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
     let release, fail = false, grants = [], hold = true;
+    let requestArrived;
+    const heldRequest = new Promise(resolve => { requestArrived = resolve; });
     const roles = [{ role_code: 'admin', role_name: 'Admin', is_system: true, active_user_count: 1 }, { role_code: 'staff', role_name: 'Staff', is_system: true, active_user_count: 1 }, { role_code: 'custom', role_name: 'Custom', is_system: false, active_user_count: 0 }];
     const f = await controlFixture('users', async (req, res) => {
       if (req.path === '/users') { res.json({ success: true, users: [] }); return true; }
       if (req.path === '/roles') { res.json({ success: true, roles, grants, permissions: ['page:report', 'page:stock'].map(permission_key => ({ permission_key, permission_label: permission_key, nav_group: 'management' })) }); return true; }
       if (req.path === '/roles/staff/permissions') {
-        if (hold) await new Promise(resolve => { release = resolve; });
+        if (hold) await new Promise(resolve => { release = resolve; requestArrived(); });
         if (fail) res.status(503).json({ success: false, error: 'Fixture permission failed' });
         else { grants = req.body.permissionKeys.map(permission_key => ({ role_code: 'staff', permission_key })); res.json({ success: true }); }
         return true;
@@ -51,10 +53,13 @@ for (const embedded of [false, true]) {
       const { page } = f, first = page.locator('input[data-role-code=staff][data-permission-key="page:report"]'), second = page.locator('input[data-role-code=staff][data-permission-key="page:stock"]');
       await first.waitFor(); await first.check();
       assert.equal(await second.isDisabled(), true);
+      await heldRequest;
       release(); await second.waitFor({ state: 'visible' }); await page.waitForFunction(() => !document.querySelector('input[data-role-code=staff]').disabled);
       hold = false; await second.check(); await page.waitForFunction(() => !document.querySelector('input[data-role-code=staff]').disabled);
       assert.deepEqual(new Set(f.writes().at(-1).body.permissionKeys), new Set(['page:report', 'page:stock']));
-      fail = true; await first.uncheck(); await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('Fixture permission failed'));
+      // A rejected save intentionally restores the checked state immediately;
+      // uncheck() asserts the transient state and can fail on a fast response.
+      fail = true; await first.click(); await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('Fixture permission failed'));
       assert.equal(await first.isChecked(), true); assert.equal(await second.isChecked(), true);
       await page.locator('.matrix-delete-role[data-role-code=custom]').click(); await f.choose(false);
       const count = f.writes().length;

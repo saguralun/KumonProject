@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/student-manager.css?v=20261023-resume-dialog">
+  <link rel="stylesheet" href="/css/student-manager.css?v=20261030-ksis-auto-preview">
   <link rel="stylesheet" href="/css/app-scale.css?v=20260906-statistics-page">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-update-anytime">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
@@ -375,6 +375,11 @@
           <button type="submit" class="primary-button" id="addStudentSave">💾 Add Student</button>
         </div>
       </form>
+      <aside class="student-ksis-pane hidden" id="ksisStudentPane" aria-label="KSIS สำหรับ Preview นักเรียน">
+        <div class="student-ksis-header"><strong>KSIS</strong><button type="button" class="secondary-button" id="ksisStudentStop">ยกเลิก Preview</button></div>
+        <div class="subtle">เข้าสู่ระบบ KSIS ได้ที่นี่ โปรแกรมจะอ่านข้อมูลต่ออัตโนมัติ</div>
+        <div class="student-ksis-slot" id="ksisStudentSlot"></div>
+      </aside>
     </div>
   </div>
 

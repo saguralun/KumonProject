@@ -18,7 +18,7 @@ import {
     updateStudent
 } from "../services/studentService.js";
 import { requireAdmin, requireStaff } from "../middleware/auth.js";
-import { previewKsisStudent } from "../services/ksisStudentService.js";
+import { previewKsisStudent, previewKsisStudentInApp } from "../services/ksisStudentService.js";
 import { readKsisReportRoster } from "../services/ksisRosterService.js";
 import { createKsisMatchingPreview, saveKsisMatchingPreview } from "../services/ksisMatchingService.js";
 
@@ -50,10 +50,14 @@ router.post("/ksis/preview", requireStaff, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const address = req.socket.remoteAddress;
     if (!["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(address)) {
-        return res.status(403).json({ success: false, error: "กรุณาใช้ฟังก์ชัน KSIS ผ่าน localhost บนเครื่องที่รัน KumonDB เพื่อเข้าสู่ระบบใน Chrome ของเครื่องนั้น" });
+        return res.status(403).json({ success: false, error: "กรุณาใช้ Preview KSIS ผ่าน localhost บนเครื่องที่รัน KumonDB" });
     }
     try {
-        res.json({ success: true, ...(await previewKsisStudent({ url: req.body?.url, userId: req.session.user.userId })) });
+        const result = req.body?.action
+            ? await previewKsisStudentInApp({ action: req.body.action, previewId: req.body.previewId, url: req.body.url,
+                userId: req.session.user.userId, origin: `${req.protocol}://${req.get('host')}`, cookieHeader: req.headers.cookie })
+            : await previewKsisStudent({ url: req.body?.url, userId: req.session.user.userId });
+        res.json({ success: true, ...result });
     } catch (error) {
         sendError(res, error);
     }

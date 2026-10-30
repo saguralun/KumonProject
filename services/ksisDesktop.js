@@ -44,7 +44,8 @@ export async function createApplicationDesktop({ origin, profileDirectory, confi
                 const actual = (await context.cookies(origin)).find((cookie) => cookie.name === 'kumondb.sid')?.value;
                 if (actual !== expected) throw httpError(409, 'กรุณาเข้าเมนู K-sis จากบัญชีในหน้าต่าง KumonDB ที่เปิดอยู่ ไม่เปลี่ยนบัญชีจากหน้าต่างอื่น');
             },
-            async activateAccount({ userId, profileDirectory: remoteProfile, cookieHeader: header }) {
+            setStudentPreview: options => application.evaluate(({ app }, value) => app.kumonDesktopController.setStudentPreview(value), options),
+            async activateAccount({ userId, profileDirectory: remoteProfile, cookieHeader: header, initialUrl = REPORT_URL }) {
                 await desktop.assertAppSession(header);
                 const known = accounts.get(userId);
                 if (known?.page.isClosed()) throw httpError(409, 'เว็บ KSIS เดิมปิดแล้ว กรุณาตรวจงานค้างก่อนเปิดใหม่');
@@ -67,7 +68,7 @@ export async function createApplicationDesktop({ origin, profileDirectory, confi
                 // Keep the exact page even if the first load fails. Retrying must not create
                 // another view or overwrite a page the user has since opened manually.
                 accounts.set(userId, account);
-                if (page.url() === marker) await page.goto(REPORT_URL, { waitUntil: 'domcontentloaded', timeout: 25000 });
+                if (page.url() === marker) await page.goto(initialUrl, { waitUntil: 'domcontentloaded', timeout: 25000 });
                 return account;
             }
         };
