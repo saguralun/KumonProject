@@ -60,9 +60,47 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
         }
         await t.test('The approved schema contract matches the current canonical schema without branch data', async () => {
             const expected = await loadSchemaContract(), actual = await readSchemaSnapshot(database);
+            assert.equal((await inspectApplicationSchema(database)).ready, true);
+            // Compare the remaining catalog exactly; the finite scope check may
+            // be deparsed differently by supported PostgreSQL releases.
+            const scope = snapshot => snapshot.tables.find(table => table.name === 'worksheet_forecast_average').constraints.find(item => item.name === 'ck_worksheet_forecast_average_scope');
+            scope(expected).definition = scope(actual).definition;
+            // PG18 additionally catalogs NOT NULL constraints; nullability is
+            // already compared exactly in the column metadata on both releases.
+            for (const table of actual.tables) table.constraints = table.constraints.filter(item => item.type !== 'n');
             for (const table of expected.tables) for (const constraint of table.constraints) delete constraint.createDefinition;
             for (const snapshot of [expected, actual]) for (const fn of snapshot.functions) fn.definition = fn.definition.replace(/\s+/g, ' ').trim();
             assert.deepEqual(actual, expected);
+        });
+        await t.test('Restored equivalent scope checks need no DDL or backup; genuinely different values remain blocked with original rows intact', async () => {
+            const constraint = 'ck_worksheet_forecast_average_scope';
+            const row = (await database.query(`INSERT INTO kumon.worksheet_forecast_average
+                (subject_id,level_master_id,worksheet_packet_no,source_scope,student_count)
+                SELECT subject_id,level_master_id,1,'2Y',7 FROM kumon.level_master ORDER BY level_master_id LIMIT 1 RETURNING *`)).rows[0];
+            const change = async definition => database.query(`ALTER TABLE kumon.worksheet_forecast_average DROP CONSTRAINT ${constraint}, ADD CONSTRAINT ${constraint} ${definition}`);
+            const unchanged = async () => {
+                assert.deepEqual((await database.query('SELECT * FROM kumon.worksheet_forecast_average WHERE worksheet_forecast_average_id=$1', [row.worksheet_forecast_average_id])).rows[0], row);
+            };
+            try {
+                for (const definition of [
+                    "CHECK (source_scope::text = ANY (ARRAY['2Y'::text, 'ALL'::text]))",
+                    "CHECK (source_scope IN ('ALL', '2Y'))",
+                    "CHECK (((source_scope)::text = ANY ((ARRAY['2Y'::varchar, 'ALL'::varchar])::text[])))"
+                ]) {
+                    await change(definition);
+                    const before = await readSchemaSnapshot(database);
+                    const result = await prepareApplicationDatabase({ database, backup: async () => { throw Error('Equivalent constraints must not trigger a backup or repair'); }, report: async () => {} });
+                    assert.deepEqual(result, { ready: true, applied: false, changes: [] });
+                    assert.deepEqual(await readSchemaSnapshot(database), before); await unchanged();
+                }
+                await change("CHECK (source_scope IN ('2Y', 'ALL', 'OTHER'))");
+                const before = await readSchemaSnapshot(database);
+                await assert.rejects(prepareApplicationDatabase({ database, backup: async () => { throw Error('Conflicts must stop before backup'); }, report: async () => {} }), error => error.statusCode === 409 && error.message.includes('OTHER') && error.message.includes('คาดหวัง'));
+                assert.deepEqual(await readSchemaSnapshot(database), before); await unchanged();
+            } finally {
+                await change("CHECK (source_scope IN ('2Y', 'ALL'))");
+                await database.query('DELETE FROM kumon.worksheet_forecast_average WHERE worksheet_forecast_average_id=$1', [row.worksheet_forecast_average_id]);
+            }
         });
         const migration = await fs.readFile('database/004_payment_status_provenance.sql', 'utf8');
         await t.test('Payment migration upgrades a legacy schema and is safe to apply twice', async () => {

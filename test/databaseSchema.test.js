@@ -44,6 +44,48 @@ test('Incompatible types, missing required historical data, core tables and conf
     }
 });
 
+test('Forecast scope checks recognize only the same two case-sensitive values through IN, ANY and PostgreSQL cast variations', async () => {
+    const expected = await loadSchemaContract();
+    const check = actual => actual.tables.find(table => table.name === 'worksheet_forecast_average').constraints.find(item => item.name === 'ck_worksheet_forecast_average_scope');
+    for (const definition of [
+        "CHECK (source_scope IN ('2Y', 'ALL'))",
+        "CHECK (source_scope::text = ANY (ARRAY['2Y'::text, 'ALL'::text]))",
+        "CHECK (source_scope::text = ANY (ARRAY['2Y'::character varying::text, 'ALL'::character varying::text]))",
+        "CHECK (((source_scope)::text = ANY ((ARRAY['ALL'::character varying, '2Y'::character varying])::text[])))",
+        "check (\"source_scope\" in ('ALL'::text, '2Y'::text))",
+        "CHECK (source_scope::text = ANY ('{2Y,ALL}'::text[]))"
+    ]) {
+        const actual = structuredClone(expected); check(actual).definition = definition;
+        const plan = planSchemaUpgrade(expected, actual);
+        // Array-literal strings are deliberately outside this narrow recognizer.
+        if (definition.includes('{2Y')) assert.equal(plan.blockers.length, 1);
+        else { assert.equal(plan.ready, true, definition); assert.deepEqual(plan.operations, []); }
+    }
+    for (const definition of [
+        "CHECK (source_scope IN ('3Y', 'ALL'))",
+        "CHECK (source_scope IN ('2Y', 'all'))",
+        "CHECK (source_scope IN ('2Y', 'ALL', 'OTHER'))",
+        "CHECK (source_scope IN ('2Y', '2Y'))",
+        "CHECK (lower(source_scope) IN ('2Y', 'ALL'))",
+        "CHECK (source_scope::character(2) IN ('2Y', 'ALL'))",
+        "CHECK (source_scope IN ('2Y', 'ALL') OR true)",
+        "CHECK (other_column IN ('2Y', 'ALL'))",
+        "CHECK (source_scope IN ('2 Y', 'ALL'))",
+        "CHECK (source_scope IN ('2Y', 'ALL')) NOT VALID"
+    ]) {
+        const actual = structuredClone(expected); check(actual).definition = definition;
+        const plan = planSchemaUpgrade(expected, actual);
+        assert.equal(plan.blockers.length, 1, definition);
+        assert.ok(plan.blockers[0].includes(`พบ: ${definition}`));
+        assert.deepEqual(plan.operations, []);
+    }
+    const unvalidated = structuredClone(expected); check(unvalidated).validated = false;
+    assert.equal(planSchemaUpgrade(expected, unvalidated).blockers.length, 1);
+    const renamed = structuredClone(expected), branchCheck = check(renamed); branchCheck.name = 'branch_same_scope';
+    branchCheck.definition = "CHECK (source_scope IN ('2Y', 'ALL'))";
+    assert.equal(planSchemaUpgrade(expected, renamed).ready, true);
+});
+
 function fixture({ failBackup = false, failDdl = false, blockers = [], ready = false, failVerification = false } = {}) {
     const events = []; let changed = ready, inspections = 0;
     const client = {

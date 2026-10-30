@@ -40,6 +40,13 @@ about receipt migration 004. It does not run during an ordinary app launch.
   They need a reviewed migration or recovery of the original data, not guesses.
 - Extra branch-specific tables/columns are retained. Existing defaults or
   stricter nullability are not silently overwritten.
+- The Forecast scope CHECK accepts only `2Y` and `ALL`. PostgreSQL can deparse
+  that same rule as IN or ANY with different text/varchar casts, especially
+  after restoring a dump. The inspector recognizes only those finite-set
+  variants for this one approved check, including reversed value order. It
+  leaves the existing constraint and rows unchanged. Changed values, extra
+  conditions, truncating casts and unvalidated constraints still block an
+  update; the error shows both observed and expected definitions for review.
 - This checks schema compatibility, not whether every historical business
   record exists. It cannot recover deleted data or combine branch databases.
 

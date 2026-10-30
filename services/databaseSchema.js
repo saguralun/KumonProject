@@ -48,6 +48,41 @@ function columnSql(column) {
 }
 
 const normalized = sql => sql.replaceAll('kumon.', '').replaceAll('"', '').replace(/\s+/g, ' ').trim();
+
+// pg_get_constraintdef can change IN into ANY and vary text/varchar casts after
+// dump/restore or across PostgreSQL versions. Recognize only this known finite
+// string-set check, not arbitrary expressions or blanket removal of SQL casts.
+function isForecastScopeCheck(sql) {
+    if (typeof sql !== 'string' || sql.length > 2048) return false;
+    const token = /\s+|'(?:[^']|'')*'|"(?:[^"]|"")*"|::|[a-z_][a-z0-9_]*|[()[\],=]/giy;
+    const parts = []; let offset = 0, depth = 0;
+    while (offset < sql.length) {
+        token.lastIndex = offset;
+        const match = token.exec(sql);
+        if (!match) return false;
+        offset = token.lastIndex;
+        const value = match[0];
+        if (/^\s+$/.test(value)) continue;
+        if (value === '(') { depth++; continue; }
+        if (value === ')') { if (--depth < 0) return false; continue; }
+        parts.push(value === '"source_scope"' ? 'source_scope' : /^[a-z_]/i.test(value) ? value.toLowerCase() : value);
+    }
+    if (depth !== 0) return false;
+    const cast = '(?: :: (?:text|character varying))*';
+    const pair = `'(2Y|ALL)'${cast} , '(2Y|ALL)'${cast}`;
+    const expression = parts.join(' ');
+    const any = new RegExp(`^check source_scope(?: :: text)? = any array \\[ ${pair} \\](?: :: (?:text|character varying) \\[ \\])?$`);
+    const list = new RegExp(`^check source_scope(?: :: text)? in ${pair}$`);
+    const match = any.exec(expression) || list.exec(expression);
+    return Boolean(match && new Set(match.slice(1)).size === 2);
+}
+
+function sameConstraint(table, expected, actual) {
+    if (normalized(expected.definition) === normalized(actual.definition)) return true;
+    return table === 'worksheet_forecast_average' && expected.type === 'c' && actual.type === 'c'
+        && expected.name === 'ck_worksheet_forecast_average_scope'
+        && isForecastScopeCheck(expected.definition) && isForecastScopeCheck(actual.definition);
+}
 const coreTables = new Set(['center_master', 'subject_master', 'level_master', 'worksheet_master', 'status_master',
     'prefix_master', 'gender_master', 'school_grade_master', 'student', 'enrollment', 'billing']);
 
@@ -85,10 +120,10 @@ export function planSchemaUpgrade(expected, actual, populatedTables = new Set(),
         }
         for (const constraint of table.constraints) {
             const current = found?.constraints.find(item => item.name === constraint.name
-                || item.type === constraint.type && normalized(item.definition) === normalized(constraint.definition));
+                || item.type === constraint.type && sameConstraint(table.name, constraint, item));
             if (current) {
-                if (current.type !== constraint.type || normalized(current.definition) !== normalized(constraint.definition) || !current.validated) {
-                    blockers.push(`ข้อกำหนด ${table.name}.${constraint.name} ไม่ตรงรุ่น ต้องตรวจข้อมูลก่อน`);
+                if (current.type !== constraint.type || !sameConstraint(table.name, constraint, current) || !current.validated) {
+                    blockers.push(`ข้อกำหนด ${table.name}.${constraint.name} ไม่ตรงรุ่น ต้องตรวจข้อมูลก่อน • พบ: ${current.definition} • คาดหวัง: ${constraint.definition}${!current.validated ? ' • ยังไม่ผ่านการตรวจข้อมูลเดิม' : ''}`);
                 }
             } else add(constraint.type === 'f' ? foreignKeys : constraints, 'constraint', `${table.name}.${constraint.name}`,
                 `ALTER TABLE ${tableName(table.name)} ADD CONSTRAINT ${quoteIdentifier(constraint.name)} ${constraint.createDefinition || constraint.definition}`);

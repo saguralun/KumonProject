@@ -59,6 +59,10 @@ restart-helper test, not necessary for this suite's application regression check
   unsafe-change rejection, competing upgrades and complete rollback. Windows
   bridge fixtures prove failed preparation leaves their original server running
   and successful preparation permits only their isolated replacement server.
+  Forecast CHECK fixtures cover IN/ANY and text/varchar dump/restore variants
+  without any repair, preserve existing rows, and reject genuinely changed
+  allowed values. Run the isolated fixture with `TEST_PG_BIN` pointing to each
+  supported installed PostgreSQL release to check its catalog representation.
   See `database/UPGRADES.md` for operational limits and contract regeneration.
 - Atomic restore, including a real failed COPY on the disposable database.
 - Student selection during saves, stale responses and visible save failures.
