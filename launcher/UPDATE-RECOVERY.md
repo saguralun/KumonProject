@@ -53,6 +53,13 @@ itself. The helper is only needed to bridge the older handler that cannot yet
 download the new implementation. It does not diagnose or repair unrelated
 shortcut-launch failures.
 
+If an older running handler returns 401/403 after the files are recovered, the
+helper stops without attempting authentication or database work. Sign into the
+application with an authorized Admin account and use its Update button, which
+sends that browser's existing session. The helper does not share browser cookies,
+request credentials or bypass the old handler's access check. File recovery and
+its verified archives remain intact, so the signed-in update can continue.
+
 ## Maintaining the helper
 
 After changing `services/updateWorktreeService.js` or

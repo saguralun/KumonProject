@@ -53,6 +53,7 @@ async function recoveryMain() {
     try {
         const response = await fetch(`${origin}/api/system/update-apply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
         const result = await response.json();
+        if ([401, 403].includes(response.status)) throw new Error(`จัดการไฟล์ค้างแล้ว แต่เซิร์ฟเวอร์ที่เปิดอยู่ยังขอสิทธิ์เข้าสู่ระบบก่อนอัปเดต (${response.status})\nเปิด KumonDB ที่ http://localhost:${port}/login.html เข้าสู่ระบบด้วยบัญชี Admin แล้วกดปุ่มอัปเดตโปรแกรมจากในหน้าจอนั้น\nขั้นตอนเตรียมฐานข้อมูลยังไม่ได้เริ่ม ไม่ต้องเปิดตัวช่วยซ้ำ และไม่ต้องรัน SQL เอง\nไฟล์สำรองที่จัดการไว้: ${recovered.backupDirectory || 'รอบนี้ไม่มีไฟล์ค้าง'}`);
         if (!response.ok || result.success === false) throw new Error(result.error || 'Update failed');
     } catch (error) { if (!(error instanceof TypeError)) throw error; }
     const deadline = Date.now() + 10 * 60000;

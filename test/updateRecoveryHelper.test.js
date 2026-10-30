@@ -71,6 +71,26 @@ test('A downloaded helper reports unknown source changes and never calls update 
     const projectData = path.join(f.local, 'KumonDB'); await assert.rejects(fs.access(projectData));
 });
 
+for (const status of [401, 403]) {
+    test(`An older server requiring login (${status}) leaves recovery intact and directs the user to the signed-in update action without obtaining credentials`, async t => {
+        const f = await fixture(t), app = express(); let calls = 0;
+        app.use(express.json());
+        app.get('/api/system/runtime', (_req, res) => res.json({ instanceId: 'fixture-original', processId: process.pid }));
+        app.post('/api/system/update-apply', (req, res) => {
+            calls++; assert.deepEqual(req.body, { confirm: true }); assert.equal(req.get('cookie'), undefined);
+            res.status(status).json({ success: false, error: 'กรุณาเข้าสู่ระบบ' });
+        });
+        app.use((_req, _res) => assert.fail('The helper must not request login, credentials, payment or a database repair endpoint'));
+        const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+        try {
+            await fs.writeFile(path.join(f.repo, '.env'), `PORT=${server.address().port}`);
+            await assert.rejects(f.run('--yes'), error => error.stderr.includes('บัญชี Admin') && error.stderr.includes('ขั้นตอนเตรียมฐานข้อมูลยังไม่ได้เริ่ม') && error.stderr.includes(`(${status})`));
+            assert.equal(calls, 1); assert.equal(await f.git('status', '--porcelain'), '');
+            assert.equal(await fs.readFile(path.join(f.repo, 'server.js'), 'utf8'), '// fixture original source\n');
+        } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
+    });
+}
+
 test('Windows double-click bootstrap executes the actual Git download bytes outside the project folder', { skip: process.platform !== 'win32', timeout: 20000 }, async t => {
     const f = await fixture(t);
     const command = `""${f.helper}" --project "${f.repo}" --yes --files-only <nul"`;
