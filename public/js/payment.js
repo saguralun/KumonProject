@@ -728,7 +728,7 @@ function setReceiptMessage(message, tone = 'error') {
     els.receiptMessage.classList.toggle('is-neutral', tone === 'neutral');
 }
 
-function confirmReceiptAction(message) {
+function confirmReceiptAction(message, { focusConfirm = false } = {}) {
     const dialog = els.receiptConfirmDialog;
     if (dialog.open) return Promise.resolve(false);
     els.receiptConfirmMessage.textContent = message;
@@ -736,6 +736,7 @@ function confirmReceiptAction(message) {
     return new Promise((resolve) => {
         dialog.addEventListener('close', () => resolve(dialog.returnValue === 'confirm'), { once: true });
         dialog.showModal();
+        dialog.querySelector(focusConfirm ? '[value="confirm"]' : '[value="cancel"]').focus();
     });
 }
 
@@ -763,7 +764,7 @@ async function receivePayment() {
         `วิธีจ่าย: ${els.receiptPaymentMethod.options[els.receiptPaymentMethod.selectedIndex]?.textContent || state.receipt.paymentMethodName}`
     ].join("\n");
 
-    if (!await confirmReceiptAction(confirmMessage)) {
+    if (!await confirmReceiptAction(confirmMessage, { focusConfirm: true })) {
         return;
     }
     if (state.isReceivingPayment) return;

@@ -60,6 +60,7 @@ for (const embedded of [false, true]) test(`Choosing two of three subjects, canc
         assert.match(await page.locator('#receiptPaper .receipt-total').innerText(), /3,400/);
         await page.locator('#receiptReceivePayment').click();
         assert.match(await page.locator('#receiptConfirmMessage').innerText(), /จำนวนวิชา: 2/);
+        assert.equal(await page.locator('#receiptConfirmAccept').evaluate(button => button === document.activeElement), true);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
         assert.equal(payments.length, 0);
         await page.screenshot({ path: path.join(os.tmpdir(), `kumondb-partial-payment-confirm-${embedded}.png`), fullPage: true });
@@ -83,7 +84,8 @@ for (const embedded of [false, true]) test(`Choosing two of three subjects, canc
         assert.equal(await page.locator('[data-receipt-enrollment]:checked').count(), 2);
         await page.screenshot({ path: path.join(os.tmpdir(), `kumondb-partial-payment-error-${embedded}.png`), fullPage: true });
         await page.locator('#receiptReceivePayment').click();
-        await page.locator('#receiptConfirmAccept').click();
+        assert.equal(await page.locator('#receiptConfirmAccept').evaluate(button => button === document.activeElement), true);
+        await page.keyboard.press('Enter');
         await page.waitForFunction(() => document.getElementById('receiptModal').classList.contains('hidden'));
         assert.deepEqual(payments.map((item) => item.selectedEnrollmentIds), [[101, 102], [101, 102]]);
         await page.locator('[data-receipt-row-index]').click();
