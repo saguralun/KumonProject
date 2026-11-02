@@ -48,6 +48,7 @@ const state = {
     isReceivingPayment: false,
     isCancellingPayment: false,
     isPrintingReceipt: false,
+    receiptSession: 0,
     receiptPrintUsed: false,
     isPrintingTest: false,
     printerConnected: false,
@@ -703,6 +704,8 @@ function openReceipt(row) {
     setReceiptMessage('');
     state.selectedRow = row;
     state.receipt = null;
+    state.receiptSession++;
+    state.isPrintingReceipt = false;
     state.receiptPrintUsed = false;
     updateReceiptPrintButton();
     // row.billingId is the billing record for whatever HAS been paid this
@@ -957,27 +960,34 @@ async function printReceiptViaBackend() {
         return;
     }
 
+    const session = state.receiptSession;
+    const receipt = state.receipt;
+    const payload = JSON.stringify(receipt);
+    const label = `${receipt.receiptBook}/${receipt.receiptNo} • ${receipt.studentName}`;
+    const isCurrent = () => session === state.receiptSession;
+    const isVisible = () => isCurrent() && !els.receiptModal.classList.contains("hidden");
     state.isPrintingReceipt = true;
     state.receiptPrintUsed = true;
     updateReceiptPrintButton();
-    const originalLabel = els.receiptPrint.textContent;
-    els.receiptPrint.textContent = "⏳ กำลังพิมพ์";
-    setStatus("กำลังพิมพ์ใบเสร็จ...");
+    setStatus("ส่งงานพิมพ์เบื้องหลังแล้ว • รับเงินต่อได้เลย");
+    // The click handler's request continues independently. Move to Receive now;
+    // a slow printer must not hold keyboard focus or the next receipt hostage.
+    focusPrimaryReceiptAction();
 
     try {
         await requestJson("/api/payment/print-receipt", {
             method: "POST",
-            body: JSON.stringify(state.receipt)
+            body: payload
         });
-        setStatus("พิมพ์ใบเสร็จแล้ว");
+        if (isVisible()) setStatus(`ส่งใบเสร็จ ${label} ไปยังเครื่องพิมพ์แล้ว`);
     } catch (error) {
-        setStatus(error.message, "error");
+        const message = `ส่งพิมพ์ใบเสร็จ ${label} ไม่สำเร็จ: ${error.message}`;
+        setStatus(message, "error");
+        if (isVisible()) setReceiptMessage(message);
     } finally {
-        state.isPrintingReceipt = false;
-        els.receiptPrint.textContent = originalLabel;
-        updateReceiptPrintButton();
-        if (!els.receiptModal.classList.contains("hidden")) {
-            focusPrimaryReceiptAction();
+        if (isCurrent()) {
+            state.isPrintingReceipt = false;
+            updateReceiptPrintButton();
         }
     }
 }

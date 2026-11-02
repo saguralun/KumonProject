@@ -2,6 +2,9 @@ import { discoverPrinterHost } from "./printerDiscoveryService.js";
 import { renderLinesToBitmap } from "./receiptBitmapRenderer.js";
 import { sendViaLan } from "./printerTransportLan.js";
 import { sendViaUsb } from "./printerTransportUsb.js";
+import { createPrinterQueue } from "./printerQueue.js";
+
+const queueRawBytes = createPrinterQueue(sendRawBytes);
 
 // "auto" (default) scans the LAN for the printer every time it's needed
 // (fast — uses a cached IP after the first successful print, see
@@ -200,7 +203,7 @@ async function sendRawBytes(buffer) {
 }
 
 export async function printRawAsciiTest() {
-    await sendRawBytes(buildAsciiTestPayload());
+    await queueRawBytes(buildAsciiTestPayload());
     return { success: true };
 }
 
@@ -292,6 +295,6 @@ export function buildReceiptPayload(receipt) {
 }
 
 export async function printReceipt(receipt) {
-    await sendRawBytes(buildReceiptPayload(receipt));
+    await queueRawBytes(buildReceiptPayload(receipt));
     return { success: true };
 }
