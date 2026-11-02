@@ -811,9 +811,8 @@ function renderHistoryTable(data) {
     // — a plain status_action never recorded a "before" snapshot to
     // revert current_status_group1_id to the way a bill does, so staff
     // use the existing Absent/OT/Resume/Complete buttons afterward if the
-    // enrollment's actual current status also needs fixing. Both are
-    // data-admin-only (not the broader data-staff-up the Absent/OT/Resume
-    // buttons above use) since they permanently remove real records.
+    // enrollment's actual current status also needs fixing. Bill cancellation
+    // is available to Admin/Instructor; deleting a status log stays Admin-only.
     const showCancel = data.type === "billing";
     const showDelete = data.type === "status";
     const showReturnCd = data.type === "cd";
@@ -823,7 +822,8 @@ function renderHistoryTable(data) {
             <thead>
                 <tr>
                     ${data.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("")}
-                    ${showCancel || showDelete ? `<th data-admin-only></th>` : ""}
+                    ${showCancel ? `<th data-staff-up></th>` : ""}
+                    ${showDelete ? `<th data-admin-only></th>` : ""}
                     ${showReturnCd ? `<th data-staff-up></th>` : ""}
                 </tr>
             </thead>
@@ -838,7 +838,7 @@ function renderHistoryTable(data) {
                             return `<td>${escapeHtml(text)}</td>`;
                         }).join("")}
                         ${showCancel ? `
-                            <td data-admin-only>
+                            <td data-staff-up>
                                 <button
                                     type="button"
                                     class="danger-button compact"
@@ -907,24 +907,27 @@ async function returnCd(button) {
 }
 
 async function cancelBilling(billingId) {
-    if (!billingId) {
+    if (!billingId || !state.selectedStudentId) {
         return;
     }
+    const studentId = state.selectedStudentId, enrollmentId = state.selectedEnrollmentId;
 
     if (!await confirmAction(`ยกเลิกบิล #${billingId} ใช่ไหม? สถานะที่แก้ภายหลังจะไม่ถูกย้อนกลับ`)) {
         return;
     }
+    if (state.selectedStudentId !== studentId) return;
 
     setStatus("กำลังยกเลิกบิล...");
 
     try {
-        const data = await requestJson("/api/payment/receipt/cancel", {
-            method: "POST",
-            body: JSON.stringify({ billingId })
+        const data = await requestJson(`/api/students/${encodeURIComponent(studentId)}/history/billing/${encodeURIComponent(billingId)}/cancel`, {
+            method: "POST"
         });
 
-        await loadProfile(state.selectedStudentId, { preferredEnrollmentId: state.selectedEnrollmentId });
-        await loadHistory();
+        if (state.selectedStudentId === studentId) {
+            await loadProfile(studentId, { preferredEnrollmentId: enrollmentId });
+            await loadHistory();
+        }
         setStatus(`ยกเลิกบิลแล้ว${data.warning ? ' • ' + data.warning : ''}`);
     } catch (error) {
         setStatus(error.message, "error");

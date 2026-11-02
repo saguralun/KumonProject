@@ -123,8 +123,11 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             const id = await student('Unchanged'), receipt = await payment(id);
             const metadata = (await database.query('SELECT * FROM kumon.billing_detail WHERE billing_id=$1', [receipt.billingId])).rows[0];
             assert.ok(metadata.inserted_status_history_id); assert.ok(metadata.payment_status_updated_at);
+            const studentId = receipt.receipt.studentId;
+            await assert.rejects(cancelReceiptPayment({ billingId: receipt.billingId, studentId: studentId + 1000000 }), { statusCode: 404 });
+            assert.deepEqual((await database.query('SELECT * FROM kumon.billing_detail WHERE billing_id=$1', [receipt.billingId])).rows[0], metadata);
             await database.query(`INSERT INTO kumon.enrollment_status(enrollment_id,status_id,status_month,status_year) VALUES($1,$2,10,2026)`, [id, statuses.get('A')]);
-            const result = await cancelReceiptPayment({ billingId: receipt.billingId });
+            const result = await cancelReceiptPayment({ billingId: receipt.billingId, studentId });
             assert.equal(result.restoredEnrollments, 1); assert.equal(result.deletedStatusHistory, 1);
             assert.equal((await database.query('SELECT current_status_group1_id AS status FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].status, statuses.get('N'));
             assert.deepEqual((await database.query('SELECT status_id FROM kumon.enrollment_status WHERE enrollment_id=$1', [id])).rows.map((row) => row.status_id), [statuses.get('A')]);

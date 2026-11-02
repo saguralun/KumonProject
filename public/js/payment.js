@@ -44,6 +44,9 @@ const state = {
     searchTimer: null,
     selectedRow: null,
     receipt: null,
+    partialReceiptDraft: null,
+    receiptPreviewRequest: 0,
+    isLoadingReceipt: false,
     paymentMethods: [],
     isReceivingPayment: false,
     isCancellingPayment: false,
@@ -511,7 +514,7 @@ function renderReceiptSubjectPicker(receipt) {
     }
 
     els.receiptSubjectPicker.innerHTML = `
-        <div class="receipt-picker-title">เลือกวิชาที่รับเงิน</div>
+        <div class="receipt-picker-title">${state.partialReceiptDraft ? "เลือกวิชาเพื่อออกบิลเพิ่ม • ไม่เลือกเพื่อพิมพ์ใบเสร็จเดิม" : "เลือกวิชาที่รับเงิน"}</div>
         <div class="receipt-picker-list">
             ${receipt.details.map((detail) => {
                 const checked = detail.isPaid || detail.isSelected;
@@ -551,16 +554,18 @@ function renderReceipt(receipt) {
 
     els.receiptModalSubtitle.textContent = `เล่ม ${receipt.receiptBook} เลขที่ ${receipt.receiptNo}${latestText}`;
     const hasBilling = Boolean(receipt.billingId);
+    const partialReprint = Boolean(state.partialReceiptDraft && !state.partialReceiptDraft.receiptDetails?.length);
 
-    els.receiptCancelPayment.classList.toggle("hidden", !hasBilling);
+    els.receiptCancelPayment.classList.toggle("hidden", !hasBilling || Boolean(state.partialReceiptDraft));
     els.receiptCancelPayment.disabled = !hasBilling || state.isCancellingPayment;
     els.receiptCancelPayment.textContent = state.isCancellingPayment ? "⏳ กำลังยกเลิก" : "↩️ Cancel Receipt";
-    els.receiptPaymentControls.classList.toggle("hidden", hasBilling);
-    els.receiptSubjectPicker.classList.toggle("hidden", hasBilling);
-    els.receiptReceivePayment.classList.toggle("hidden", hasBilling);
-    els.receiptReceivePayment.disabled = hasBilling || state.isReceivingPayment || !receipt.receiptDetails?.length;
-    els.receiptReceivePayment.textContent = receipt.billingId ? "✅ รับเงินแล้ว" : "💵 รับเงิน";
-    renderReceiptSubjectPicker(receipt);
+    els.receiptPaymentControls.classList.toggle("hidden", hasBilling || partialReprint);
+    els.receiptSubjectPicker.classList.toggle("hidden", hasBilling && !state.partialReceiptDraft);
+    els.receiptReceivePayment.classList.toggle("hidden", hasBilling || partialReprint);
+    els.receiptReceivePayment.disabled = hasBilling || state.isLoadingReceipt || state.isReceivingPayment || !receipt.receiptDetails?.length;
+    els.receiptReceivePayment.textContent = hasBilling ? "✅ รับเงินแล้ว" : state.partialReceiptDraft ? "💵 รับเงินเพิ่ม" : "💵 รับเงิน";
+    els.receiptPrint.textContent = partialReprint ? "🖨️ พิมพ์ใบเสร็จเดิม" : "🖨️ Print";
+    renderReceiptSubjectPicker(state.partialReceiptDraft || receipt);
     const { name: studentNamePart, nickname: studentNicknamePart } = splitNickname(receipt.studentName);
 
     els.receiptPaper.innerHTML = `
@@ -637,17 +642,24 @@ function renderReceipt(receipt) {
         <div class="receipt-line"></div>
         <div class="receipt-center">Thank you</div>
     `;
+    updateReceiptPrintButton();
 }
 
 async function refreshReceiptPreview({
     existingBillingId = null,
-    selectedEnrollmentIds = null
+    selectedEnrollmentIds = null,
+    preservePartialDraft = false
 } = {}) {
     if (!state.selectedRow) {
         return;
     }
 
     const period = selectedPeriod();
+    const row = state.selectedRow, requestId = ++state.receiptPreviewRequest;
+    const isCurrent = () => requestId === state.receiptPreviewRequest && row === state.selectedRow;
+    state.isLoadingReceipt = true;
+    updateReceiptPrintButton();
+    els.receiptReceivePayment.disabled = true;
 
     setStatus("กำลังเตรียมใบเสร็จ...");
 
@@ -655,7 +667,7 @@ async function refreshReceiptPreview({
         const data = await requestJson("/api/payment/receipt/preview", {
             method: "POST",
             body: JSON.stringify({
-                enrollmentId: state.selectedRow.sourceEnrollmentId,
+                enrollmentId: row.sourceEnrollmentId,
                 billingDate: todayIsoDate(),
                 billingMonth: period.billingMonth,
                 billingYear: period.billingYear,
@@ -664,6 +676,10 @@ async function refreshReceiptPreview({
                 selectedEnrollmentIds
             })
         });
+        if (!isCurrent()) return;
+        if (preservePartialDraft && Number(data.receipt.billingId) !== Number(existingBillingId)) {
+            throw new Error('ไม่พบใบเสร็จเดิม กรุณาตรวจรายการอีกครั้ง ยังไม่ได้ออกบิลใหม่');
+        }
 
         if (data.receipt.alreadyPaid && !data.receipt.billingId) {
             await refreshReceiptPreview({
@@ -674,13 +690,48 @@ async function refreshReceiptPreview({
         }
 
         state.receipt = data.receipt;
+        if (!preservePartialDraft) {
+            state.partialReceiptDraft = !data.receipt.billingId && (data.receipt.partiallyPaid || row.isPartial) ? data.receipt : null;
+        }
+        state.isLoadingReceipt = false;
         renderPaymentMethods(data.paymentMethods, state.receipt.paymentMethodId);
         renderReceipt(state.receipt);
         els.receiptModal.classList.remove("hidden");
         focusPrimaryReceiptAction();
         setStatus("พร้อมพิมพ์ใบเสร็จ");
     } catch (error) {
-        setStatus(error.message, "error");
+        if (isCurrent()) { setStatus(error.message, "error"); setReceiptMessage(error.message); }
+    } finally {
+        if (isCurrent()) {
+            state.isLoadingReceipt = false;
+            updateReceiptPrintButton();
+            els.receiptReceivePayment.disabled = Boolean(state.receipt?.billingId) || state.isReceivingPayment || !state.receipt?.receiptDetails?.length;
+        }
+    }
+}
+
+function updateReceiptSelection() {
+    const draft = state.partialReceiptDraft || state.receipt;
+    if (!draft || draft.billingId) return;
+    const wasReprint = Boolean(state.receipt?.billingId);
+    recalculateReceiptTotals(draft);
+    const reprint = Boolean(state.partialReceiptDraft && !draft.receiptDetails.length);
+    // A delayed reprint lookup must never replace a newly selected extra bill.
+    state.receiptPreviewRequest++;
+    state.isLoadingReceipt = false;
+    if (wasReprint || reprint) {
+        state.receiptSession++;
+        state.isPrintingReceipt = false;
+        state.receiptPrintUsed = false;
+    }
+    state.receipt = draft;
+    setReceiptMessage('');
+    renderPaymentMethods(null, draft.paymentMethodId);
+    renderReceipt(draft);
+    if (reprint) {
+        const billingId = draft.existingBillingId || draft.details.find(detail => detail.isPaid)?.paidBillingId || state.selectedRow?.billingId;
+        if (billingId) void refreshReceiptPreview({ existingBillingId: billingId, selectedEnrollmentIds: [], preservePartialDraft: true });
+        else setReceiptMessage('ไม่พบเลขใบเสร็จเดิม กรุณาปิดแล้วเปิดรายการใหม่');
     }
 }
 
@@ -704,6 +755,7 @@ function openReceipt(row) {
     setReceiptMessage('');
     state.selectedRow = row;
     state.receipt = null;
+    state.partialReceiptDraft = null;
     state.receiptSession++;
     state.isPrintingReceipt = false;
     state.receiptPrintUsed = false;
@@ -721,6 +773,8 @@ function openReceipt(row) {
 }
 
 function closeReceipt() {
+    state.receiptPreviewRequest++;
+    state.isLoadingReceipt = false;
     els.receiptModal.classList.add("hidden");
 }
 
@@ -744,7 +798,7 @@ function confirmReceiptAction(message, { focusConfirm = false } = {}) {
 }
 
 async function receivePayment() {
-    if (!state.selectedRow || !state.receipt || state.isReceivingPayment) {
+    if (!state.selectedRow || !state.receipt || state.receipt.billingId || state.isLoadingReceipt || state.isReceivingPayment || !state.receipt.receiptDetails?.length) {
         return;
     }
 
@@ -956,7 +1010,7 @@ async function printReceiptViaBackend() {
     // while it's focused (browsers fire a button's click on Enter same
     // as a mouse click), or any other rapid double-press, fired an
     // independent, un-guarded print request each time.
-    if (!state.receipt || state.isPrintingReceipt || state.receiptPrintUsed || !state.printerConnected) {
+    if (!state.receipt?.receiptDetails?.length || state.isLoadingReceipt || state.isPrintingReceipt || state.receiptPrintUsed || !state.printerConnected) {
         return;
     }
 
@@ -993,7 +1047,7 @@ async function printReceiptViaBackend() {
 }
 
 function updateReceiptPrintButton() {
-    els.receiptPrint.disabled = !state.printerConnected || state.isPrintingReceipt || state.receiptPrintUsed;
+    els.receiptPrint.disabled = !state.printerConnected || state.isLoadingReceipt || !state.receipt?.receiptDetails?.length || state.isPrintingReceipt || state.receiptPrintUsed;
     els.receiptPrint.title = state.receiptPrintUsed
         ? "สั่งพิมพ์แล้ว หากต้องการพิมพ์ซ้ำให้ปิดและเปิดใบเสร็จใหม่"
         : state.printerConnected ? "" : "เครื่องพิมพ์ยังไม่พร้อม — เช็คสถานะที่มุมขวาบนก่อน";
@@ -1165,8 +1219,7 @@ function bindEvents() {
             return;
         }
 
-        recalculateReceiptTotals(state.receipt);
-        renderReceipt(state.receipt);
+        updateReceiptSelection();
     });
     els.receiptPaymentMethod.addEventListener("change", () => {
         if (state.receipt?.billingId) {

@@ -18,6 +18,7 @@ import {
     updateStudent
 } from "../services/studentService.js";
 import { requireAdmin, requireStaff } from "../middleware/auth.js";
+import { cancelReceiptPayment } from "../services/paymentService.js";
 import { previewKsisStudent, previewKsisStudentInApp } from "../services/ksisStudentService.js";
 import { readKsisReportRoster } from "../services/ksisRosterService.js";
 import { createKsisMatchingPreview, saveKsisMatchingPreview } from "../services/ksisMatchingService.js";
@@ -240,6 +241,12 @@ router.delete("/:studentId/history/cd/:cdUsedId", requireStaff, async (req, res)
     } catch (error) {
         sendError(res, error);
     }
+});
+
+router.post("/:studentId/history/billing/:billingId/cancel", requireStaff, async (req, res) => {
+    try {
+        res.json({ success: true, ...(await cancelReceiptPayment({ studentId: req.params.studentId, billingId: req.params.billingId })) });
+    } catch (error) { sendError(res, error); }
 });
 
 router.delete("/:studentId/history/status/:enrollmentStatusId", requireAdmin, async (req, res) => {

@@ -1153,9 +1153,13 @@ export async function receiveReceiptPayment(payload) {
 
 export async function cancelReceiptPayment(payload) {
     const billingId = Number(payload?.billingId);
+    const studentId = payload?.studentId === undefined ? null : Number(payload.studentId);
 
     if (!Number.isInteger(billingId) || billingId < 1) {
         throw httpError(400, "Billing ID ไม่ถูกต้อง");
+    }
+    if (studentId !== null && (!Number.isSafeInteger(studentId) || studentId < 1)) {
+        throw httpError(400, "Student ID ไม่ถูกต้อง");
     }
 
     const client = await pool.connect();
@@ -1179,7 +1183,7 @@ export async function cancelReceiptPayment(payload) {
         `, [billingId]);
         const billing = billingResult.rows[0];
 
-        if (!billing) {
+        if (!billing || (studentId !== null && Number(billing.student_id) !== studentId)) {
             throw httpError(404, "ไม่พบใบเสร็จนี้");
         }
 
