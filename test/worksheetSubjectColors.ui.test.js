@@ -62,10 +62,14 @@ test("WS progress and packet bars follow ME/EFL/TRP on subject and Main/Zun swit
                 await page.waitForFunction((subject) => document.querySelector(".worksheet-page").dataset.wsSubject === subject, enrollment.subjectCode);
                 const colors = await page.evaluate(() => ({ stroke: getComputedStyle(document.querySelector(".worksheet-progress-bar")).stroke,
                     text: getComputedStyle(document.getElementById("worksheetProgressCaption")).color,
+                    selectText: getComputedStyle(document.getElementById("studentSubjectSelect")).color,
+                    stripBorder: getComputedStyle(document.querySelector(".student-strip")).borderLeftColor,
                     gradient: getComputedStyle(document.querySelector(".packet-bar-fill")).backgroundImage,
                     status: [...document.querySelectorAll(".history-table .badge")].map((element) => getComputedStyle(element).backgroundColor) }));
                 const expected = palette[enrollment.subjectCode];
                 assert.equal(colors.stroke, expected.stroke); assert.equal(colors.text, expected.text);
+                assert.equal(colors.selectText, expected.text);
+                if (width > 1120) assert.equal(colors.stripBorder, expected.stroke);
                 await page.waitForFunction((color) => getComputedStyle(document.querySelector(".worksheet-progress-tab.active")).color === color, expected.text);
                 assert.ok(colors.gradient.includes(expected.top)); assert.ok(colors.gradient.includes(expected.bottom));
                 if (!statusColors) statusColors = colors.status;
@@ -89,6 +93,18 @@ test("WS progress and packet bars follow ME/EFL/TRP on subject and Main/Zun swit
         await page.locator("#studentSubjectSelect").selectOption("1");
         await page.waitForFunction(() => document.querySelector(".worksheet-page").dataset.wsSubject === "ME");
         assert.equal(await page.locator(".worksheet-progress-bar").evaluate((element) => getComputedStyle(element).stroke), palette.ME.stroke);
+        const searchMode = page.locator('[data-mode="name"]');
+        await searchMode.click();
+        for (const subject of ['EFL', 'TRP', 'ME', 'ALL']) {
+            await page.locator(`#subjectButtons [data-subject="${subject}"]`).click();
+            assert.equal(await searchMode.getAttribute('aria-pressed'), 'true');
+            assert.equal(await page.locator(`#subjectButtons [data-subject="${subject}"]`).getAttribute('aria-pressed'), 'true');
+            const { state } = await page.evaluate(async () => {
+                const { state } = await import('/js/worksheet/worksheetState.js');
+                return { state: { subjectFilter: state.subjectFilter, searchMode: state.searchMode, enrollmentId: state.context.enrollment.enrollmentId } };
+            });
+            assert.deepEqual(state, { subjectFilter: subject, searchMode: 'name', enrollmentId: 1 });
+        }
         assert.deepEqual(writes, []); assert.deepEqual(errors, []);
     } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 });

@@ -27,7 +27,7 @@ export function renderSearchResults() {
         >
             <span class="result-id">#${escapeHtml(row.enrollmentId)}</span>
             <span class="result-name">${escapeHtml(row.studentName)}</span>
-            <span class="result-subject">${escapeHtml(row.subjectCode)} ${escapeHtml(row.currentLevelCode)}</span>
+            <span class="result-subject" data-subject="${escapeHtml(row.subjectCode)}">${escapeHtml(row.subjectCode)} ${escapeHtml(row.currentLevelCode)}</span>
         </button>
     `).join("");
     els.searchResults.classList.remove("hidden");
@@ -86,6 +86,7 @@ export function setSubjectFilter(subject) {
     state.subjectFilter = subject;
     els.subjectButtons.querySelectorAll(".subject-button").forEach((button) => {
         button.classList.toggle("active", button.dataset.subject === subject);
+        button.setAttribute("aria-pressed", String(button.dataset.subject === subject));
     });
     queueSearch();
     els.studentSearch.focus();
@@ -96,6 +97,7 @@ export function setSearchMode(mode) {
     state.searchMode = mode;
     els.searchMode.querySelectorAll(".mode-button").forEach((button) => {
         button.classList.toggle("active", button.dataset.mode === mode);
+        button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
     });
     els.studentSearch.placeholder = mode === "id"
         ? "Enrollment ID"

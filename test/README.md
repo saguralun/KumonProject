@@ -111,6 +111,14 @@ restart-helper test, not necessary for this suite's application regression check
   remain. Shared WS/AT confirmation scopes are invalidated if another window
   changes eligible identities before approval.
 
+- Students/WS subject cues are covered with synthetic browser and Electron
+  fixtures: independent subject filters and ID/name search, ME/EFL/TRP panel
+  colors, mixed enrollment status badges, responsive layout and no writes.
+  Directory absence durations use month/year history, not an invented day;
+  missing history stays unknown. The disposable PostgreSQL suite checks
+  repeated A logs, Resume followed by a new absence (including the same
+  month), exact enrollment searches and existing Active/Absent filters.
+
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/
 restart actions without separate authorization.

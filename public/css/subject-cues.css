@@ -1,0 +1,50 @@
+/* Loaded only by Students and WS Input, after shared layout rules.
+   Subject colors identify subjects; separate text badges identify status. */
+[data-subject="ME"] { --subject-ink: #0369a1; --subject-accent: #11a8dc; --subject-tint: #eaf9ff; --subject-border: #bae6fd; }
+[data-subject="EFL"] { --subject-ink: #9a3412; --subject-accent: #ea580c; --subject-tint: #fff7ed; --subject-border: #fed7aa; }
+[data-subject="TRP"] { --subject-ink: #065f46; --subject-accent: #059669; --subject-tint: #ecfdf5; --subject-border: #a7f3d0; }
+
+@media screen {
+  :root .student-directory { background: #f0f4f9; border-color: #cbd8e5; }
+  .directory-heading { display: grid; gap: 3px; margin-bottom: 10px; font-weight: 700; color: #273d54; }
+  .directory-heading > span { font-weight: 400; font-size: 11px; color: #53657a; }
+  :root .workspace-student-list .student-item { padding: 10px; border-color: #d3dfeb; background: #fff; text-align: left; }
+  :root .workspace-student-list .student-item[data-directory-tone="inactive"] { background: #fff8f1; border-color: #f4d2b9; }
+  :root .workspace-student-list .student-item[data-directory-tone="complete"] { background: #faf5ff; border-color: #e6d5f7; }
+  :root .workspace-student-list .student-item.active,
+  :root .workspace-student-list .student-item.active:hover:not(:disabled) { background: #e8effc; border-color: #537fd0; box-shadow: inset 3px 0 #537fd0; color: #1e3a6b; }
+  .student-item-statuses { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .directory-status, .enrollment-status { display: inline-block; border: 1px solid transparent; border-radius: 5px; padding: 2px 5px; font-size: 11px; line-height: 1.5; font-weight: 600; white-space: normal; }
+  .directory-status.status-active { background: #eef3f8; color: #334b63; border-color: #dbe3ed; }
+  .directory-status.status-inactive, .enrollment-status:is([data-status="A"], [data-status="OT"]) { background: #fff1e6; color: #9a3412; border-color: #fdcba8; }
+  .directory-status.status-complete, .enrollment-status[data-status="CP"] { background: #f3e8ff; color: #6b21a8; border-color: #dfc6f7; }
+  .directory-status.status-unknown { background: #f1f5f9; color: #526174; }
+  .enrollment-status { margin-left: 3px; background: #fff; color: #334b63; border-color: #dbe3ed; }
+  .enrollment-panel[data-subject] { background: var(--subject-tint, #fff); border-color: var(--subject-border, #dde3ee); border-top: 3px solid var(--subject-accent, #dde3ee); }
+  .enrollment-panel .enrollment-tab[data-subject] { background: #fff; color: var(--subject-ink, #334b63); border-color: var(--subject-border, #dbe3ed); }
+  .enrollment-panel .enrollment-tab[data-subject].active { background: var(--subject-tint); border-color: var(--subject-accent); box-shadow: inset 0 -3px var(--subject-accent); }
+  .enrollment-panel .enrollment-tab[data-subject]:hover:not(:disabled) { background: var(--subject-tint); }
+  .enrollment-panel[data-subject] .panel-header .subtle { color: var(--subject-ink); }
+
+  /* Two bounded groups prevent subject filters and search modes blending. */
+  :root .worksheet-page .workspace-subjects, :root .worksheet-page .search-mode { padding: 6px; border: 1px solid #d1dce8; border-radius: 9px; gap: 4px; }
+  :root .worksheet-page .workspace-subjects { background: #f1f5f9; }
+  :root .worksheet-page .search-mode { background: #f0f2ff; border-color: #d8dcf2; }
+  .search-group-label { grid-column: 1 / -1; font-size: 10px; font-weight: 700; color: #526174; line-height: 1.2; padding: 0 2px 2px; }
+  :root .worksheet-page .subject-button[data-subject]:not([data-subject="ALL"]) { color: var(--subject-ink); border-color: var(--subject-border); background: #fff; }
+  :root .worksheet-page .subject-button[data-subject]:not([data-subject="ALL"]):hover:not(:disabled),
+  :root .worksheet-page .subject-button[data-subject]:not([data-subject="ALL"]).active { background: var(--subject-tint); border-color: var(--subject-accent); color: var(--subject-ink); }
+  :root .worksheet-page .subject-button.active { box-shadow: inset 0 -3px var(--subject-accent, #64748b); }
+  :root .worksheet-page .subject-button[data-subject="ALL"].active { background: #e2e8f0; color: #334155; border-color: #94a3b8; }
+  .worksheet-page .result-subject[data-subject] { color: var(--subject-ink); background: var(--subject-tint); border: 1px solid var(--subject-border); border-radius: 5px; padding: 3px 7px; }
+  .worksheet-page .student-strip:not(.is-empty) { background: var(--ws-tint); border-color: var(--ws-border); border-left: 4px solid var(--ws-accent); }
+  .worksheet-page .student-strip:not(.is-empty) .student-meta,
+  .worksheet-page .student-strip:not(.is-empty) .subject-select-wrap { color: var(--ws-text); }
+  .worksheet-page .student-strip:not(.is-empty) .subject-select-wrap select { color: var(--ws-text); border-color: var(--ws-border); background-color: #fff; }
+  .worksheet-page .student-strip:not(.is-empty) .pattern-control { background: #fff; border-color: var(--ws-border); }
+  .worksheet-page .student-strip:not(.is-empty) .pattern-button.active { background: var(--ws-tint); color: var(--ws-text); border-color: var(--ws-accent); }
+  :is(.student-page, .worksheet-page) button:focus-visible { outline: 2px solid #334155; outline-offset: 2px; }
+}
+@media screen and (max-width: 1120px) {
+  .worksheet-page .student-strip:not(.is-empty) :is(.pattern-control, .subject-select-wrap) { background: var(--ws-tint); border-color: var(--ws-border); }
+}

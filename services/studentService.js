@@ -684,6 +684,31 @@ export async function searchStudents({
         `
         : "student.student_id DESC";
     const result = await pool.query(`
+        WITH last_attending_status AS (
+            SELECT DISTINCT ON (history.enrollment_id)
+                history.enrollment_id, history.status_year, history.status_month, history.enrollment_status_id
+            FROM ${TABLE_SCHEMA}.enrollment_status history
+            JOIN ${TABLE_SCHEMA}.status_master history_status ON history_status.status_id = history.status_id
+            WHERE history_status.status_group = 1
+              AND history_status.status_code NOT IN ('A', 'OT')
+            ORDER BY history.enrollment_id, history.status_year DESC, history.status_month DESC, history.enrollment_status_id DESC
+        ), absence_period AS (
+            -- Start of the uninterrupted absence after the last active status.
+            -- Read history in sets, avoiding a scan per student/month.
+            SELECT DISTINCT ON (history.enrollment_id)
+                history.enrollment_id, history.status_month, history.status_year
+            FROM ${TABLE_SCHEMA}.enrollment_status history
+            JOIN ${TABLE_SCHEMA}.status_master history_status ON history_status.status_id = history.status_id
+            LEFT JOIN last_attending_status attending ON attending.enrollment_id = history.enrollment_id
+            WHERE history_status.status_group = 1
+              AND history_status.status_code IN ('A', 'OT')
+              AND history.status_month BETWEEN 1 AND 12
+              AND history.status_year BETWEEN 1 AND 9999
+              AND (attending.enrollment_id IS NULL OR
+                  (history.status_year, history.status_month, history.enrollment_status_id)
+                    > (attending.status_year, attending.status_month, attending.enrollment_status_id))
+            ORDER BY history.enrollment_id, history.status_year, history.status_month, history.enrollment_status_id
+        )
         SELECT
             student.student_id,
             student.first_name,
@@ -697,6 +722,8 @@ export async function searchStudents({
                     'subjectCode', subject.subject_code,
                     'currentLevelCode', level.level_code,
                     'statusCode', status.status_code,
+                    'absenceSinceMonth', absence.status_month,
+                    'absenceSinceYear', absence.status_year,
                     'isKumonConnect', e.is_kumon_connect
                 )
                 ORDER BY subject.subject_id
@@ -710,6 +737,8 @@ export async function searchStudents({
             ON level.level_master_id = e.current_level_master_id
         LEFT JOIN ${TABLE_SCHEMA}.status_master status
             ON status.status_id = e.current_status_group1_id
+        LEFT JOIN absence_period absence
+            ON absence.enrollment_id = e.enrollment_id AND status.status_code IN ('A', 'OT')
         ${whereSql}
         GROUP BY student.student_id
         ORDER BY ${orderSql}

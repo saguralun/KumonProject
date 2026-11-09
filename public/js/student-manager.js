@@ -1,4 +1,5 @@
 import { bindFourDigitYearDateInputs } from "./dateInputYear.js";
+import { directoryStatus, directoryTone } from "./studentDirectoryStatus.js";
 import { bindKsisImport, resetKsisImport } from "./studentKsisImport.js";
 import { closeWsGraphModal, loadWsGraph, openWsGraphModal, updateWsGraphButtonVisibility } from "./studentWsGraph.js";
 import {
@@ -184,9 +185,14 @@ function renderStudentList() {
                 type="button"
                 class="student-item ${Number(student.studentId) === Number(state.selectedStudentId) ? "active" : ""}"
                 data-student-id="${escapeHtml(student.studentId)}"
+                data-directory-tone="${directoryTone(student.enrollments)}"
                 data-preferred-enrollment-id="${escapeHtml(student.matchedEnrollmentId || "")}"
             >
                 <div class="student-item-name">${escapeHtml(student.displayName)}</div>
+                <span class="student-item-statuses">${(student.enrollments || []).map((enrollment) => {
+                    const status = directoryStatus(enrollment);
+                    return `<span class="directory-status status-${status.tone}" title="${escapeHtml(status.title)}">${escapeHtml(status.label)}</span>`;
+                }).join("") || '<span class="directory-status status-unknown">ยังไม่มีวิชา</span>'}</span>
             </button>
         `).join("");
     syncStudentControls();
@@ -316,29 +322,10 @@ function fillEnrollmentForm(enrollment = null) {
     els.saveEnrollmentButton.textContent = "💾 Save Enrollment";
 }
 
-// N/IT/EO/R/C all mean the subject is actively being studied right now
-// (just started/transferred in/added/resumed/continuing); A/OT mean it's
-// currently paused or left; CP means it's finished — three outcomes worth
-// telling apart at a glance on the subject tabs, so each gets its own
-// color (see .enrollment-tab.status-* in student-manager.css).
-const ENROLLMENT_TAB_STATUS_CLASS = {
-    N: "status-active",
-    IT: "status-active",
-    EO: "status-active",
-    R: "status-active",
-    C: "status-active",
-    A: "status-inactive",
-    OT: "status-inactive",
-    CP: "status-completer"
-};
-
-function enrollmentTabStatusClass(statusGroup1Code) {
-    return ENROLLMENT_TAB_STATUS_CLASS[statusGroup1Code] || "";
-}
-
 function renderEnrollmentTabs() {
     els.enrollmentAbsentButton.classList.remove("payment-absent-target");
     const enrollments = state.profile?.enrollments || [];
+    delete els.enrollmentTabs.closest(".enrollment-panel").dataset.subject;
 
     if (!enrollments.length) {
         els.enrollmentTabs.innerHTML = "";
@@ -359,10 +346,13 @@ function renderEnrollmentTabs() {
     els.enrollmentTabs.innerHTML = enrollments.map((enrollment) => `
         <button
             type="button"
-            class="enrollment-tab ${enrollmentTabStatusClass(enrollment.statusGroup1Code)} ${Number(enrollment.enrollmentId) === Number(state.selectedEnrollmentId) ? "active" : ""}"
+            class="enrollment-tab ${Number(enrollment.enrollmentId) === Number(state.selectedEnrollmentId) ? "active" : ""}"
+            data-subject="${escapeHtml(enrollment.subjectCode)}"
+            aria-pressed="${Number(enrollment.enrollmentId) === Number(state.selectedEnrollmentId)}"
             data-enrollment-id="${escapeHtml(enrollment.enrollmentId)}"
         >
             ${escapeHtml(enrollment.subjectCode)} #${escapeHtml(enrollment.enrollmentId)}
+            <span class="enrollment-status" data-status="${escapeHtml(enrollment.statusGroup1Code || '')}">${escapeHtml(enrollment.statusGroup1Code || '—')}</span>
         </button>
     `).join("");
     const active = enrollments.find((enrollment) =>
@@ -370,6 +360,7 @@ function renderEnrollmentTabs() {
     ) || enrollments[0];
 
     state.selectedEnrollmentId = active.enrollmentId;
+    els.enrollmentTabs.closest(".enrollment-panel").dataset.subject = active.subjectCode;
     const canLeave = active.statusGroup1Code === "C";
     const canResume = ["A", "OT"].includes(active.statusGroup1Code);
     const canComplete = Boolean(active.canComplete) && active.statusGroup1Code !== "CP";
@@ -571,6 +562,7 @@ async function deleteSelectedStudent() {
         updateWsGraphButtonVisibility();
         els.enrollmentTabs.innerHTML = "";
         els.enrollmentForm.classList.add("hidden");
+        delete els.enrollmentTabs.closest(".enrollment-panel").dataset.subject;
         els.enrollmentEmpty.classList.remove("hidden");
         els.enrollmentEmpty.textContent = "เลือกเด็กก่อน";
         els.historyTableWrap.innerHTML = `<div class="empty-state">เลือกเด็กเพื่อดูประวัติ</div>`;

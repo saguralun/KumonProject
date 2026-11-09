@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/css/app-scale.css?v=20261030-project-audit">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-update-anytime">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
+  <link rel="stylesheet" href="/css/subject-cues.css?v=20261109-subject-status">
 </head>
 
 <body>
@@ -72,14 +73,16 @@
 
       <section class="search-band" aria-label="Student search">
         <div class="subject-buttons workspace-subjects" id="subjectButtons" role="group" aria-label="รายวิชา">
-          <button type="button" class="subject-button active" data-subject="ALL">ALL</button>
-          <button type="button" class="subject-button" data-subject="ME">ME</button>
-          <button type="button" class="subject-button" data-subject="EFL">EFL</button>
-          <button type="button" class="subject-button" data-subject="TRP">TRP</button>
+          <span class="search-group-label">กรองวิชา</span>
+          <button type="button" class="subject-button active" data-subject="ALL" aria-pressed="true">ALL</button>
+          <button type="button" class="subject-button" data-subject="ME" aria-pressed="false">ME</button>
+          <button type="button" class="subject-button" data-subject="EFL" aria-pressed="false">EFL</button>
+          <button type="button" class="subject-button" data-subject="TRP" aria-pressed="false">TRP</button>
         </div>
-        <div class="search-mode" id="searchMode">
-          <button type="button" class="mode-button active" data-mode="id">ID</button>
-          <button type="button" class="mode-button" data-mode="name">ชื่อ</button>
+        <div class="search-mode" id="searchMode" role="group" aria-label="ค้นหาด้วย">
+          <span class="search-group-label">ค้นหาด้วย</span>
+          <button type="button" class="mode-button active" data-mode="id" aria-pressed="true">ID</button>
+          <button type="button" class="mode-button" data-mode="name" aria-pressed="false">ชื่อ</button>
         </div>
 
         <div class="search-field">

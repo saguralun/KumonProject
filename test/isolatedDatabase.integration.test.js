@@ -13,7 +13,7 @@ import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt
 import { createDeliveryOrder, processDeliveryOrder } from '../services/stockReceiveService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
-import { applyEnrollmentStatusAction } from '../services/studentService.js';
+import { applyEnrollmentStatusAction, searchStudents } from '../services/studentService.js';
 import { paymentDatabaseStatus } from '../services/databaseStatusService.js';
 import { setAccountActive, updateAccountRole } from '../services/authService.js';
 
@@ -86,6 +86,35 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             return (await database.query(`INSERT INTO kumon.enrollment(student_id,subject_id,current_level_master_id,starting_worksheet_master_id,en_start_date,current_status_group1_id) VALUES($1,1,$2,$3,'2026-10-01',$4) RETURNING enrollment_id`, [person.student_id, ws.level_master_id, ws.worksheet_master_id, statuses.get('N')])).rows[0].enrollment_id;
         }
         const payment = (enrollmentId) => receiveReceiptPayment({ enrollmentId, billingDate: '2026-10-23', billingMonth: 10, billingYear: 2026 });
+        await t.test('Student directory uses the latest uninterrupted absence per subject without changing search/filter semantics', async () => {
+            const id = await student('Directory absence');
+            const person = (await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].student_id;
+            await database.query('UPDATE kumon.enrollment SET current_status_group1_id=$2 WHERE enrollment_id=$1', [id, statuses.get('A')]);
+            for (const [code, month, year] of [['A', 1, 2020], ['R', 5, 2025], ['A', 8, 2025], ['A', 10, 2026]]) {
+                await database.query('INSERT INTO kumon.enrollment_status(enrollment_id,status_id,status_month,status_year) VALUES($1,$2,$3,$4)', [id, statuses.get(code), month, year]);
+            }
+            const other = [];
+            for (const [code, status] of [['EFL', 'C'], ['TRP', 'A']]) {
+                const master = (await database.query(`SELECT lm.subject_id,wm.worksheet_master_id,wm.level_master_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id JOIN kumon.subject_master sm ON sm.subject_id=lm.subject_id WHERE sm.subject_code=$1 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1`, [code])).rows[0];
+                other.push((await database.query(`INSERT INTO kumon.enrollment(student_id,subject_id,current_level_master_id,starting_worksheet_master_id,en_start_date,current_status_group1_id) VALUES($1,$2,$3,$4,'2025-01-01',$5) RETURNING enrollment_id`, [person, master.subject_id, master.level_master_id, master.worksheet_master_id, statuses.get(status)])).rows[0].enrollment_id);
+            }
+            for (const filter of ['all', 'active', 'absent']) {
+                const rows = await searchStudents({ query: 'Directory absence', status: filter });
+                assert.equal(rows.length, 1); assert.equal(rows[0].studentId, person);
+                const subjects = new Map(rows[0].enrollments.map(e => [e.subjectCode, e]));
+                assert.deepEqual([subjects.get('ME').absenceSinceMonth, subjects.get('ME').absenceSinceYear], [8, 2025]);
+                assert.equal(subjects.get('EFL').statusCode, 'C');
+                assert.equal(subjects.get('EFL').absenceSinceMonth, null);
+                assert.equal(subjects.get('TRP').absenceSinceMonth, null); // no invented departure date
+            }
+            const exact = (await searchStudents({ query: String(id), status: 'all' })).find(s => s.studentId === person);
+            assert.equal(exact.matchedEnrollmentId, id);
+            for (const [code, month] of [['R', 10], ['A', 10]]) {
+                await database.query('INSERT INTO kumon.enrollment_status(enrollment_id,status_id,status_month,status_year) VALUES($1,$2,$3,2026)', [id, statuses.get(code), month]);
+            }
+            const recent = (await searchStudents({ query: 'Directory absence', status: 'absent' }))[0].enrollments.find(e => e.enrollmentId === id);
+            assert.deepEqual([recent.absenceSinceMonth, recent.absenceSinceYear], [10, 2026]);
+        });
         await t.test('Paying two of three subjects commits exactly two details and leaves the third for a second receipt', async () => {
             const id = await student('Partial three');
             const person = (await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].student_id;
