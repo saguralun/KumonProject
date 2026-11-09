@@ -40,10 +40,10 @@ function incompleteWsTable(rows) {
             </thead>
             <tbody>
                 ${rows.map((row) => `
-                    <tr data-incomplete-enrollment-id="${escapeHtml(row.enrollmentId)}">
+                    <tr data-incomplete-enrollment-id="${escapeHtml(row.enrollmentId)}" data-subject="${escapeHtml(row.subjectCode)}">
                         <td>#${escapeHtml(row.enrollmentId)}</td>
                         <td>${escapeHtml(row.studentName)}</td>
-                        <td>${escapeHtml(row.subjectCode)}</td>
+                        <td><span class="incomplete-subject">${escapeHtml(row.subjectCode)}</span></td>
                         <td>${escapeHtml(row.currentLevelCode || "-")}</td>
                         <td>${escapeHtml(latestWorksheetText(row))}</td>
                         <td>${escapeHtml(row.latestWorksheetDate ? formatDateDisplay(row.latestWorksheetDate) : "-")}</td>

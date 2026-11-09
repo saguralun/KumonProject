@@ -28,6 +28,12 @@ test("WS progress and packet bars follow ME/EFL/TRP on subject and Main/Zun swit
             if (url.pathname === "/api/auth/me") data = { user: { role: "admin", displayName: "UI Test" }, permissions: ["*"] };
             if (url.pathname === "/api/worksheet/search") data.rows = [enrollments[0]];
             if (url.pathname.endsWith("/worksheet-summary")) data.worksheetMonthSummary = monthSummary;
+            if (url.pathname === '/api/worksheet/incomplete-ws') {
+                const regularPage = Number(url.searchParams.get('regularPage'));
+                const rows = enrollments.map(e => ({ ...e, latestWorksheetLabel: 'H101', latestWorksheetDate: '2026-10-19', latestPacketWorksheetNo: 101 }));
+                data = { cutoffDate: '2026-10-21', regular: { rows: regularPage === 2 ? [rows[2]] : rows, page: regularPage, totalPages: 2, totalRows: 4 },
+                    kc: { rows: [rows[1]], page: 1, totalPages: 1, totalRows: 1 } };
+            }
             const match = url.pathname.match(/\/enrollments\/(\d+)\/context$/);
             if (match) {
                 const enrollment = enrollments[Number(match[1]) - 1];
@@ -64,11 +70,16 @@ test("WS progress and packet bars follow ME/EFL/TRP on subject and Main/Zun swit
                     text: getComputedStyle(document.getElementById("worksheetProgressCaption")).color,
                     selectText: getComputedStyle(document.getElementById("studentSubjectSelect")).color,
                     stripBorder: getComputedStyle(document.querySelector(".student-strip")).borderLeftColor,
+                    monthText: getComputedStyle(document.getElementById('historyMonthSummary')).color,
+                    monthBackground: getComputedStyle(document.getElementById('historyMonthSummary')).backgroundColor,
                     gradient: getComputedStyle(document.querySelector(".packet-bar-fill")).backgroundImage,
                     status: [...document.querySelectorAll(".history-table .badge")].map((element) => getComputedStyle(element).backgroundColor) }));
                 const expected = palette[enrollment.subjectCode];
                 assert.equal(colors.stroke, expected.stroke); assert.equal(colors.text, expected.text);
                 assert.equal(colors.selectText, expected.text);
+                assert.equal(colors.monthText, expected.text);
+                assert.equal(colors.monthBackground, { ME: 'rgb(234, 249, 255)', EFL: 'rgb(255, 247, 237)', TRP: 'rgb(236, 253, 245)' }[enrollment.subjectCode]);
+                assert.match(await page.locator('#historyMonthSummary').innerText(), /11 วัน.*11 ชุด/);
                 if (width > 1120) assert.equal(colors.stripBorder, expected.stroke);
                 await page.waitForFunction((color) => getComputedStyle(document.querySelector(".worksheet-progress-tab.active")).color === color, expected.text);
                 assert.ok(colors.gradient.includes(expected.top)); assert.ok(colors.gradient.includes(expected.bottom));
@@ -105,6 +116,22 @@ test("WS progress and packet bars follow ME/EFL/TRP on subject and Main/Zun swit
             });
             assert.deepEqual(state, { subjectFilter: subject, searchMode: 'name', enrollmentId: 1 });
         }
+        await page.locator('#findIncompleteWs').click();
+        const table = page.locator('#incompleteWsTableWrap');
+        await table.locator('tr[data-subject="TRP"]').first().waitFor();
+        for (const [subject, background] of [['ME', 'rgb(234, 249, 255)'], ['EFL', 'rgb(255, 247, 237)'], ['TRP', 'rgb(236, 253, 245)']]) {
+            const row = table.locator(`tr[data-subject="${subject}"]`).first();
+            assert.equal(await row.evaluate(el => getComputedStyle(el).backgroundColor), background);
+            assert.equal(await row.locator('.incomplete-subject').innerText(), subject);
+        }
+        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-incomplete-subject-colors.png'), fullPage: true });
+        await table.locator('[data-incomplete-section="regular"][data-incomplete-page="next"]').click();
+        await page.waitForFunction(() => document.querySelectorAll('#incompleteWsTableWrap .incomplete-ws-section:first-child tbody tr').length === 1);
+        assert.equal(await table.locator('.incomplete-ws-section').nth(1).locator('tr[data-subject="EFL"]').count(), 1);
+        await table.locator('.incomplete-ws-section').first().locator('.incomplete-subject').click();
+        await page.waitForFunction(() => document.querySelector('.worksheet-page').dataset.wsSubject === 'TRP');
+        assert.equal(await page.locator('#incompleteWsModal').isVisible(), false);
+        assert.match(await page.locator('#studentSearch').inputValue(), /^#3 /);
         assert.deepEqual(writes, []); assert.deepEqual(errors, []);
     } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 });

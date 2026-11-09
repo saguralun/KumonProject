@@ -1,5 +1,5 @@
 /* Loaded only by Students and WS Input, after shared layout rules.
-   Subject colors identify subjects; separate text badges identify status. */
+   WS uses subject colors; Student tabs use status colors, with subject-colored panels. */
 [data-subject="ME"] { --subject-ink: #0369a1; --subject-accent: #11a8dc; --subject-tint: #eaf9ff; --subject-border: #bae6fd; }
 [data-subject="EFL"] { --subject-ink: #9a3412; --subject-accent: #ea580c; --subject-tint: #fff7ed; --subject-border: #fed7aa; }
 [data-subject="TRP"] { --subject-ink: #065f46; --subject-accent: #059669; --subject-tint: #ecfdf5; --subject-border: #a7f3d0; }
@@ -14,16 +14,19 @@
   :root .workspace-student-list .student-item.active,
   :root .workspace-student-list .student-item.active:hover:not(:disabled) { background: #e8effc; border-color: #537fd0; box-shadow: inset 3px 0 #537fd0; color: #1e3a6b; }
   .student-item-statuses { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
-  .directory-status, .enrollment-status { display: inline-block; border: 1px solid transparent; border-radius: 5px; padding: 2px 5px; font-size: 11px; line-height: 1.5; font-weight: 600; white-space: normal; }
+  .directory-status { display: inline-block; border: 1px solid transparent; border-radius: 5px; padding: 2px 5px; font-size: 11px; line-height: 1.5; font-weight: 600; white-space: normal; }
   .directory-status.status-active { background: #eef3f8; color: #334b63; border-color: #dbe3ed; }
-  .directory-status.status-inactive, .enrollment-status:is([data-status="A"], [data-status="OT"]) { background: #fff1e6; color: #9a3412; border-color: #fdcba8; }
-  .directory-status.status-complete, .enrollment-status[data-status="CP"] { background: #f3e8ff; color: #6b21a8; border-color: #dfc6f7; }
+  .directory-status.status-inactive { background: #fff1e6; color: #9a3412; border-color: #fdcba8; }
+  .directory-status.status-complete { background: #f3e8ff; color: #6b21a8; border-color: #dfc6f7; }
   .directory-status.status-unknown { background: #f1f5f9; color: #526174; }
-  .enrollment-status { margin-left: 3px; background: #fff; color: #334b63; border-color: #dbe3ed; }
   .enrollment-panel[data-subject] { background: var(--subject-tint, #fff); border-color: var(--subject-border, #dde3ee); border-top: 3px solid var(--subject-accent, #dde3ee); }
-  .enrollment-panel .enrollment-tab[data-subject] { background: #fff; color: var(--subject-ink, #334b63); border-color: var(--subject-border, #dbe3ed); }
-  .enrollment-panel .enrollment-tab[data-subject].active { background: var(--subject-tint); border-color: var(--subject-accent); box-shadow: inset 0 -3px var(--subject-accent); }
-  .enrollment-panel .enrollment-tab[data-subject]:hover:not(:disabled) { background: var(--subject-tint); }
+  .enrollment-tab[data-status] { --tab-ink: #475569; --tab-tint: #f1f5f9; --tab-border: #cbd5e1; }
+  .enrollment-tab:is([data-status="C"], [data-status="N"], [data-status="EO"], [data-status="IT"], [data-status="R"]) { --tab-ink: #047857; --tab-tint: #e6f8f0; --tab-border: #86e0bd; }
+  .enrollment-tab:is([data-status="A"], [data-status="OT"]) { --tab-ink: #b91c1c; --tab-tint: #fdeceb; --tab-border: #f3a8a8; }
+  .enrollment-tab[data-status="CP"] { --tab-ink: #6b21a8; --tab-tint: #f3e8ff; --tab-border: #d8b4fe; }
+  .enrollment-panel .enrollment-tab[data-status] { background: var(--tab-tint); color: var(--tab-ink); border-color: var(--tab-border); }
+  .enrollment-panel .enrollment-tab[data-status].active { border-color: var(--tab-ink); box-shadow: inset 0 -3px var(--tab-ink); }
+  .enrollment-panel .enrollment-tab[data-status]:hover:not(:disabled) { background: var(--tab-tint); border-color: var(--tab-ink); }
   .enrollment-panel[data-subject] .panel-header .subtle { color: var(--subject-ink); }
 
   /* Two bounded groups prevent subject filters and search modes blending. */
@@ -37,6 +40,10 @@
   :root .worksheet-page .subject-button.active { box-shadow: inset 0 -3px var(--subject-accent, #64748b); }
   :root .worksheet-page .subject-button[data-subject="ALL"].active { background: #e2e8f0; color: #334155; border-color: #94a3b8; }
   .worksheet-page .result-subject[data-subject] { color: var(--subject-ink); background: var(--subject-tint); border: 1px solid var(--subject-border); border-radius: 5px; padding: 3px 7px; }
+  #incompleteWsModal .incomplete-ws-table tbody tr[data-subject] { background: var(--subject-tint, #fff); }
+  #incompleteWsModal .incomplete-ws-table tbody tr[data-subject]:hover { box-shadow: inset 3px 0 var(--subject-accent, #94a3b8); }
+  #incompleteWsModal .incomplete-subject { display: inline-block; padding: 2px 7px; border: 1px solid var(--subject-border, #cbd5e1); border-radius: 5px; color: var(--subject-ink, #334155); background: #fff; font-weight: 700; }
+  .worksheet-page[data-ws-subject] .history-month-summary { color: var(--ws-text); background: var(--ws-tint); border-color: var(--ws-border); }
   .worksheet-page .student-strip:not(.is-empty) { background: var(--ws-tint); border-color: var(--ws-border); border-left: 4px solid var(--ws-accent); }
   .worksheet-page .student-strip:not(.is-empty) .student-meta,
   .worksheet-page .student-strip:not(.is-empty) .subject-select-wrap { color: var(--ws-text); }

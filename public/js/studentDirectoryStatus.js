@@ -14,9 +14,9 @@ export function absenceDuration(enrollment, now = new Date()) {
     // History stores billing periods, not an exact departure day.
     const months = (now.getFullYear() - year) * 12 + now.getMonth() + 1 - month;
     if (months < 0) return `เริ่มงวด ${month}/${year}`;
-    if (months === 0) return "ไม่ถึง 1 เดือน (ตามงวด)";
+    if (months === 0) return "ไม่ถึง 1 เดือน";
     const years = Math.floor(months / 12), remainder = months % 12;
-    return [years ? `${years} ปี` : "", remainder ? `${remainder} เดือน` : ""].filter(Boolean).join(" ") + " (ตามงวด)";
+    return [years ? `${years} ปี` : "", remainder ? `${remainder} เดือน` : ""].filter(Boolean).join(" ");
 }
 
 export function directoryStatus(enrollment, now) {

@@ -348,11 +348,12 @@ function renderEnrollmentTabs() {
             type="button"
             class="enrollment-tab ${Number(enrollment.enrollmentId) === Number(state.selectedEnrollmentId) ? "active" : ""}"
             data-subject="${escapeHtml(enrollment.subjectCode)}"
+            data-status="${escapeHtml(enrollment.statusGroup1Code || '')}"
+            aria-label="${escapeHtml(`${enrollment.subjectCode} #${enrollment.enrollmentId} • ${enrollment.statusGroup1Name || enrollment.statusGroup1Code || 'ไม่ทราบสถานะ'}`)}"
             aria-pressed="${Number(enrollment.enrollmentId) === Number(state.selectedEnrollmentId)}"
             data-enrollment-id="${escapeHtml(enrollment.enrollmentId)}"
         >
             ${escapeHtml(enrollment.subjectCode)} #${escapeHtml(enrollment.enrollmentId)}
-            <span class="enrollment-status" data-status="${escapeHtml(enrollment.statusGroup1Code || '')}">${escapeHtml(enrollment.statusGroup1Code || '—')}</span>
         </button>
     `).join("");
     const active = enrollments.find((enrollment) =>

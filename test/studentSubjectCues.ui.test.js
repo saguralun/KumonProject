@@ -30,6 +30,7 @@ for (const embedded of [false, true]) test(`Student directory status and subject
         const badges = page.locator('[data-student-id="1"] .directory-status');
         assert.equal(await badges.count(), 3);
         assert.match((await badges.allTextContents()).join(' '), /ME · C.*EFL · A.*TRP · C/);
+        assert.doesNotMatch(await page.locator('#studentList').innerText(), /\(ตามงวด\)/);
         assert.equal(await page.locator('[data-student-id="2"] .student-item-name').innerText(), '<script>Bad name</script>');
         assert.match(await page.locator('[data-student-id="2"] .directory-status').innerText(), /ไม่ทราบงวดที่ออก/);
         assert.match(await page.locator('[data-student-id="3"]').innerText(), /ยังไม่มีวิชา/);
@@ -49,7 +50,10 @@ for (const embedded of [false, true]) test(`Student directory status and subject
                 assert.equal(await page.locator('#enrollmentResumeButton').isDisabled(), code !== 'EFL');
                 const active = page.locator('#enrollmentTabs .active');
                 assert.equal(await active.getAttribute('aria-pressed'), 'true');
-                assert.equal(await active.locator('.enrollment-status').innerText(), code === 'EFL' ? 'A' : 'C');
+                assert.equal(await active.locator('.enrollment-status').count(), 0);
+                assert.equal(await active.innerText(), `${code} #${subjects.find(s => s.code === code).id * 10}`);
+                assert.equal(await active.evaluate(el => getComputedStyle(el).color), code === 'EFL' ? 'rgb(185, 28, 28)' : 'rgb(4, 120, 87)');
+                assert.match(await active.getAttribute('aria-label'), code === 'EFL' ? /Absent/ : /Continue/);
                 assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
             }
             await page.screenshot({ path: path.join(os.tmpdir(), `kumondb-student-cues-${embedded ? 'desktop' : 'browser'}-${width}.png`), fullPage: true });
