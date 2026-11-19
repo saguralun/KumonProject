@@ -159,6 +159,8 @@ function bindUpdateButton() {
       if (toggle) {
         toggle.classList.toggle('app-menu-has-update', !data.upToDate);
         toggle.title = toggle.dataset.tooltip = data.upToDate ? 'เปิดเมนู' : 'เปิดเมนู · มีอัปเดตโปรแกรม';
+        const menuLabel = toggle.getAttribute('aria-expanded') === 'true' ? 'ปิดเมนู' : 'เปิดเมนู';
+        toggle.setAttribute('aria-label', menuLabel + (data.upToDate ? '' : ' · มีอัปเดตโปรแกรม'));
       }
     }, { isBusy: () => button.disabled });
   }).catch(() => {});

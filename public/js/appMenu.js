@@ -31,7 +31,8 @@
       if (value) previousFocus = document.activeElement;
       opened = value;
       page.classList.toggle('app-menu-open', value);
-      toggle.setAttribute('aria-expanded', String(value)); toggle.setAttribute('aria-label', value ? 'ปิดเมนู' : 'เปิดเมนู');
+      toggle.setAttribute('aria-expanded', String(value));
+      toggle.setAttribute('aria-label', (value ? 'ปิดเมนู' : 'เปิดเมนู') + (toggle.classList.contains('app-menu-has-update') ? ' · มีอัปเดตโปรแกรม' : ''));
       panel.setAttribute('aria-hidden', String(!value)); panel.inert = !value; workspace.inert = value;
       if (value) closeButton.focus({ preventScroll: true });
       else {
