@@ -23,28 +23,40 @@ async function loadKsisMatchingStudents(client = pool) {
 
 export function proposeKsisMatches(roster, students) {
     const groups = new Map();
-    for (const row of roster) {
-        if (!groups.has(row.kumonId)) groups.set(row.kumonId, []);
-        groups.get(row.kumonId).push(row);
+    for (const [index, row] of roster.entries()) {
+        const rawId = String(row.kumonId ?? '').trim();
+        const kumonId = ['', '0', '-'].includes(rawId) ? '' : rawId;
+        const identityComplete = nameKey(row.fullName) && /^\d{4}-\d{2}-\d{2}$/.test(row.birthDate);
+        // A blank ID is not an identity: keep different children separate,
+        // while collapsing the same name+DOB repeated across subjects/pages.
+        const key = JSON.stringify(kumonId ? ['id', kumonId] : identityComplete
+            ? ['name_birth_date', nameKey(row.fullName), row.birthDate] : ['incomplete', index]);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push({ ...row, kumonId });
     }
     const idsByStudent = new Map(students.map((student) => [student.studentId, student.enrollments.map((enrollment) => normalizeKumonStudentId(enrollment.kumonId)).filter(Boolean)]));
-    const proposed = [...groups].map(([kumonId, copies]) => {
+    const proposed = [...groups.values()].map((copies) => {
         const source = copies[0];
-        const invalid = !/^\d{13}$/.test(kumonId) || !source.fullName || !/^\d{4}-\d{2}-\d{2}$/.test(source.birthDate)
+        const kumonId = source.kumonId;
+        const missingId = !kumonId;
+        const invalid = (!missingId && !/^\d{13}$/.test(kumonId)) || !nameKey(source.fullName) || !/^\d{4}-\d{2}-\d{2}$/.test(source.birthDate)
             || copies.some((row) => nameKey(row.fullName) !== nameKey(source.fullName) || row.birthDate !== source.birthDate);
         const byName = invalid ? [] : students.filter((student) => nameKey(fullName(student)) === nameKey(source.fullName));
         const exact = byName.filter((student) => student.birthDate === source.birthDate);
-        const candidates = (exact.length ? exact : byName).map((student) => {
+        const candidates = (missingId ? exact : exact.length ? exact : byName).map((student) => {
             const existing = idsByStudent.get(student.studentId);
             const taken = students.some((other) => other.studentId !== student.studentId && idsByStudent.get(other.studentId).includes(kumonId));
-            const conflict = !student.enrollments.length || taken || existing.some((id) => id !== kumonId);
+            const conflict = !student.enrollments.length || (!missingId && (taken || existing.some((id) => id !== kumonId)));
             return { ...student, name: fullName(student), conflict, sameBirthDate: student.birthDate === source.birthDate };
         });
         const safeExact = candidates.filter((student) => !student.conflict && student.sameBirthDate);
-        let status = invalid ? "invalid" : !candidates.length ? "unmatched" : !safeExact.length ? candidates.every((student) => student.conflict) ? "conflict" : "review"
+        let status = invalid ? "invalid" : missingId ? "missing_id" : !candidates.length ? "unmatched" : !safeExact.length ? candidates.every((student) => student.conflict) ? "conflict" : "review"
             : exact.length > 1 ? "ambiguous" : "exact";
         if (status === "exact" && safeExact[0].enrollments.every((enrollment) => String(enrollment.kumonId || "").trim() === kumonId)) status = "matched";
-        return { kumonId, fullName: source.fullName, birthDate: source.birthDate, status, candidates };
+        const reason = status === 'missing_id' ? candidates.length === 1 ? 'ชื่อและวันเกิดตรงกัน • ใช้จับคู่เพื่อกรอกข้อมูลได้'
+            : candidates.length > 1 ? 'ชื่อและวันเกิดตรงกันหลายคน กรุณาตรวจคู่ด้วยตนเอง'
+                : 'ไม่พบชื่อและวันเกิดที่ตรงกันในโปรแกรม' : '';
+        return { kumonId, fullName: source.fullName, birthDate: source.birthDate, status, candidates, reason };
     });
     // Two external IDs must never be preselected for the same local student.
     const counts = new Map();
@@ -71,9 +83,10 @@ export async function saveKsisMatchingPreview({ previewId, selections, userId },
     if (!preview || preview.userId !== Number(userId) || preview.expires < Date.now()) throw httpError(409, "Preview หมดอายุหรือถูกใช้แล้ว กรุณาอ่านรายชื่อใหม่");
     if (!Array.isArray(selections) || !selections.length || selections.length > preview.rows.length) throw httpError(400, "กรุณาเลือกรายการที่จะยืนยัน");
     const selected = selections.map((selection) => {
+        if (!/^\d{13}$/.test(selection.kumonId)) throw httpError(400, 'ยังไม่มีรหัสคุมองที่ใช้บันทึกได้ กรุณาตรวจรายการ');
         const row = preview.rows.find((item) => item.kumonId === selection.kumonId);
         const student = row?.candidates.find((item) => item.studentId === Number(selection.studentId));
-        if (!student || student.conflict || ["invalid", "matched"].includes(row.status)) throw httpError(400, "รายการที่เลือกไม่ตรงกับ Preview หรือมีรหัสขัดแย้ง");
+        if (!student || student.conflict || ["invalid", "matched", "missing_id"].includes(row.status)) throw httpError(400, "รายการที่เลือกไม่ตรงกับ Preview หรือมีรหัสขัดแย้ง");
         return { kumonId: row.kumonId, studentId: student.studentId };
     });
     if (new Set(selected.map((row) => row.studentId)).size !== selected.length || new Set(selected.map((row) => row.kumonId)).size !== selected.length) throw httpError(409, "เลือกเด็กหรือรหัสคุมองซ้ำกัน กรุณาตรวจรายการ");

@@ -98,6 +98,7 @@ button:disabled {
 .draft-result-reason.draft-result-notice { color: #64748b; }
 .match-state { display: inline-block; border-radius: 4px; padding: 3px 6px; background: #f1f5f9; white-space: nowrap; }
 .match-exact, .match-matched { background: #e7f8ef; color: #047857; }
+.match-info, .match-missing_id { background: #eef4f8; color: #425c66; }
 .match-review, .match-ambiguous { background: #fff4db; color: #92400e; }
 .match-conflict, .match-invalid { background: #fff1f2; color: #b91c1c; }
 .matching-dialog { max-width: min(520px, calc(100vw - 32px)); border: 1px solid #bcc9d9; border-radius: 8px; padding: 20px; font-size: 14px; }

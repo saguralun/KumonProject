@@ -12,10 +12,10 @@ test('ID-less preview shows both identities, requires unchecked per-subject conf
 }, async () => {
     const field = (value, options = null) => ({ value, options, writable: true });
     const records = ['ME', 'EFL'].map((Subject, index) => ({ ID: index + 1, StudentId: 100, Subject, 'รหัสคุมอง': '',
-        'ชื่อจริง': 'นักเรียนตัวอย่าง', 'นามสกุล': 'ทดสอบ', 'วันเกิด': '01/01/2563', CurrentLevel: 'C90', WksUsed: 8, Status1: 'N' }));
+        'ชื่อจริง': 'นักเรียนตัวอย่าง', 'นามสกุล': 'ทดสอบ', 'วันเกิด': '01/01/2563', CurrentLevel: 'C90', WksUsed: 8, Status1: 'C' }));
     records.push({ ...records[0], ID: 3, StudentId: 200, 'ชื่อจริง': 'เด็กวันเกิดไม่ครบ', 'วันเกิด': '', Status1: 'EO' });
     const document = { context: 'ชื่อศูนย์ TEST ประจำเดือน Oct - 2026', page: 1, modalOpen: false,
-        rows: ['ME', 'EFL'].map((subject) => ({ key: `new-${subject}`, studentKey: 'header:0', kumonId: '', fullName: 'นักเรียนตัวอย่าง ทดสอบ',
+            rows: ['ME', 'EFL'].map((subject) => ({ key: `new-${subject}`, studentKey: 'header:0', kumonId: subject === 'ME' ? '7642650000001' : '', fullName: 'นักเรียนตัวอย่าง ทดสอบ',
             birthDate: '01/01/2020', subject, level: field('C', ['C', 'D']), worksheet: field('80', ['80', '90']),
             used: field('0'), status: field('C', ['C', 'N', 'EO']), dirty: false })) };
     const rows = planKsisReportDraft(records, document, { month: 10, year: 2026 }, 'ALL', { includeZun: false });
@@ -43,6 +43,8 @@ test('ID-less preview shows both identities, requires unchecked per-subject conf
         await page.locator('#ksisDraftPreview').click(); await page.locator('[data-confirm-identity]').first().waitFor();
         assert.equal(await page.locator('[data-confirm-identity]').count(), 2);
         assert.equal(await page.locator('[data-confirm-identity]:checked').count(), 0);
+        assert.equal(await page.locator('#ksisDraftRows .match-conflict').count(), 1); // genuinely missing DOB only
+        assert.equal(await page.locator('#ksisDraftRows .match-info').count(), 2);
         assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
         assert.match(await page.locator('#ksisDraftRows').innerText(), /Report: นักเรียนตัวอย่าง ทดสอบ • 01\/01\/2563/);
         assert.match(await page.locator('#ksisDraftRows').innerText(), /KSIS: นักเรียนตัวอย่าง ทดสอบ • 01\/01\/2020/);

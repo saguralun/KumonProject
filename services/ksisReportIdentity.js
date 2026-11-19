@@ -14,11 +14,15 @@ export function matchKsisReportIdentity(record, records, website) {
     if (byId) {
         const targets = website.filter((row) => normalizeKumonStudentId(row.kumonId) === kumonId && row.subject === record.Subject);
         const duplicates = records.filter((row) => normalizeKumonStudentId(row['รหัสคุมอง']) === kumonId && row.Subject === record.Subject);
-        return { targets, method: 'kumon_id', studentKey: `id:${kumonId}`,
-            reason: duplicates.length !== 1 ? 'รหัสและวิชาซ้ำในรายงาน' : targets.length > 1 ? 'รหัสและวิชาซ้ำใน KSIS' : '' };
+        const key = localIdentity(record);
+        const hasNamedTarget = key && website.some(row => row.subject === record.Subject && siteIdentity(row) === key);
+        if (targets.length || duplicates.length !== 1 || !hasNamedTarget) {
+            return { targets, method: 'kumon_id', studentKey: `id:${kumonId}`,
+                reason: duplicates.length !== 1 ? 'รหัสและวิชาซ้ำในรายงาน' : targets.length > 1 ? 'รหัสและวิชาซ้ำใน KSIS' : '' };
+        }
     }
-    if (!noId(kumonId) || !['R', 'IT', 'N', 'EO'].includes(record.Status1)) {
-        return { targets: [], method: 'unresolved', studentKey: null, reason: 'ยังไม่มีรหัสคุมองครบ 13 หลัก' };
+    if (!byId && !noId(kumonId)) {
+        return { targets: [], method: 'unresolved', studentKey: null, reason: 'รูปแบบรหัสคุมองไม่ถูกต้อง กรุณาตรวจข้อมูล' };
     }
     const key = localIdentity(record);
     if (!key) return { targets: [], method: 'name_birth_date', studentKey: null, reason: 'ชื่อ นามสกุล หรือวันเกิดไม่ครบ ไม่จับคู่เด็กที่ไม่มีรหัส' };
@@ -30,7 +34,7 @@ export function matchKsisReportIdentity(record, records, website) {
     const reason = peers.filter((row) => row.Subject === record.Subject).length !== 1 || differentStudents.size > 1
         ? 'ชื่อ วันเกิด และรายวิชาซ้ำในรายงาน ไม่เลือกคู่ให้อัตโนมัติ'
         : targets.length > 1 || differentHeaders.size > 1 ? 'พบชื่อและวันเกิดซ้ำใน KSIS ไม่เลือกคู่ให้อัตโนมัติ'
-            : candidates.some((row) => !noId(row.kumonId)) ? 'KSIS มีรหัสคุมองแล้ว กรุณาจับคู่รหัสก่อน'
+            : byId && candidates.some((row) => !noId(row.kumonId) && normalizeKumonStudentId(row.kumonId) !== kumonId) ? 'รหัสคุมองใน Report และ KSIS ขัดแย้งกัน กรุณาตรวจคู่'
                 : !targets.length ? 'ไม่พบชื่อ นามสกุล วันเกิด และรายวิชาที่ตรงในหน้า KSIS ปัจจุบัน' : '';
     return { targets, method: 'name_birth_date', studentKey: record.StudentId != null ? `local:${record.StudentId}` : `identity:${key}`, reason };
 }

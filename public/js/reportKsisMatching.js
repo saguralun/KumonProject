@@ -1,4 +1,4 @@
-const labels = { exact: "ตรงแน่นอน", review: "วันเกิดต่างกัน", ambiguous: "พบหลายคู่", conflict: "รหัสขัดแย้ง", unmatched: "ไม่พบคู่", invalid: "ข้อมูลไม่ครบ", matched: "มีรหัสตรงแล้ว" };
+const labels = { exact: "ตรงแน่นอน", review: "วันเกิดต่างกัน", ambiguous: "พบหลายคู่", conflict: "รหัสขัดแย้ง", unmatched: "ไม่พบคู่", invalid: "ข้อมูลไม่ครบ", missing_id: "ยังไม่มีรหัสคุมอง", matched: "มีรหัสตรงแล้ว" };
 
 export function setupKsisMatching({ open, setStatus, onStateChange = () => {} }) {
   const get = (id) => document.getElementById(id);
@@ -8,7 +8,7 @@ export function setupKsisMatching({ open, setStatus, onStateChange = () => {} })
   let preview = null, busy = false;
   const chosen = new Map();
   const candidate = (row) => row.candidates.find((item) => item.studentId === chosen.get(row.kumonId));
-  const eligible = (row) => !["matched", "invalid"].includes(row.status) && row.candidates.some((item) => !item.conflict);
+  const eligible = (row) => /^\d{13}$/.test(row.kumonId) && !["matched", "invalid", "missing_id"].includes(row.status) && row.candidates.some((item) => !item.conflict);
   const optionText = (item) => `#${item.studentId} ${item.name} • ${item.birthDate || "ไม่ระบุวันเกิด"}`;
   function render() {
     onStateChange({ busy });
@@ -21,12 +21,16 @@ export function setupKsisMatching({ open, setStatus, onStateChange = () => {} })
     selectExact.disabled = busy || !preview?.rows.some((row) => row.status === "exact");
     container.innerHTML = rows.length ? `<table class="matching-table"><thead><tr><th>เลือก</th><th>KSIS</th><th>วันเกิด KSIS</th><th>นักเรียนในโปรแกรม</th><th>รหัสเดิม / วิชา</th><th>ผลเทียบ</th></tr></thead><tbody>${rows.map((row) => {
       const index = preview.rows.indexOf(row);
-      const local = candidate(row) || row.candidates[0];
-      return `<tr><td><input type="checkbox" data-match-check="${index}" aria-label="เลือก ${escapeHtml(row.fullName)}" ${chosen.has(row.kumonId) ? "checked" : ""} ${!eligible(row) || busy ? "disabled" : ""}></td>
+      const local = candidate(row) || (row.status === 'missing_id' && row.candidates.length !== 1 ? null : row.candidates[0]);
+      const missingId = row.status === 'missing_id';
+      const identityIssue = missingId && row.candidates.length !== 1;
+      const statusLabel = identityIssue ? row.candidates.length ? 'พบหลายคู่ชื่อและวันเกิด' : 'ไม่พบคู่ชื่อและวันเกิด' : labels[row.status];
+      const statusClass = missingId ? identityIssue ? 'match-review' : 'match-info' : `match-${row.status}`;
+      return `<tr><td>${missingId ? '<span class="subtle" title="แสดงคู่ชื่อและวันเกิด ไม่ต้องบันทึกรหัส">—</span>' : `<input type="checkbox" data-match-check="${index}" aria-label="เลือก ${escapeHtml(row.fullName)}" ${chosen.has(row.kumonId) ? "checked" : ""} ${!eligible(row) || busy ? "disabled" : ""}>`}</td>
         <td><strong>${escapeHtml(row.fullName)}</strong><div class="subtle">${escapeHtml(row.kumonId)}</div></td><td>${escapeHtml(row.birthDate)}</td>
-        <td>${row.candidates.length ? !eligible(row) ? escapeHtml(optionText(local)) : `<select data-match-choice="${index}" aria-label="คู่ของ ${escapeHtml(row.fullName)}" ${busy ? "disabled" : ""}><option value="">เลือกนักเรียน</option>${row.candidates.map((item) => `<option value="${item.studentId}" ${chosen.get(row.kumonId) === item.studentId ? "selected" : ""} ${item.conflict ? "disabled" : ""}>${escapeHtml(optionText(item))}</option>`).join("")}</select>` : "—"}</td>
+        <td>${row.candidates.length ? !eligible(row) ? row.candidates.map(item => escapeHtml(optionText(item))).join('<br>') : `<select data-match-choice="${index}" aria-label="คู่ของ ${escapeHtml(row.fullName)}" ${busy ? "disabled" : ""}><option value="">เลือกนักเรียน</option>${row.candidates.map((item) => `<option value="${item.studentId}" ${chosen.get(row.kumonId) === item.studentId ? "selected" : ""} ${item.conflict ? "disabled" : ""}>${escapeHtml(optionText(item))}</option>`).join("")}</select>` : "—"}</td>
         <td>${local?.enrollments.map((item) => `${escapeHtml(item.subject)}: ${escapeHtml(item.kumonId || "—")}`).join("<br>") || "—"}</td>
-        <td><span class="match-state match-${row.status}">${labels[row.status]}</span></td></tr>`;
+        <td><span class="match-state ${statusClass}">${statusLabel}</span>${identityIssue ? '<div class="subtle">ยังไม่มีรหัสคุมอง</div>' : ''}${row.reason ? `<div class="subtle">${escapeHtml(row.reason)}</div>` : ''}</td></tr>`;
     }).join("")}</tbody></table>` : '<div class="empty-state">ไม่พบรายการ</div>';
   }
   get("ksisMatchingButton").addEventListener("click", open);
@@ -42,19 +46,19 @@ export function setupKsisMatching({ open, setStatus, onStateChange = () => {} })
       }
       preview = data;
       source.textContent = `${data.context || "KSIS Report B"} • อ่าน ${data.pagesRead} หน้า • ${data.rows.length} คน • ยังไม่บันทึก`;
-      setStatus("อ่านรายชื่อแล้ว กรุณาตรวจคู่ก่อนยืนยัน");
+      setStatus("อ่านรายชื่อแล้ว กรุณาตรวจคู่ก่อนใช้งาน");
     } catch (error) { source.textContent = error.message; setStatus(error.message, "error"); }
     finally { busy = false; read.disabled = false; render(); }
   });
   selectExact.addEventListener("click", () => {
-    for (const row of preview.rows.filter((item) => item.status === "exact")) chosen.set(row.kumonId, row.candidates[0].studentId);
+    for (const row of preview.rows.filter((item) => item.status === "exact" && eligible(item))) chosen.set(row.kumonId, row.candidates[0].studentId);
     render();
   });
   container.addEventListener("change", (event) => {
     if (busy) return;
     const input = event.target;
     const row = preview?.rows[Number(input.dataset.matchCheck ?? input.dataset.matchChoice)];
-    if (!row) return;
+    if (!row || !eligible(row)) return;
     if (input.matches("[data-match-choice]")) {
       if (input.value) chosen.set(row.kumonId, Number(input.value)); else chosen.delete(row.kumonId);
     } else if (input.matches("[data-match-check]")) {

@@ -54,8 +54,8 @@ const newDocument = () => {
     return doc;
 };
 
-test('R/IT/N/EO without IDs require an exact name, DOB and subject match plus explicit per-preview confirmation', () => {
-    for (const Status1 of ['R', 'IT', 'N', 'EO']) {
+test('Students without IDs use exact name, DOB and subject matches regardless of active status, with per-preview confirmation', () => {
+    for (const Status1 of ['R', 'IT', 'N', 'EO', 'C']) {
         for (const code of ['', '0', '-']) {
             const source = newStudent({ Status1, 'รหัสคุมอง': code, 'วันเกิด': '01/01/2563' });
             const doc = newDocument(); doc.rows[0].kumonId = code; doc.rows[0].fullName = ' ตัวอย่าง   ทดสอบ ';
@@ -108,11 +108,8 @@ test('ID-less matching never guesses duplicates, different birthdays, names, sub
         [newStudent({ 'วันเกิด': '02/01/2020' }), newDocument(), /ไม่พบชื่อ/],
         [newStudent({ 'ชื่อจริง': 'คนอื่น' }), newDocument(), /ไม่พบชื่อ/],
         [newStudent({ Subject: 'EFL' }), newDocument(), /ไม่พบชื่อ/],
-        [newStudent({ 'รหัสคุมอง': '123456789' }), newDocument(), /13 หลัก/],
-        [newStudent({ Status1: 'C' }), newDocument(), /13 หลัก/]
+        [newStudent({ 'รหัสคุมอง': '123456789' }), newDocument(), /รูปแบบรหัส/]
     ];
-    const withCode = newDocument(); withCode.rows[0].kumonId = '7642650000001';
-    cases.push([newStudent(), withCode, /KSIS มีรหัส/]);
     const duplicateSite = newDocument(); duplicateSite.rows.push({ ...duplicateSite.rows[0], key: 'other', studentKey: 'header:1' });
     cases.push([newStudent(), duplicateSite, /ซ้ำใน KSIS/]);
     for (const [source, doc, reason] of cases) {
@@ -125,6 +122,23 @@ test('ID-less matching never guesses duplicates, different birthdays, names, sub
     }
     const splitSite = newDocument(); splitSite.rows.push({ ...splitSite.rows[0], key: 'efl', subject: 'EFL', studentKey: 'header:1' });
     assert.match(planKsisReportDraft([newStudent()], splitSite, period, 'ME')[0].reason, /ซ้ำใน KSIS/);
+});
+
+test('WS permits a missing ID on either side, keeps identity confirmation, and still blocks conflicting known IDs', () => {
+    for (const [localId, siteId] of [['', '7642650000001'], ['7642650000001', '']]) {
+        const source = newStudent({ 'รหัสคุมอง': localId, Status1: 'C' });
+        const doc = newDocument(); doc.rows[0].kumonId = siteId;
+        const [row] = planKsisReportDraft([source], doc, period, 'ME', { includeZun: false });
+        assert.equal(row.ready, true); assert.equal(row.matchMethod, 'name_birth_date');
+        assert.equal(row.requiresIdentityConfirmation, true);
+        assert.equal(selectConfirmedKsisDraftRows([row])[0].ready, false);
+        assert.equal(selectConfirmedKsisDraftRows([row], [{ enrollmentId: row.enrollmentId, key: row.key }])[0].ready, true);
+        assert.equal(source['รหัสคุมอง'], localId); assert.equal(doc.rows[0].kumonId, siteId);
+    }
+    const source = newStudent({ 'รหัสคุมอง': '7642650000002' });
+    const doc = newDocument(); doc.rows[0].kumonId = '7642650000001';
+    const [row] = planKsisReportDraft([source], doc, period, 'ME', { includeZun: false });
+    assert.equal(row.ready, false); assert.match(row.reason, /ขัดแย้ง/);
 });
 
 test('Confirmation rejects unknown, duplicated, blocked and ID-based rows and never enables other unconfirmed students', () => {

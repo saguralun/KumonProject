@@ -22,6 +22,21 @@ test('WS audit compares ID-less special statuses by exact name and DOB without c
     assert.match(duplicate.rows[0].reason, /ซ้ำใน KSIS/);
 });
 
+test('WS audit accepts an absent ID on either side as normal but reviews conflicting known IDs', () => {
+    for (const [localId, siteId] of [['', '7642650000001'], ['7642650000001', ''], ['', '']]) {
+        const source = record({ StudentId: 100, 'รหัสคุมอง': localId });
+        const actual = site({ kumonId: siteId });
+        const before = structuredClone({ source, actual });
+        const result = compareKsisWs([source], docs([actual]));
+        assert.equal(result.counts.matched, 1); assert.equal(result.counts.review, 0);
+        assert.equal(result.rows[0].matchMethod, 'name_birth_date');
+        assert.deepEqual({ source, actual }, before);
+    }
+    const result = compareKsisWs([record({ StudentId: 100, 'รหัสคุมอง': '7642650000002' })], docs([site()]));
+    assert.equal(result.counts.matched, 0); assert.equal(result.counts.review, 1);
+    assert.match(result.rows[0].reason, /ขัดแย้ง/);
+});
+
 test('Native audit allows only observed read POST endpoints, never arbitrary Get names or saves', () => {
     const url = 'https://kao.ksis.kumon.com/kth/api/reportb/GetReportBDetailEntryListPageByCriteria';
     assert.equal(isKsisAuditReadRequest('POST', url, 'xhr'), true);
@@ -100,7 +115,7 @@ test('OT is skipped like A even without worksheet data, including KSIS-only rows
 });
 
 test("WS audit separates off-page, missing KSIS, missing Report and subjects without guessing matches by name", () => {
-    const records = [record(), record({ Subject: "EFL" }), record({ "รหัสคุมอง": "7642650000002" })];
+    const records = [record(), record({ Subject: "EFL" }), record({ "รหัสคุมอง": "7642650000002", 'ชื่อจริง': 'อีกคน' })];
     const documents = docs([site(), site({ kumonId: "7642650000003", subject: "TRP" })]);
     const current = compareKsisWs(records, documents);
     assert.equal(current.counts.matched, 1); assert.equal(current.outsidePage, 2); assert.equal(current.counts.missing_report, 1);

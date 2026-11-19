@@ -65,6 +65,20 @@ test('AT handles multiple tests per pupil without a false duplicate identity, an
     assert.equal(planKsisAt([record({ 'รหัสคุมอง': '', Status1: 'EO' })], site, period, 'ME')[0].outcome, 'review');
 });
 
+test('AT can use name, DOB and subject when either side has no ID, even for C, without removing review of conflicts', () => {
+    for (const [localId, siteId] of [['', '7642650000001'], ['7642650000001', ''], ['', '']]) {
+        const source = record({ 'รหัสคุมอง': localId });
+        const site = document(); site.students[0].kumonId = siteId;
+        const [row] = planKsisAt([source], site, period, 'ME');
+        assert.equal(row.outcome, 'ready'); assert.equal(row.requiresIdentityConfirmation, true);
+        assert.deepEqual(selectConfirmedKsisAt([row]), []);
+        assert.equal(selectConfirmedKsisAt([row], [row.id]).length, 1);
+        assert.equal(source['รหัสคุมอง'], localId); assert.equal(site.students[0].kumonId, siteId);
+    }
+    const [row] = planKsisAt([record({ 'รหัสคุมอง': '7642650000002' })], document(), period, 'ME');
+    assert.equal(row.outcome, 'review'); assert.match(row.reason, /ขัดแย้ง/);
+});
+
 test('AT blocks duplicate source test events, partial existing rows, and mismatched DOB', () => {
     const row = record({ TestType1: 'AT', DateTest1: '10/10/2026', LevelTest1: 'C', Time1: 70, Score1: 0, Group1: 2 });
     assert.equal(planKsisAt([row], document(), period, 'ME').every((row) => row.outcome === 'review'), true);

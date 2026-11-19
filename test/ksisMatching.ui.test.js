@@ -6,6 +6,8 @@ import { once } from "node:events";
 import os from "node:os";
 import path from "node:path";
 import { readKsisRosterPages } from "../services/ksisRosterService.js";
+import { proposeKsisMatches } from '../services/ksisMatchingService.js';
+import { controlFixture } from './support/controlFixture.js';
 
 test("KSIS roster reader visits all pages without editing form values or saving", {
     skip: process.env.TEST_BROWSER_UI !== "1", timeout: 25000
@@ -87,4 +89,55 @@ test("Matching view requires review and explicit confirmation before any save re
         await browser.close();
         await new Promise((resolve) => server.close(resolve));
     }
+});
+
+for (const embedded of [false, true]) test(`ID-less matching previews every new child, uses name+DOB, and never submits their empty IDs (${embedded ? 'desktop' : 'browser'})`, {
+    skip: process.env.TEST_BROWSER_UI !== '1', timeout: 30000
+}, async () => {
+    const students = [11, 12, 13, 14].map(id => ({ studentId: id, firstName: `เด็กใหม่${id}`, lastName: 'ทดสอบ', birthDate: `2023-07-${id}`,
+        enrollments: [{ id: id * 10, subject: 'EFL', kumonId: null }] }));
+    const roster = students.map(s => ({ fullName: `${s.firstName} ${s.lastName}`, birthDate: s.birthDate, kumonId: s.studentId === 14 ? '7642650000014' : '' }));
+    roster.push({ ...roster[0] });
+    let confirms = 0;
+    const f = await controlFixture('ksis', async (req, res) => {
+        if (req.path === '/ksis/desktop/open') { res.json({ success: true }); return true; }
+        if (req.path === '/students/ksis/matching/preview') {
+            res.json({ success: true, previewId: 'id-less-fixture', context: 'ศูนย์ทดสอบ Nov 2026', pagesRead: 2, rows: proposeKsisMatches(roster, students) }); return true;
+        }
+        if (req.path === '/students/ksis/matching/confirm') { confirms++; res.status(500).json({ success: false, error: 'Unexpected confirm' }); return true; }
+        return false;
+    }, { embedded });
+    try {
+        const { page } = f;
+        await page.locator('#ksisMatchingButton').click(); await page.locator('#ksisReadRoster').click();
+        await page.locator('#ksisMatchRows tbody tr').first().waitFor();
+        assert.match(await page.locator('#ksisMatchCount').innerText(), /4 \/ 4 คน.*เลือก 0 คน/);
+        await page.locator('#ksisMatchFilter').selectOption('missing_id');
+        const rows = page.locator('#ksisMatchRows tbody tr');
+        assert.equal(await rows.count(), 3);
+        for (let index = 0; index < 3; index++) {
+            const row = rows.nth(index), s = students[index];
+            assert.match(await row.locator('td').nth(3).innerText(), new RegExp(`#${s.studentId} .*${s.birthDate}`));
+            assert.equal(await row.locator('.match-state').innerText(), 'ยังไม่มีรหัสคุมอง');
+            assert.equal(await row.locator('input[type=checkbox]').count(), 0);
+            assert.equal(await row.locator('.match-info').count(), 1);
+            assert.equal(await row.locator('.match-state').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(238, 244, 248)');
+            assert.match(await row.innerText(), /ใช้จับคู่เพื่อกรอกข้อมูลได้/);
+            assert.equal(await row.locator('[data-match-choice]').count(), 0);
+        }
+        assert.equal(await page.locator('#ksisConfirmMatches').isDisabled(), true);
+        await page.locator('#ksisSelectExact').click();
+        await page.locator('#ksisMatchFilter').selectOption('all');
+        assert.equal(await page.locator('[data-match-check]:checked').count(), 1);
+        assert.match(await page.locator('tr:has([data-match-check]:checked)').innerText(), /เด็กใหม่14/);
+        await page.locator('#ksisConfirmMatches').click();
+        assert.equal(confirms, 0); await page.locator('#ksisCancelConfirm').click();
+        await page.locator('#ksisMatchFilter').selectOption('missing_id');
+        if (!embedded) await page.setViewportSize({ width: 390, height: 844 });
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
+        await page.screenshot({ path: path.join(os.tmpdir(), `kumondb-matching-missing-id-${embedded ? 'desktop' : 'browser'}.png`), fullPage: true });
+        assert.equal(confirms, 0);
+        assert.equal(f.writes().every(req => ['/students/ksis/matching/preview', '/ksis/desktop/open'].includes(req.path)), true);
+        assert.deepEqual(f.errors, []);
+    } finally { await f.close(); }
 });

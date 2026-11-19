@@ -97,3 +97,60 @@ test("One local student cannot be assigned two KSIS codes in one confirmation", 
         selections: [{ kumonId, studentId: 1 }, { kumonId: "7642650000002", studentId: 1 }] }, db), { statusCode: 409 });
     assert.ok(!db.calls.includes("BEGIN"));
 });
+
+test('ID-less new students stay separate by name and DOB while repeated subjects/pages collapse', () => {
+    const students = [student(), student(2, { firstName: 'คนสอง' }), student(3, { birthDate: '2021-01-01' })];
+    const roster = [source({ kumonId: '' }), source({ kumonId: '  ' }), source({ kumonId: '0' }), source({ kumonId: '-' }),
+        source({ kumonId: null, fullName: 'คนสอง ทดสอบ' }), source({ kumonId: '', birthDate: '2021-01-01' })];
+    const before = structuredClone({ roster, students });
+    const rows = proposeKsisMatches(roster, students);
+    assert.equal(rows.length, 3);
+    assert.deepEqual(rows.map(row => row.status), ['missing_id', 'missing_id', 'missing_id']);
+    assert.deepEqual(rows.map(row => row.candidates.map(c => c.studentId)), [[1], [2], [3]]);
+    assert.ok(rows.every(row => row.kumonId === '' && row.candidates[0].sameBirthDate));
+    assert.deepEqual({ roster, students }, before);
+});
+
+test('Missing IDs require exact name plus DOB and expose ambiguity without inventing a match', () => {
+    const wrongDob = proposeKsisMatches([source({ kumonId: '', birthDate: '2021-01-01' })], [student()])[0];
+    assert.equal(wrongDob.status, 'missing_id'); assert.deepEqual(wrongDob.candidates, []);
+    const ambiguous = proposeKsisMatches([source({ kumonId: '' })], [student(), student(2)])[0];
+    assert.equal(ambiguous.status, 'missing_id'); assert.equal(ambiguous.candidates.length, 2);
+    assert.match(ambiguous.reason, /หลายคน/);
+    const invalid = proposeKsisMatches([source({ kumonId: '', birthDate: '' }), source({ kumonId: '', fullName: '' })], [student()]);
+    assert.equal(invalid.length, 2); assert.ok(invalid.every(row => row.status === 'invalid'));
+    assert.equal(proposeKsisMatches([source({ kumonId: '123' })], [student()])[0].status, 'invalid');
+});
+
+test('Missing-ID previews never select, erase, generate or save a Kumon ID even with a forged confirmation', async () => {
+    const local = student(); local.enrollments[0].kumonId = kumonId;
+    const db = database([local]); const before = structuredClone(db.students);
+    const preview = await createKsisMatchingPreview({ roster: { rows: [source({ kumonId: '' })] }, userId: 105 }, db);
+    assert.equal(preview.rows[0].status, 'missing_id'); assert.equal(preview.rows[0].candidates[0].studentId, 1);
+    assert.deepEqual(db.calls.length, 1);
+    for (const id of ['', null, '   ']) {
+        await assert.rejects(saveKsisMatchingPreview({ previewId: preview.previewId, selections: [{ kumonId: id, studentId: 1 }], userId: 105 }, db), { statusCode: 400 });
+    }
+    assert.ok(!db.calls.some(sql => sql === 'BEGIN' || sql.startsWith('UPDATE')));
+    assert.deepEqual(db.students, before);
+});
+
+test('N/EO first-month identities become next-month ID proposals for the same student without automatic writes', async () => {
+    for (const status of ['N', 'EO']) {
+        const local = student();
+        local.enrollments.forEach(enrollment => { enrollment.statusCode = status; });
+        const db = database([local]); const before = structuredClone(db.students);
+        const firstMonth = await createKsisMatchingPreview({ userId: 106,
+            roster: { rows: [source({ kumonId: '' })], context: 'Nov 2026' } }, db);
+        assert.equal(firstMonth.rows[0].status, 'missing_id');
+        assert.equal(firstMonth.rows[0].candidates[0].studentId, local.studentId);
+        assert.match(firstMonth.rows[0].reason, /ใช้จับคู่เพื่อกรอกข้อมูลได้/);
+        const nextMonth = await createKsisMatchingPreview({ userId: 106,
+            roster: { rows: [source()], context: 'Dec 2026' } }, db);
+        assert.equal(nextMonth.rows[0].status, 'exact');
+        assert.equal(nextMonth.rows[0].candidates[0].studentId, local.studentId);
+        assert.deepEqual(nextMonth.rows[0].candidates[0].enrollments.map(e => e.id), local.enrollments.map(e => e.id));
+        assert.deepEqual(db.students, before);
+        assert.ok(db.calls.every(sql => sql.startsWith('SELECT')));
+    }
+});

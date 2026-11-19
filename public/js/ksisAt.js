@@ -1,5 +1,5 @@
 const labels = { ready: 'พร้อมกรอก', existing: 'มีผลสอบตรงกันแล้ว', review: 'ต้องตรวจ', saved: 'บันทึกแล้ว', unconfirmed: 'รอยืนยันคู่', not_started: 'ยังไม่ได้กรอก' };
-const classes = { ready: 'match-exact', existing: 'match-matched', saved: 'match-exact', review: 'match-conflict', unconfirmed: 'match-review', not_started: 'match-review' };
+const classes = { ready: 'match-exact', existing: 'match-matched', saved: 'match-exact', review: 'match-conflict', unconfirmed: 'match-info', not_started: 'match-review' };
 
 export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange }) {
   const get = (id) => document.getElementById(id);
