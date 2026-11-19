@@ -24,6 +24,9 @@ async function loadKsisMatchingStudents(client = pool) {
 export function proposeKsisMatches(roster, students) {
     const groups = new Map();
     for (const [index, row] of roster.entries()) {
+        // Trial data is parent-entered and is outside the matching scope.
+        // Keep a child who also has a non-trial subject in this month's roster.
+        if (row.subjects?.length && row.subjects.every((item) => String(item.status).trim().toUpperCase() === 'T')) continue;
         const rawId = String(row.kumonId ?? '').trim();
         const kumonId = ['', '0', '-'].includes(rawId) ? '' : rawId;
         const identityComplete = nameKey(row.fullName) && /^\d{4}-\d{2}-\d{2}$/.test(row.birthDate);

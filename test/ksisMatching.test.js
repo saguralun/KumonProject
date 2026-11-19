@@ -7,6 +7,19 @@ const student = (studentId = 1, extras = {}) => ({ studentId, firstName: "ตั
     enrollments: [{ id: studentId * 10, subject: "ME", kumonId: null }, { id: studentId * 10 + 1, subject: "EFL", kumonId: null }], ...extras });
 const source = (extras = {}) => ({ fullName: "ตัวอย่าง ทดสอบ", birthDate: "2020-01-01", kumonId, ...extras });
 
+test('Matching excludes trial-only children before grouping and keeps mixed and regular subjects', () => {
+    const real = source({ subjects: [{ subject: 'ME', status: 'N' }] });
+    const trial = source({ fullName: 'กรอกชื่อผิด', birthDate: '', subjects: [{ subject: 'EFL', status: ' T ' }] });
+    assert.deepEqual(proposeKsisMatches([trial], [student()]), []);
+    const rows = proposeKsisMatches([trial, real], [student()]);
+    assert.equal(rows.length, 1); assert.equal(rows[0].status, 'exact');
+    for (const status of ['N', 'EO', 'C', 'A']) {
+        const mixed = source({ kumonId: '', subjects: [{ subject: 'ME', status: 'T' }, { subject: 'EFL', status }] });
+        assert.equal(proposeKsisMatches([mixed], [student()])[0].status, 'missing_id');
+    }
+    assert.equal(proposeKsisMatches([source({ subjects: [] })], [student()])[0].status, 'exact');
+});
+
 function database(initial) {
     let students = structuredClone(initial);
     let backup;

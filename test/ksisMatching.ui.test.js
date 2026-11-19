@@ -20,7 +20,7 @@ test("KSIS roster reader visits all pages without editing form values or saving"
             <div id="students"></div><ul class="pagination"><li><a href="#" onclick="turn(1);return false">«</a></li><li><a>‹</a></li>
             <li class="active">2</li><li><a href="#" onclick="turn(2);return false">›</a></li></ul>
             <script>
-            function render(n){document.getElementById('students').innerHTML='<table class="vk-grid-content-student"><tr><td></td><td>ตัวอย่าง ทดสอบ'+n+'</td><td>764265000000'+n+'</td><td>PK3</td><td>01/01/2563</td><td></td></tr></table>';}
+            function render(n){document.getElementById('students').innerHTML='<div><table class="vk-grid-content-student"><tr><td></td><td>ตัวอย่าง ทดสอบ'+n+'</td><td>764265000000'+n+'</td><td>PK3</td><td>01/01/2563</td><td></td></tr></table><table class="vk-grid-content-subject"><tr><td></td><td>Math</td><td></td><td>T</td><td></td><td></td><td></td><td></td><td></td><td>'+(n===1?'T':'<select><option selected>C</option><option>T</option></select>')+'</td></tr><tr><td></td><td>English EFL</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td><select style="display:none"><option>T</option></select></td></tr></table></div>';}
             function turn(n){const lis=document.querySelectorAll('.pagination li');lis[2].textContent=n;lis[0].classList.toggle('disabled',n===1);lis[1].classList.toggle('disabled',n===1);lis[3].classList.toggle('disabled',n===2);setTimeout(()=>render(n),30);}
             render(2);document.querySelectorAll('.pagination li')[3].classList.add('disabled');
             </script>` }));
@@ -29,6 +29,11 @@ test("KSIS roster reader visits all pages without editing form values or saving"
         assert.equal(result.pagesRead, 2);
         assert.equal(result.rows.length, 2);
         assert.equal(result.rows[0].birthDate, "2020-01-01");
+        assert.deepEqual(result.rows.map(row => row.subjects), [[{ subject: 'ME', status: 'T' }], [{ subject: 'ME', status: 'C' }]]);
+        const matched = proposeKsisMatches(result.rows, [{ studentId: 2, firstName: 'ตัวอย่าง', lastName: 'ทดสอบ2', birthDate: '2020-01-01',
+            enrollments: [{ id: 20, subject: 'ME', kumonId: '' }] }]);
+        assert.equal(matched.length, 1); assert.equal(matched[0].fullName, 'ตัวอย่าง ทดสอบ2');
+        assert.equal(matched[0].status, 'exact');
         assert.equal(await page.locator("#untouched").inputValue(), "original");
         assert.equal(await page.locator("body").getAttribute("data-saved"), null);
     } finally { await browser.close(); }
@@ -98,6 +103,7 @@ for (const embedded of [false, true]) test(`ID-less matching previews every new 
         enrollments: [{ id: id * 10, subject: 'EFL', kumonId: null }] }));
     const roster = students.map(s => ({ fullName: `${s.firstName} ${s.lastName}`, birthDate: s.birthDate, kumonId: s.studentId === 14 ? '7642650000014' : '' }));
     roster.push({ ...roster[0] });
+    roster.push({ fullName: 'ทดลองเรียนกรอกผิด', birthDate: '', kumonId: '7642650000014', subjects: [{ subject: 'EFL', status: 'T' }] });
     let confirms = 0;
     const f = await controlFixture('ksis', async (req, res) => {
         if (req.path === '/ksis/desktop/open') { res.json({ success: true }); return true; }

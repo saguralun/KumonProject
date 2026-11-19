@@ -45,7 +45,7 @@ export function setupKsisMatching({ open, setStatus, onStateChange = () => {} })
         return;
       }
       preview = data;
-      source.textContent = `${data.context || "KSIS Report B"} • อ่าน ${data.pagesRead} หน้า • ${data.rows.length} คน • ยังไม่บันทึก`;
+      source.textContent = `${data.context || "KSIS Report B"} • อ่าน ${data.pagesRead} หน้า • ${data.rows.length} คน • ไม่รวมทดลองเรียน (T) • ยังไม่บันทึก`;
       setStatus("อ่านรายชื่อแล้ว กรุณาตรวจคู่ก่อนใช้งาน");
     } catch (error) { source.textContent = error.message; setStatus(error.message, "error"); }
     finally { busy = false; read.disabled = false; render(); }

@@ -18,7 +18,16 @@ export function readKsisRosterDocument() {
             .at(-1)?.textContent || "").replace(/\s+/g, " ").trim(),
         rows: tables.map((table) => {
             const cells = table.rows[0]?.cells || [];
-            return { fullName: cells[1]?.textContent.trim() || "", kumonId: cells[2]?.textContent.trim() || "", birthDate: cells[4]?.textContent.trim() || "" };
+            const subjectRows = Array.from(table.parentElement.querySelector("table.vk-grid-content-subject")?.rows || []);
+            const subjects = subjectRows.map((row) => {
+                const cell = row.cells[9];
+                const control = Array.from(cell?.querySelectorAll("select,input") || [])
+                    .find((element) => element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+                const status = ((control?.tagName === "SELECT" ? control.selectedOptions[0]?.textContent
+                    : control ? control.value : cell?.innerText) || "").trim();
+                return { subject: ({ Math: "ME", "English EFL": "EFL", "Thai Reading": "TRP" })[row.cells[1]?.textContent.trim()] || "", status };
+            }).filter((item) => item.subject && item.status);
+            return { fullName: cells[1]?.textContent.trim() || "", kumonId: cells[2]?.textContent.trim() || "", birthDate: cells[4]?.textContent.trim() || "", subjects };
         })
     };
 }
