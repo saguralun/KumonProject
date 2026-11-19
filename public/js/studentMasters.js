@@ -77,18 +77,10 @@ export function zunLevelChoices() {
     );
     const zi = zunLevels.find((level) => level.code === "ZI");
     const zii = zunLevels.find((level) => level.code === "ZII");
-    const choices = [];
-
-    if (zi) {
-        choices.push({ value: `${zi.id}:ZI1`, label: "ZI1", levelMasterId: zi.id });
-        choices.push({ value: `${zi.id}:ZI21`, label: "ZI21", levelMasterId: zi.id });
-    }
-
-    if (zii) {
-        choices.push({ value: `${zii.id}:ZII1`, label: "ZII1", levelMasterId: zii.id });
-    }
-
-    return choices;
+    // Enrollment stores the level only. Packet numbers belong to WS Input.
+    return [zi, zii].filter(Boolean).map(level => ({
+        value: String(level.id), label: level.code, levelMasterId: level.id
+    }));
 }
 
 export function resolveAddZunLevelId(value) {
@@ -99,12 +91,7 @@ export function resolveAddZunLevelId(value) {
     return String(value).split(":")[0] || "";
 }
 
-// Reverse of the above: given a saved (plain-id) currentZunLevelMasterId,
-// pick which of zunLevelChoices' composite option values should show as
-// selected. The plain id alone can't tell ZI1 from ZI21 (both resolve to
-// the same ZI level row — see zunLevelChoices), so this just lands on
-// that level's first choice; picking between them was never saved
-// anywhere to begin with.
+// Select the same level ID that the existing enrollment column stores.
 export function zunValueForLevelId(levelMasterId) {
     if (!levelMasterId) {
         return "";

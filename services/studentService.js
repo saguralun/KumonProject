@@ -2,10 +2,30 @@ import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
 import { normalizeKumonStudentId } from "./kumonStudentId.js";
+import { specialStatusForStartDate } from '../public/js/enrollmentDateStatus.js';
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
 const HISTORY_LIMIT = 80;
+
+// Keep the full-edit boundary identical to the Delete eligibility shown by
+// getStudentProfile. A DT assessment alone does not consume an enrollment.
+function enrollmentUsageSql() {
+    return ['billing_detail', 'worksheet_used', 'cd_used', 'at_used', 'enrollment_status'].map(table =>
+        `EXISTS (SELECT 1 FROM ${TABLE_SCHEMA}.${table} used WHERE used.enrollment_id=e.enrollment_id)`
+    ).join(' OR ');
+}
+
+async function alignEnrollmentSpecialStatus(client, data) {
+    let code = '';
+    if (data.currentStatusGroup2Id) {
+        const result = await client.query(`SELECT status_code FROM ${TABLE_SCHEMA}.status_master WHERE status_id=$1 AND status_group=2`, [data.currentStatusGroup2Id]);
+        if (!result.rows[0]) throw httpError(400, 'Status พิเศษไม่ถูกต้อง');
+        code = result.rows[0].status_code;
+    }
+    const nextCode = specialStatusForStartDate(code, data.enStartDate);
+    if (nextCode !== code) data.currentStatusGroup2Id = nextCode ? await statusIdByCode(client, nextCode, 2) : null;
+}
 
 async function hasOpeningScheduleActiveColumn() {
     const result = await pool.query(`
@@ -794,27 +814,7 @@ export async function getStudentProfile(studentId, client = pool) {
                       AND at_master.level_master_id = e.current_level_master_id
                       AND at_used.is_pass = TRUE
                 ) AS has_passed_current_level_at,
-                EXISTS (
-                    SELECT 1
-                    FROM ${TABLE_SCHEMA}.billing_detail detail
-                    WHERE detail.enrollment_id = e.enrollment_id
-                ) OR EXISTS (
-                    SELECT 1
-                    FROM ${TABLE_SCHEMA}.worksheet_used worksheet
-                    WHERE worksheet.enrollment_id = e.enrollment_id
-                ) OR EXISTS (
-                    SELECT 1
-                    FROM ${TABLE_SCHEMA}.cd_used cd
-                    WHERE cd.enrollment_id = e.enrollment_id
-                ) OR EXISTS (
-                    SELECT 1
-                    FROM ${TABLE_SCHEMA}.at_used at_used_blocker
-                    WHERE at_used_blocker.enrollment_id = e.enrollment_id
-                ) OR EXISTS (
-                    SELECT 1
-                    FROM ${TABLE_SCHEMA}.enrollment_status status_used
-                    WHERE status_used.enrollment_id = e.enrollment_id
-                ) AS has_delete_blocker,
+                (${enrollmentUsageSql()}) AS has_delete_blocker,
                 CONCAT(wd1.weekday_name, ' ', os1.start_time::text, '-', os1.end_time::text) AS opening_schedule_label1,
                 CONCAT(wd2.weekday_name, ' ', os2.start_time::text, '-', os2.end_time::text) AS opening_schedule_label2
             FROM ${TABLE_SCHEMA}.enrollment e
@@ -1132,6 +1132,23 @@ export async function updateEnrollment(studentId, enrollmentId, payload) {
 
     try {
         await client.query("BEGIN");
+        const locked = await client.query(`SELECT e.* FROM ${TABLE_SCHEMA}.enrollment e
+            WHERE e.enrollment_id=$1 AND e.student_id=$2 FOR UPDATE`, [normalizedEnrollmentId, normalizedStudentId]);
+        const previous = locked.rows[0];
+        if (!previous) throw httpError(404, 'ไม่พบ enrollment ของ student นี้');
+        // Separate statement AFTER the lock: observe a WS/payment committed
+        // while this request was waiting instead of trusting the old Preview.
+        const usage = await client.query(`SELECT (${enrollmentUsageSql()}) AS has_usage
+            FROM ${TABLE_SCHEMA}.enrollment e WHERE e.enrollment_id=$1`, [normalizedEnrollmentId]);
+        const used = usage.rows[0]?.has_usage !== false;
+        const protectedFields = {
+            subjectId: 'subject_id', startingWorksheetMasterId: 'starting_worksheet_master_id',
+            currentStatusGroup1Id: 'current_status_group1_id', currentStatusGroup2Id: 'current_status_group2_id'
+        };
+        if (used && Object.entries(protectedFields).some(([field, column]) => Number(data[field] || 0) !== Number(previous[column] || 0))) {
+            throw httpError(409, 'วิชานี้มีประวัติใช้งานแล้ว แก้ข้อมูลเริ่มต้นไม่ได้ กรุณาโหลดข้อมูลใหม่');
+        }
+        if (!used && data.enStartDate !== normalizeDate(previous.en_start_date)) await alignEnrollmentSpecialStatus(client, data);
         data.currentLevelMasterId = requiredInt(
             data.currentLevelMasterId,
             "ระดับที่เรียน"

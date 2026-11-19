@@ -1,4 +1,5 @@
 import { bindFourDigitYearDateInputs } from "./dateInputYear.js";
+import { enrollmentMonthStart } from './enrollmentDateStatus.js';
 import { directoryStatus, directoryTone } from "./studentDirectoryStatus.js";
 import { bindKsisImport, resetKsisImport } from "./studentKsisImport.js";
 import { closeWsGraphModal, loadWsGraph, openWsGraphModal, updateWsGraphButtonVisibility } from "./studentWsGraph.js";
@@ -23,6 +24,7 @@ import {
 import { resolveAddZunLevelId, zunValueForLevelId } from "./studentMasters.js";
 import {
     alignStartDateForHalfMonth,
+    alignEnrollmentDateForHalfStatus,
     fillAddEnrollmentDefaults,
     fillMasterSelects,
     refreshAddEnrollmentOptions,
@@ -31,6 +33,7 @@ import {
     refreshAddStartingWorksheetFromDt,
     refreshLevelSelects,
     setEnrollmentLocked,
+    syncEnrollmentDateStatus,
     showAddEnrollmentCurrentCheck,
     updateAddEnrollmentDerivedFields,
     updateAddOpeningSchedule,
@@ -259,11 +262,7 @@ function fillStudentForm(student = {}) {
 }
 
 export function defaultEnrollmentDate() {
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
+    return enrollmentMonthStart();
 }
 
 function fillEnrollmentForm(enrollment = null) {
@@ -292,7 +291,7 @@ function fillEnrollmentForm(enrollment = null) {
     }
 
     state.isNewEnrollment = false;
-    setEnrollmentLocked(true);
+    setEnrollmentLocked(!enrollment.canDeleteEnrollment);
     setFormValue(form, "enrollmentId", enrollment.enrollmentId);
     setFormValue(form, "subjectId", enrollment.subjectId);
     refreshLevelSelects({
@@ -374,6 +373,7 @@ function renderEnrollmentTabs() {
     els.deleteEnrollmentButton.classList.toggle("hidden", !canDeleteEnrollment);
     els.enrollmentActionBar.classList.toggle("hidden", !(canLeave || canResume || canComplete || canDeleteEnrollment));
     els.enrollmentSubtitle.textContent = `${active.subjectCode} • ${active.currentLevelCode}${active.currentZunLevelCode ? ` • Zun ${active.currentZunLevelCode}` : ""}${active.isKumonConnect ? " • KC" : ""} • ${active.statusGroup1Name}`;
+    if (active.canDeleteEnrollment) els.enrollmentSubtitle.textContent += ' • แก้ข้อมูลเริ่มต้นได้';
     fillEnrollmentForm(active);
     syncStudentControls();
 }
@@ -627,10 +627,6 @@ async function saveEnrollment(event) {
 
     try {
         const payload = readForm(els.enrollmentForm);
-        // currentZunLevelMasterId comes out of the form as one of
-        // zunLevelChoices' composite "levelMasterId:label" values (e.g.
-        // "1:ZI1") — same as the "+ Subject" modal — so it needs the same
-        // unwrap back to a plain level_master id before it's sent.
         payload.currentZunLevelMasterId = resolveAddZunLevelId(payload.currentZunLevelMasterId);
         const endpoint = `/api/students/${encodeURIComponent(studentId)}/enrollments/${encodeURIComponent(payload.enrollmentId)}`;
         const data = await requestJson(endpoint, {
@@ -1203,7 +1199,6 @@ function bindEvents() {
     els.addEnrollmentForm.elements.dtMasterId.addEventListener("change", refreshAddStartingWorksheetFromDt);
     els.addEnrollmentForm.elements.enStartDate.addEventListener("change", updateHalfMonthByStartDate);
     els.addEnrollmentForm.elements.currentStatusGroup2Id.addEventListener("change", () => {
-        delete els.addEnrollmentForm.elements.currentStatusGroup2Id.dataset.autoHalfMonth;
         setAutoFilled(els.addEnrollmentForm, "currentStatusGroup2Id", false);
         alignStartDateForHalfMonth();
     });
@@ -1232,7 +1227,15 @@ function bindEvents() {
     });
     els.enrollmentForm.addEventListener("submit", saveEnrollment);
     els.enrollmentForm.elements.subjectId.addEventListener("change", () => {
-        refreshLevelSelects();
+        refreshLevelSelects({ keepZun: true });
+        const subject = state.masters.subjects.find(row => Number(row.id) === Number(els.enrollmentForm.elements.subjectId.value));
+        if (subject) els.enrollmentForm.closest('.enrollment-panel').dataset.subject = subject.code;
+    });
+    els.enrollmentForm.elements.enStartDate.addEventListener('change', () => {
+        if (selectedEnrollment()?.canDeleteEnrollment) syncEnrollmentDateStatus(els.enrollmentForm);
+    });
+    els.enrollmentForm.elements.currentStatusGroup2Id.addEventListener('change', () => {
+        if (selectedEnrollment()?.canDeleteEnrollment) alignEnrollmentDateForHalfStatus(els.enrollmentForm);
     });
     els.enrollmentForm.elements.currentLevelMasterId.addEventListener("change", () => {
         refreshLevelSelects({

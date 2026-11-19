@@ -119,6 +119,17 @@ restart-helper test, not necessary for this suite's application regression check
   repeated A logs, Resume followed by a new absence (including the same
   month), exact enrollment searches and existing Active/Absent filters.
 
+- Unused enrollment corrections are checked in browser
+  and Electron, including failed-save recovery, reload and Add Subject.
+  New Start Date and DT defaults use day one of the current calendar month;
+  existing enrollment dates are unchanged when opened. Tests also cover the
+  date default after the 20th and across December/January.
+  Disposable PostgreSQL tests cover half-month/exemption rules, the existing
+  schema remaining unchanged, and a new status committed while an initial-data
+  edit waits on the enrollment lock. These fixes add no tables or columns.
+  Both Student subject forms offer No Zun / ZI / ZII and round-trip the
+  existing level IDs; packet selection remains in WS Input.
+
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/
 restart actions without separate authorization.

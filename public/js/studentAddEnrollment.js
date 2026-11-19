@@ -10,6 +10,7 @@
 // circular import in this app: both directions are only ever invoked from
 // event handlers, never at module-evaluation time.
 import { defaultEnrollmentDate, els, state } from "./student-manager.js";
+import { specialStatusForStartDate } from "./enrollmentDateStatus.js";
 import {
     clearAutoFilled,
     clearFieldError,
@@ -161,10 +162,7 @@ export function refreshLevelSelects({
         form.elements.currentLevelMasterId.value = previousLevelId;
     }
 
-    // Same granular ZI1/ZI21/ZII1 choices the "+ Subject" modal offers
-    // (see zunLevelChoices — subject-agnostic, so this doesn't filter by
-    // the current subjectId) rather than the raw ZI/ZII level rows —
-    // those two rows just aren't specific enough to pick from directly.
+    // Both Student forms use the shared ZI/ZII levels, independent of subject.
     const zunChoices = zunLevelChoices();
 
     form.elements.currentZunLevelMasterId.innerHTML = optionHtml(zunChoices, {
@@ -528,36 +526,25 @@ export function validateAddEnrollmentForm() {
 }
 
 export function updateHalfMonthByStartDate() {
-    const form = els.addEnrollmentForm;
-    const parts = localDateParts(form.elements.enStartDate.value);
-    const halfStatus = statusByCode("H", 2);
+    syncEnrollmentDateStatus(els.addEnrollmentForm);
+}
+
+export function syncEnrollmentDateStatus(form) {
     const statusField = form.elements.currentStatusGroup2Id;
-
-    if (!parts || !halfStatus) {
-        return;
-    }
-
-    if (parts.day >= 11 && parts.day <= 20) {
-        setFormValue(form, "currentStatusGroup2Id", halfStatus.id);
-        statusField.dataset.autoHalfMonth = "true";
-        setAutoFilled(form, "currentStatusGroup2Id", true);
-        setAutoFilled(form, "enStartDate", false);
-    } else if (statusField.dataset.autoHalfMonth === "true") {
-        setFormValue(form, "currentStatusGroup2Id", "");
-        delete statusField.dataset.autoHalfMonth;
-        setAutoFilled(form, "currentStatusGroup2Id", false);
-        setAutoFilled(form, "enStartDate", false);
-    } else if (isHalfMonthStatusId(statusField.value)) {
-        alignStartDateForHalfMonth();
-    } else {
-        setFormValue(form, "currentStatusGroup2Id", "");
-        setAutoFilled(form, "currentStatusGroup2Id", false);
-        setAutoFilled(form, "enStartDate", false);
-    }
+    const previous = (state.masters?.statuses || []).find(row => Number(row.id) === Number(statusField.value));
+    const nextCode = specialStatusForStartDate(previous?.code || '', form.elements.enStartDate.value);
+    const next = nextCode ? statusByCode(nextCode, 2) : null;
+    if (nextCode && !next) return;
+    setFormValue(form, 'currentStatusGroup2Id', next?.id || '');
+    setAutoFilled(form, 'currentStatusGroup2Id', statusField.value !== String(previous?.id || ''));
+    setAutoFilled(form, 'enStartDate', false);
 }
 
 export function alignStartDateForHalfMonth() {
-    const form = els.addEnrollmentForm;
+    alignEnrollmentDateForHalfStatus(els.addEnrollmentForm);
+}
+
+export function alignEnrollmentDateForHalfStatus(form) {
     const parts = localDateParts(form.elements.enStartDate.value);
 
     if (!parts || !isHalfMonthStatusId(form.elements.currentStatusGroup2Id.value)) {
@@ -660,8 +647,9 @@ export function fillAddEnrollmentDefaults() {
     );
     setFormValue(form, "studentId", student?.studentId);
     setFormValue(form, "studentName", student?.displayName);
-    setFormValue(form, "enStartDate", defaultEnrollmentDate());
-    setFormValue(form, "dtDate", defaultEnrollmentDate());
+    const startingDate = defaultEnrollmentDate();
+    setFormValue(form, "enStartDate", startingDate);
+    setFormValue(form, "dtDate", startingDate);
     setFormValue(form, "currentStatusGroup1Id", defaultStatus?.id || "");
     setFormValue(form, "isKumonConnect", false);
     form.elements.currentStatusGroup1Id.disabled = hasEnrollment;
