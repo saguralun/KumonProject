@@ -2,6 +2,42 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { controlFixture } from './support/controlFixture.js';
 
+for (const embedded of [false, true]) test(`WS delete focuses Confirm, Escape/cancel preserve the record and Enter deletes once (${embedded ? 'desktop' : 'browser'})`, { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
+  let deletes = 0;
+  const summary = { billingMonth: 10, billingYear: 2026, usedDays: 1, cpwsRecords: 1 };
+  const enrollment = { enrollmentId: 1, subjectCode: 'ME', studentName: 'Delete fixture', currentLevelMasterId: 1, currentLevelCode: 'C', statusName: 'Continue' };
+  const row = { worksheetUsedId: 99, worksheetType: 'WS', worksheetDate: '2026-10-20', worksheetLabel: 'C101', isStockProcessed: false };
+  const f = await controlFixture('worksheet', async (req, res) => {
+    if (req.path === '/worksheet/enrollments/1/context') {
+      res.json({ enrollment, studentEnrollments: [enrollment], defaults: { patternCode: 'daily10', receiveDate: '2026-10-20', mainWorksheetNo: 101 },
+        patterns: [{ code: 'daily10', shortLabel: '10/day', suffixes: [1], dayOffsets: [0] }],
+        worksheetOptions: { main: [{ worksheetNo: 101 }], zun: [] }, history: [row], worksheetMonthSummary: summary }); return true;
+    }
+    if (req.path.endsWith('/worksheet-summary')) { res.json({ success: true, worksheetMonthSummary: summary }); return true; }
+    if (req.method === 'DELETE' && req.path === '/worksheet/entries/99') {
+      deletes++; assert.deepEqual(req.body, { enrollmentId: 1 }); res.json({ success: true }); return true;
+    }
+    return false;
+  }, { embedded });
+  try {
+    const { page } = f;
+    await page.evaluate(async () => { await (await import('/js/worksheet/worksheet.js')).loadEnrollmentContext(1); });
+    const remove = page.locator('[data-delete-history-id="99"]');
+    await remove.click();
+    assert.equal(await page.locator('#appDialogConfirm').evaluate(el => el === document.activeElement), true);
+    assert.equal(deletes, 0);
+    await page.keyboard.press('Escape'); assert.equal(deletes, 0);
+    await remove.click(); await f.choose(false); assert.equal(deletes, 0);
+    assert.equal(await remove.count(), 1);
+    await remove.click();
+    assert.equal(await page.locator('#appDialogConfirm').evaluate(el => el === document.activeElement), true);
+    await page.keyboard.press('Enter');
+    await page.waitForFunction(() => document.getElementById('statusLine').textContent === 'ลบ record แล้ว');
+    assert.equal(deletes, 1); assert.equal(await remove.count(), 0);
+    assert.equal(f.writes().length, 1); assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
 for (const embedded of [false, true]) test(`CD confirmations and history controls cannot duplicate a request or mix another student's response (${embedded ? 'desktop' : 'browser'})`, { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
   let fail = true, releaseCd, releaseHistory;
   const summary = { billingMonth: 10, billingYear: 2026, usedDays: 1, cpwsRecords: 1 };

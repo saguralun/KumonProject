@@ -1,5 +1,5 @@
 import { bindFourDigitYearDateInputs } from "./dateInputYear.js";
-import { enrollmentMonthStart } from './enrollmentDateStatus.js';
+import { enrollmentMonthStart, canCorrectEnrollmentDateStatus } from './enrollmentDateStatus.js';
 import { directoryStatus, directoryTone } from "./studentDirectoryStatus.js";
 import { bindKsisImport, resetKsisImport } from "./studentKsisImport.js";
 import { closeWsGraphModal, loadWsGraph, openWsGraphModal, updateWsGraphButtonVisibility } from "./studentWsGraph.js";
@@ -291,7 +291,9 @@ function fillEnrollmentForm(enrollment = null) {
     }
 
     state.isNewEnrollment = false;
-    setEnrollmentLocked(!enrollment.canDeleteEnrollment);
+    setEnrollmentLocked(!enrollment.canDeleteEnrollment, {
+        canEditDateStatus: canCorrectEnrollmentDateStatus(enrollment.statusGroup1Code, enrollment.canDeleteEnrollment)
+    });
     setFormValue(form, "enrollmentId", enrollment.enrollmentId);
     setFormValue(form, "subjectId", enrollment.subjectId);
     refreshLevelSelects({
@@ -374,6 +376,7 @@ function renderEnrollmentTabs() {
     els.enrollmentActionBar.classList.toggle("hidden", !(canLeave || canResume || canComplete || canDeleteEnrollment));
     els.enrollmentSubtitle.textContent = `${active.subjectCode} • ${active.currentLevelCode}${active.currentZunLevelCode ? ` • Zun ${active.currentZunLevelCode}` : ""}${active.isKumonConnect ? " • KC" : ""} • ${active.statusGroup1Name}`;
     if (active.canDeleteEnrollment) els.enrollmentSubtitle.textContent += ' • แก้ข้อมูลเริ่มต้นได้';
+    else if (canCorrectEnrollmentDateStatus(active.statusGroup1Code)) els.enrollmentSubtitle.textContent += ' • แก้ Start Date / Special Status ได้';
     fillEnrollmentForm(active);
     syncStudentControls();
 }
@@ -1232,10 +1235,12 @@ function bindEvents() {
         if (subject) els.enrollmentForm.closest('.enrollment-panel').dataset.subject = subject.code;
     });
     els.enrollmentForm.elements.enStartDate.addEventListener('change', () => {
-        if (selectedEnrollment()?.canDeleteEnrollment) syncEnrollmentDateStatus(els.enrollmentForm);
+        const enrollment = selectedEnrollment();
+        if (canCorrectEnrollmentDateStatus(enrollment?.statusGroup1Code, enrollment?.canDeleteEnrollment)) syncEnrollmentDateStatus(els.enrollmentForm);
     });
     els.enrollmentForm.elements.currentStatusGroup2Id.addEventListener('change', () => {
-        if (selectedEnrollment()?.canDeleteEnrollment) alignEnrollmentDateForHalfStatus(els.enrollmentForm);
+        const enrollment = selectedEnrollment();
+        if (canCorrectEnrollmentDateStatus(enrollment?.statusGroup1Code, enrollment?.canDeleteEnrollment)) alignEnrollmentDateForHalfStatus(els.enrollmentForm);
     });
     els.enrollmentForm.elements.currentLevelMasterId.addEventListener("change", () => {
         refreshLevelSelects({

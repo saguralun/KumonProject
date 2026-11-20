@@ -125,6 +125,13 @@ export const worksheetApi = {
         );
     },
 
+    async updateEntryNumber(payload) {
+        const { worksheetUsedId, ...body } = payload;
+        return requestJson(`/api/worksheet/entries/${encodeURIComponent(worksheetUsedId)}/number`, {
+            method: "PATCH", body: JSON.stringify(body)
+        });
+    },
+
     async updateEntryDate({
         enrollmentId,
         worksheetUsedId,

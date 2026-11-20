@@ -13,7 +13,8 @@ import {
     saveAtCompletion,
     saveWorksheetEntries,
     searchEnrollments,
-    updateWorksheetEntryDate
+    updateWorksheetEntryDate,
+    updateWorksheetEntryNumber
 } from "../services/worksheetService.js";
 
 const router = express.Router();
@@ -193,6 +194,18 @@ router.patch("/entries/:worksheetUsedId/date", async (req, res) => {
     } catch (error) {
         sendError(res, error);
     }
+});
+
+router.patch("/entries/:worksheetUsedId/number", async (req, res) => {
+    try {
+        res.json(await updateWorksheetEntryNumber({
+            worksheetUsedId: req.params.worksheetUsedId,
+            enrollmentId: req.body?.enrollmentId,
+            worksheetNo: req.body?.worksheetNo,
+            expectedWorksheetMasterId: req.body?.expectedWorksheetMasterId,
+            expectedActualWorksheetNo: req.body?.expectedActualWorksheetNo
+        }));
+    } catch (error) { sendError(res, error); }
 });
 
 export default router;

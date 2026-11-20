@@ -1,7 +1,7 @@
 // One asynchronous confirmation path for browsers and the embedded desktop.
 (() => {
   let active = false;
-  function show(message, { title = 'ยืนยันรายการ', confirmText = 'ยืนยัน', cancelText = 'ยกเลิก', notice = false } = {}) {
+  function show(message, { title = 'ยืนยันรายการ', confirmText = 'ยืนยัน', cancelText = 'ยกเลิก', notice = false, focusConfirm = false } = {}) {
     if (active) return Promise.resolve(false);
     active = true;
     if (!document.getElementById('appDialogStyles')) {
@@ -28,7 +28,7 @@
         if (previousFocus?.isConnected && !previousFocus.closest('[inert]')) previousFocus.focus();
         resolve(accepted);
       }, { once: true });
-      try { dialog.showModal(); document.dispatchEvent(new CustomEvent('app:dialog-change', { detail: { open: true } })); (notice ? confirm : cancel).focus(); }
+      try { dialog.showModal(); document.dispatchEvent(new CustomEvent('app:dialog-change', { detail: { open: true } })); (notice || focusConfirm ? confirm : cancel).focus(); }
       catch (error) { dialog.remove(); active = false; reject(error); }
     });
   }

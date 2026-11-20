@@ -2,7 +2,7 @@ import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
 import { normalizeKumonStudentId } from "./kumonStudentId.js";
-import { specialStatusForStartDate } from '../public/js/enrollmentDateStatus.js';
+import { specialStatusForStartDate, canCorrectEnrollmentDateStatus } from '../public/js/enrollmentDateStatus.js';
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
@@ -1138,17 +1138,21 @@ export async function updateEnrollment(studentId, enrollmentId, payload) {
         if (!previous) throw httpError(404, 'ไม่พบ enrollment ของ student นี้');
         // Separate statement AFTER the lock: observe a WS/payment committed
         // while this request was waiting instead of trusting the old Preview.
-        const usage = await client.query(`SELECT (${enrollmentUsageSql()}) AS has_usage
-            FROM ${TABLE_SCHEMA}.enrollment e WHERE e.enrollment_id=$1`, [normalizedEnrollmentId]);
+        const usage = await client.query(`SELECT (${enrollmentUsageSql()}) AS has_usage, status1.status_code AS status_group1_code
+            FROM ${TABLE_SCHEMA}.enrollment e
+            JOIN ${TABLE_SCHEMA}.status_master status1 ON status1.status_id=e.current_status_group1_id
+            WHERE e.enrollment_id=$1`, [normalizedEnrollmentId]);
         const used = usage.rows[0]?.has_usage !== false;
+        const canEditDateStatus = canCorrectEnrollmentDateStatus(usage.rows[0]?.status_group1_code, !used);
         const protectedFields = {
             subjectId: 'subject_id', startingWorksheetMasterId: 'starting_worksheet_master_id',
-            currentStatusGroup1Id: 'current_status_group1_id', currentStatusGroup2Id: 'current_status_group2_id'
+            currentStatusGroup1Id: 'current_status_group1_id'
         };
+        if (!canEditDateStatus) protectedFields.currentStatusGroup2Id = 'current_status_group2_id';
         if (used && Object.entries(protectedFields).some(([field, column]) => Number(data[field] || 0) !== Number(previous[column] || 0))) {
             throw httpError(409, 'วิชานี้มีประวัติใช้งานแล้ว แก้ข้อมูลเริ่มต้นไม่ได้ กรุณาโหลดข้อมูลใหม่');
         }
-        if (!used && data.enStartDate !== normalizeDate(previous.en_start_date)) await alignEnrollmentSpecialStatus(client, data);
+        if (canEditDateStatus && data.enStartDate !== normalizeDate(previous.en_start_date)) await alignEnrollmentSpecialStatus(client, data);
         data.currentLevelMasterId = requiredInt(
             data.currentLevelMasterId,
             "ระดับที่เรียน"

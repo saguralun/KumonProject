@@ -129,6 +129,24 @@ restart-helper test, not necessary for this suite's application regression check
   edit waits on the enrollment lock. These fixes add no tables or columns.
   Both Student subject forms offer No Zun / ZI / ZII and round-trip the
   existing level IDs; packet selection remains in WS Input.
+  N/EO enrollments retain Start Date / Special Status corrections after usage;
+  other initial fields stay locked. Browser and Electron tests cover manual
+  exemptions, H/FSH date alignment, failed-save retry and reload. Disposable
+  PostgreSQL tests preserve WS/status/billing history, reject edits after a
+  concurrent change out of N/EO, and keep the schema unchanged.
+  WS Receive Date defaults to that enrollment's Start Date without WS history;
+  existing WS uses the latest WS date plus one day. Tests cover corrected Start
+  Dates, other subjects, older WS inserts and deleting the final WS record.
+  A successful main-level advancement starts the input at packet 1, including
+  when the new level has old history; failure, historical AT edits without a
+  level change and final levels preserve their defaults. Enrollment starting
+  packets apply only to their own level; subsequent WS uses normal history.
+  Unprocessed history rows allow inline WS-number corrections with Enter;
+  Escape/blur cancels. Corrections preserve the record, date, level and CPWS,
+  resolve the corresponding packet, and refresh progress/summary atomically.
+  Browser/Electron tests cover retry, duplicate submission, processed rows,
+  late responses and failed history refresh. Disposable PostgreSQL tests cover
+  stale snapshots, Zun bounds, rollback and both stock-cut/edit lock orders.
 
 - KSIS roster previews separate ID-less children by exact name and DOB, merge
   only repeated copies of that identity, and show missing IDs as neutral info.

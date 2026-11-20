@@ -84,6 +84,7 @@ export const state = {
     patternCode: "daily10",
     progressKind: "main",
     isSaving: false,
+    pendingHistoryEdits: new Set(),
     isCompletingLevel: false,
     isCompletingZun: false,
     atModal: {
@@ -92,6 +93,10 @@ export const state = {
         source: null
     }
 };
+
+export function isHistoryEditPending() {
+    return state.pendingHistoryEdits.has(Number(state.context?.enrollment.enrollmentId));
+}
 
 export function setStatus(message, type = "neutral") {
     els.statusLine.textContent = message;

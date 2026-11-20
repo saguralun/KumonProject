@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { enrollmentMonthStart, specialStatusForStartDate } from '../public/js/enrollmentDateStatus.js';
+import { enrollmentMonthStart, specialStatusForStartDate, canCorrectEnrollmentDateStatus } from '../public/js/enrollmentDateStatus.js';
+
+test('Date and special-status corrections stay open for saved N/EO or an unused enrollment', () => {
+    for (const code of ['N', 'EO']) assert.equal(canCorrectEnrollmentDateStatus(code), true);
+    for (const code of ['C', 'A', 'OT', 'R', 'IT', 'CP', undefined]) {
+        assert.equal(canCorrectEnrollmentDateStatus(code), false);
+        assert.equal(canCorrectEnrollmentDateStatus(code, true), true);
+    }
+});
 
 test('New enrollment dates default to day one of the calendar month, including after the 20th and year boundaries', () => {
     assert.equal(enrollmentMonthStart(new Date(2026, 10, 19)), '2026-11-01');

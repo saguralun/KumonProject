@@ -665,7 +665,7 @@ export function fillAddEnrollmentDefaults() {
     updateHalfMonthByStartDate();
 }
 
-export function setEnrollmentLocked(isLocked) {
+export function setEnrollmentLocked(isLocked, { canEditDateStatus = false } = {}) {
     [
         "subjectId",
         "startingWorksheetMasterId",
@@ -675,7 +675,7 @@ export function setEnrollmentLocked(isLocked) {
         const field = els.enrollmentForm.elements[fieldName];
 
         if (field) {
-            field.disabled = isLocked;
+            field.disabled = isLocked && !(fieldName === 'currentStatusGroup2Id' && canEditDateStatus);
         }
     });
 }

@@ -64,7 +64,7 @@ import {
 } from "./worksheetIncomplete.js";
 
 let contextGeneration = 0;
-export async function loadEnrollmentContext(enrollmentId) {
+export async function loadEnrollmentContext(enrollmentId, { resetMainLevelMasterId = null } = {}) {
     if (state.isSaving) return;
     const generation = ++contextGeneration;
     state.contextRequestId = generation;
@@ -84,6 +84,11 @@ export async function loadEnrollmentContext(enrollmentId) {
         );
 
         if (generation !== contextGeneration || state.isSaving) return;
+        if (resetMainLevelMasterId != null
+            && Number(context.enrollment.currentLevelMasterId) === Number(resetMainLevelMasterId)
+            && context.worksheetOptions?.main?.some((option) => Number(option.worksheetNo) === 1)) {
+            context.defaults.mainWorksheetNo = 1;
+        }
         state.context = context;
         state.isLoadingContext = false;
         state.history = context.history || [];
@@ -126,11 +131,17 @@ export async function loadEnrollmentContext(enrollmentId) {
 
 function renderHistoryTable({ scrollToTop = false } = {}) {
     renderHistory(els.historyTableWrap, state.history, state.worksheetMonthSummary);
+    syncHistoryNumberEditControls();
 
     if (scrollToTop) {
         els.historyTableWrap.scrollTop = 0;
         els.historyTableWrap.scrollLeft = 0;
     }
+}
+
+function syncHistoryNumberEditControls() {
+    if (!state.pendingHistoryEdits.has(Number(state.context?.enrollment.enrollmentId))) return;
+    for (const control of els.historyTableWrap.querySelectorAll('input,button')) control.disabled = true;
 }
 
 function updateHistorySubtitle() {
@@ -159,8 +170,10 @@ async function refreshHistory() {
         renderWorksheetPacketSummary(state.worksheetPacketSummary);
         renderWorksheetMonthSummary(state.worksheetMonthSummary);
         updateHistorySubtitle();
+        return true;
     } catch (error) {
         if (state.context === context && els.receiveDate.value === date) setStatus(error.message, "error");
+        return false;
     }
 }
 
@@ -276,7 +289,7 @@ function readWorksheetNosFromDom(kind) {
 }
 
 async function deleteHistoryRecord(worksheetUsedId) {
-    if (!state.context || !worksheetUsedId) {
+    if (!state.context || !worksheetUsedId || state.pendingHistoryEdits.has(Number(state.context.enrollment.enrollmentId))) {
         return;
     }
 
@@ -293,10 +306,10 @@ async function deleteHistoryRecord(worksheetUsedId) {
         return;
     }
 
-    if (!await confirmAction("ลบ record นี้ใช่ไหม?")) {
+    if (!await confirmAction("ลบ record นี้ใช่ไหม?", { focusConfirm: true })) {
         return;
     }
-    if (state.context !== context || state.isSaving) return;
+    if (state.context !== context || state.isSaving || state.pendingHistoryEdits.has(Number(context.enrollment.enrollmentId))) return;
 
     try {
         const result = await worksheetApi.deleteEntry({
@@ -373,6 +386,54 @@ async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
         input.value = row.worksheetDate;
         input.disabled = false;
         setStatus(error.message, "error");
+    }
+}
+
+async function updateHistoryRecordNumber(input) {
+    const context = state.context, generation = contextGeneration;
+    if (!context || state.isSaving || state.isLoadingContext || state.isCompletingLevel || state.isCompletingZun || input.disabled
+        || state.pendingHistoryEdits.has(Number(context.enrollment.enrollmentId))
+        || els.historyTableWrap.querySelector('.history-date-input:disabled')) return;
+    const recordId = Number(input.dataset.editHistoryNumberId);
+    const row = state.history.find(item => Number(item.worksheetUsedId) === recordId);
+    if (!row || row.isStockProcessed !== false) return;
+    if (!input.checkValidity()) { input.reportValidity(); return; }
+    const worksheetNo = Number(input.value);
+    if (worksheetNo === Number(row.actualWorksheetNo)) return;
+    const enrollmentId = Number(context.enrollment.enrollmentId);
+    const isCurrent = () => state.context === context && generation === contextGeneration;
+    state.pendingHistoryEdits.add(enrollmentId);
+    syncHistoryNumberEditControls(); updatePreview(); setStatus('กำลังแก้เลข WS...');
+    let outcome;
+    try {
+        const result = await worksheetApi.updateEntryNumber({ enrollmentId, worksheetUsedId: recordId, worksheetNo,
+            expectedWorksheetMasterId: row.worksheetMasterId, expectedActualWorksheetNo: row.actualWorksheetNo });
+        if (!isCurrent()) return;
+        if (result.entry) {
+            state.history = state.history.map(item => Number(item.worksheetUsedId) === recordId ? result.entry : item);
+            context.history = state.history;
+            renderHistoryTable();
+        }
+        context.completionState = result.completionState || context.completionState;
+        context.worksheetProgress = result.worksheetProgress || context.worksheetProgress;
+        context.gradeSyncStatus = result.gradeSyncStatus;
+        context.worksheetPacketSummary = result.worksheetPacketSummary || context.worksheetPacketSummary;
+        state.worksheetPacketSummary = context.worksheetPacketSummary;
+        const refreshed = await refreshHistory();
+        if (!isCurrent()) return;
+        renderWorksheetProgress(); renderWorksheetPacketSummary(state.worksheetPacketSummary);
+        outcome = refreshed ? ['แก้เลข WS แล้ว', 'success'] : ['แก้เลข WS แล้ว แต่โหลดประวัติใหม่ไม่สำเร็จ กรุณาโหลดอีกครั้ง', 'neutral'];
+    } catch (error) {
+        if (!isCurrent()) return;
+        input.value = row.actualWorksheetNo;
+        outcome = [error.message, 'error'];
+    } finally {
+        state.pendingHistoryEdits.delete(enrollmentId);
+        if (isCurrent()) {
+            for (const control of els.historyTableWrap.querySelectorAll('input,button')) control.disabled = false;
+            updatePreview();
+            if (outcome) setStatus(...outcome);
+        }
     }
 }
 
@@ -518,6 +579,16 @@ function bindEvents() {
         }
     });
     els.historyTableWrap.addEventListener("keydown", (event) => {
+        const numberInput = event.target.closest('[data-edit-history-number-id]');
+        if (numberInput) {
+            if (event.key === 'Enter') { event.preventDefault(); void updateHistoryRecordNumber(numberInput); }
+            if (event.key === 'Escape' && !numberInput.disabled) {
+                const row = state.history.find(item => Number(item.worksheetUsedId) === Number(numberInput.dataset.editHistoryNumberId));
+                numberInput.value = row?.actualWorksheetNo ?? numberInput.defaultValue;
+                numberInput.blur();
+            }
+            return;
+        }
         const input = event.target.closest("[data-edit-history-date-id]");
 
         if (!input) {
@@ -542,6 +613,12 @@ function bindEvents() {
         }
     });
     els.historyTableWrap.addEventListener("blur", (event) => {
+        const numberInput = event.target.closest('[data-edit-history-number-id]');
+        if (numberInput && !numberInput.disabled) {
+            const row = state.history.find(item => Number(item.worksheetUsedId) === Number(numberInput.dataset.editHistoryNumberId));
+            numberInput.value = row?.actualWorksheetNo ?? numberInput.defaultValue;
+            return;
+        }
         const input = event.target.closest("[data-edit-history-date-id]");
 
         if (input && !input.disabled) {

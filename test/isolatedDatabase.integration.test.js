@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process';
 import pg from 'pg';
 import productionPool from '../config/db.js';
 import { receiveReceiptPayment, cancelReceiptPayment, previewReceipt, getPaymentStatus } from '../services/paymentService.js';
-import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel } from '../services/worksheetService.js';
+import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel, getEnrollmentContext, deleteWorksheetEntry, updateWorksheetEntryNumber } from '../services/worksheetService.js';
 import { createDeliveryOrder, processDeliveryOrder } from '../services/stockReceiveService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
@@ -114,14 +114,83 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             updated = (await updateEnrollment(person, added.enrollmentId, addedData)).profile.enrollments.find(e => e.enrollmentId === added.enrollmentId);
             assert.equal(updated.enStartDate, '2026-11-21'); assert.equal(updated.canDeleteEnrollment, true);
             await saveWorksheetEntries({ enrollmentId: added.enrollmentId, receiveDate: '2026-11-22', patternCode: 'daily10', mainWorksheetNos: [1] });
+            await database.query('UPDATE kumon.enrollment SET current_status_group1_id=$2 WHERE enrollment_id=$1', [added.enrollmentId, statuses.get('C')]);
+            addedData.currentStatusGroup1Id = statuses.get('C');
             const before = (await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [added.enrollmentId])).rows[0];
             await assert.rejects(updateEnrollment(person, added.enrollmentId, { ...addedData, currentStatusGroup2Id: statuses.get('H') }), { statusCode: 409 });
             assert.deepEqual((await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [added.enrollmentId])).rows[0], before);
             assert.deepEqual((await database.query(schemaSql)).rows, schemaBefore);
         });
+        await t.test('WS Receive Date starts at the subject Start Date only until its first WS, then follows its latest WS', async () => {
+            const id = await student('First WS receive date');
+            const person = (await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].student_id;
+            await database.query("UPDATE kumon.enrollment SET en_start_date='2026-11-14' WHERE enrollment_id=$1", [id]);
+            let context = await getEnrollmentContext(id, 30);
+            assert.equal(context.history.length, 0); assert.equal(context.defaults.receiveDate, '2026-11-14');
+            await updateEnrollment(person, id, { ...await enrollmentPayloadFor(id), enStartDate: '2026-11-18' });
+            context = await getEnrollmentContext(id, 30);
+            assert.equal(context.history.length, 0); assert.equal(context.defaults.receiveDate, '2026-11-18');
+            await saveWorksheetEntries({ enrollmentId: id, receiveDate: '2026-11-20', patternCode: 'daily10', mainWorksheetNos: [1] });
+            await updateEnrollment(person, id, { ...await enrollmentPayloadFor(id), enStartDate: '2026-12-05' });
+            assert.equal((await getEnrollmentContext(id, 1)).defaults.receiveDate, '2026-11-21');
+            // A later insert with an older WS date must not move the default back.
+            await saveWorksheetEntries({ enrollmentId: id, receiveDate: '2026-11-10', patternCode: 'daily10', mainWorksheetNos: [1] });
+            assert.equal((await getEnrollmentContext(id, 1)).defaults.receiveDate, '2026-11-21');
+            const efl = (await database.query('SELECT wm.worksheet_master_id,wm.level_master_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id WHERE lm.subject_id=2 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1')).rows[0];
+            const added = await createEnrollment(person, { ...await enrollmentPayloadFor(id), subjectId: 2,
+                currentLevelMasterId: efl.level_master_id, startingWorksheetMasterId: efl.worksheet_master_id,
+                enStartDate: '2026-11-17', currentStatusGroup1Id: statuses.get('EO') });
+            const otherContext = await getEnrollmentContext(added.enrollmentId, 30);
+            assert.equal(otherContext.history.length, 0); assert.equal(otherContext.defaults.receiveDate, '2026-11-17');
+            for (const [date, expected] of [['2026-11-20', '2026-11-11'], ['2026-11-10', '2026-12-05']]) {
+                const record = (await database.query('SELECT worksheet_used_id FROM kumon.worksheet_used WHERE enrollment_id=$1 AND worksheet_date=$2', [id, date])).rows[0];
+                await deleteWorksheetEntry({ enrollmentId: id, worksheetUsedId: record.worksheet_used_id });
+                assert.equal((await getEnrollmentContext(id, 30)).defaults.receiveDate, expected);
+            }
+        });
+        await t.test('Used N/EO enrollments can correct date and special status while history and other initial fields stay protected', async () => {
+            for (const code of ['N', 'EO']) {
+                const id = await student(`Correct used ${code}`);
+                const person = (await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].student_id;
+                await saveWorksheetEntries({ enrollmentId: id, receiveDate: '2026-10-02', patternCode: 'daily10', mainWorksheetNos: [1] });
+                await database.query('UPDATE kumon.enrollment SET current_status_group1_id=$2 WHERE enrollment_id=$1', [id, statuses.get(code)]);
+                await database.query('INSERT INTO kumon.enrollment_status(enrollment_id,status_id,status_month,status_year) VALUES($1,$2,10,2026)', [id, statuses.get(code)]);
+                const historyBefore = {};
+                for (const table of ['worksheet_used', 'enrollment_status', 'billing_detail']) {
+                    historyBefore[table] = (await database.query(`SELECT * FROM kumon.${table} WHERE enrollment_id=$1`, [id])).rows;
+                }
+                const data = { ...await enrollmentPayloadFor(id), enStartDate: '2026-11-15' };
+                let saved = (await updateEnrollment(person, id, data)).profile.enrollments[0];
+                assert.equal(saved.enStartDate, '2026-11-15'); assert.equal(saved.statusGroup2Code, 'H');
+                assert.equal(saved.canDeleteEnrollment, false); assert.equal(saved.statusGroup1Code, code);
+                saved = (await updateEnrollment(person, id, { ...data, currentStatusGroup2Id: statuses.get('F') })).profile.enrollments[0];
+                assert.equal(saved.statusGroup2Code, 'F');
+                saved = (await updateEnrollment(person, id, { ...data, enStartDate: '2026-11-21', currentStatusGroup2Id: statuses.get('F') })).profile.enrollments[0];
+                assert.equal(saved.statusGroup2Code, 'F');
+                saved = (await updateEnrollment(person, id, { ...data, currentStatusGroup2Id: statuses.get('FS') })).profile.enrollments[0];
+                assert.equal(saved.statusGroup2Code, 'FSH');
+                saved = (await updateEnrollment(person, id, { ...data, enStartDate: '2026-11-21', currentStatusGroup2Id: statuses.get('FSH') })).profile.enrollments[0];
+                assert.equal(saved.statusGroup2Code, 'FS');
+                const currentData = { ...await enrollmentPayloadFor(id), enStartDate: saved.enStartDate };
+                const before = (await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0];
+                for (const change of [{ startingWorksheetMasterId: ws.worksheet_master_id + 1 }, { subjectId: 2 },
+                    { currentStatusGroup1Id: statuses.get('C') }, { currentStatusGroup2Id: statuses.get('N') }]) {
+                    await assert.rejects(updateEnrollment(person, id, { ...currentData, ...change }), error => [400, 409].includes(error.statusCode));
+                    assert.deepEqual((await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0], before);
+                }
+                for (const [table, original] of Object.entries(historyBefore)) {
+                    assert.deepEqual((await database.query(`SELECT * FROM kumon.${table} WHERE enrollment_id=$1`, [id])).rows, original);
+                }
+                await database.query('UPDATE kumon.enrollment SET current_status_group1_id=$2 WHERE enrollment_id=$1', [id, statuses.get('C')]);
+                await assert.rejects(updateEnrollment(person, id, { ...currentData, currentStatusGroup2Id: statuses.get('H') }), { statusCode: 409 });
+                const continueData = { ...currentData, currentStatusGroup1Id: statuses.get('C') };
+                await assert.rejects(updateEnrollment(person, id, { ...continueData, currentStatusGroup2Id: statuses.get('H') }), { statusCode: 409 });
+            }
+        });
         await t.test('Unused edit rechecks history after waiting for a real concurrent enrollment lock', async sub => {
             const id = await student('Initial edit lock'), person = (await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].student_id;
-            const data = { ...await enrollmentPayloadFor(id), enStartDate: '2026-11-15', currentStatusGroup2Id: statuses.get('H') };
+            const data = { ...await enrollmentPayloadFor(id), enStartDate: '2026-11-15', currentStatusGroup2Id: statuses.get('H'),
+                startingWorksheetMasterId: ws.worksheet_master_id + 1 };
             const blocker = await database.connect(); let reached, save;
             const lockAttempted = new Promise(resolve => { reached = resolve; });
             sub.mock.method(productionPool, 'connect', async () => {
@@ -138,6 +207,32 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
                 await blocker.query('INSERT INTO kumon.enrollment_status(enrollment_id,status_id,status_month,status_year) VALUES($1,$2,11,2026)', [id, statuses.get('N')]);
                 await blocker.query('COMMIT'); await assert.rejects(save, { statusCode: 409 });
                 assert.equal((await getStudentProfile(person)).enrollments[0].enStartDate, '2026-10-01');
+            } finally { await blocker.query('ROLLBACK'); blocker.release(); if (save) await Promise.allSettled([save]); }
+        });
+        await t.test('Date/status correction rechecks N/EO eligibility after a concurrent status change', async sub => {
+            const id = await student('New status correction lock');
+            const person = (await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].student_id;
+            const data = { ...await enrollmentPayloadFor(id), currentStatusGroup1Id: statuses.get('C'),
+                enStartDate: '2026-11-15', currentStatusGroup2Id: statuses.get('H') };
+            const blocker = await database.connect(); let reached, save;
+            const lockAttempted = new Promise(resolve => { reached = resolve; });
+            sub.mock.method(productionPool, 'connect', async () => {
+                const connection = await database.connect();
+                return { release: () => connection.release(), query(sql, params) {
+                    const result = connection.query(sql, params);
+                    if (sql.includes('SELECT e.*') && sql.includes('FOR UPDATE')) reached();
+                    return result;
+                } };
+            });
+            try {
+                await blocker.query('BEGIN'); await blocker.query('SELECT enrollment_id FROM kumon.enrollment WHERE enrollment_id=$1 FOR UPDATE', [id]);
+                save = updateEnrollment(person, id, data); save.catch(() => {}); await lockAttempted;
+                await blocker.query('UPDATE kumon.enrollment SET current_status_group1_id=$2 WHERE enrollment_id=$1', [id, statuses.get('C')]);
+                await blocker.query('INSERT INTO kumon.enrollment_status(enrollment_id,status_id,status_month,status_year) VALUES($1,$2,11,2026)', [id, statuses.get('C')]);
+                await blocker.query('COMMIT'); await assert.rejects(save, { statusCode: 409 });
+                const current = (await getStudentProfile(person)).enrollments[0];
+                assert.equal(current.statusGroup1Code, 'C'); assert.equal(current.enStartDate, '2026-10-01');
+                assert.equal(current.currentStatusGroup2Id, null);
             } finally { await blocker.query('ROLLBACK'); blocker.release(); if (save) await Promise.allSettled([save]); }
         });
         await t.test('Student directory uses the latest uninterrupted absence per subject without changing search/filter semantics', async () => {
@@ -251,6 +346,93 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.equal(results.length, 10);
             assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.worksheet_used WHERE enrollment_id=ANY($1::int[])', [ids])).rows[0].n, 10);
         });
+        await t.test('Unprocessed WS number corrections retain record/date/CPWS and move the pending stock packet', async () => {
+            const id = await student('Correct WS packet');
+            const saved = await saveWorksheetEntries({ enrollmentId: id, receiveDate: '2027-03-03', patternCode: 'daily10', mainWorksheetNos: [1] });
+            const row = saved.records[0];
+            const stockBefore = (await database.query('SELECT * FROM kumon.stock ORDER BY stock_type_id,master_id')).rows;
+            const payload = { enrollmentId: id, worksheetUsedId: row.worksheetUsedId, worksheetNo: 26,
+                expectedWorksheetMasterId: row.worksheetMasterId, expectedActualWorksheetNo: row.actualWorksheetNo };
+            const corrected = await updateWorksheetEntryNumber(payload);
+            assert.equal(corrected.entry.worksheetUsedId, row.worksheetUsedId);
+            assert.equal(corrected.entry.actualWorksheetNo, 26); assert.equal(corrected.entry.packetWorksheetNo, 21);
+            assert.equal(corrected.entry.levelMasterId, row.levelMasterId); assert.equal(corrected.entry.worksheetDate, row.worksheetDate);
+            assert.equal(corrected.entry.cpws, true); assert.equal(corrected.entry.isStockProcessed, false);
+            assert.equal(corrected.worksheetProgress.main.actualWorksheetNo, 26);
+            assert.deepEqual(corrected.worksheetPacketSummary.main.rows.map(r => [r.packetWorksheetNo,r.count]), [[21,1]]);
+            assert.deepEqual((await database.query('SELECT * FROM kumon.stock ORDER BY stock_type_id,master_id')).rows, stockBefore);
+            const continuation = (await database.query(`INSERT INTO kumon.worksheet_used(enrollment_id,worksheet_master_id,actual_worksheet_no,worksheet_date,worksheet_month,worksheet_year,cpws,is_stock_processed)
+                VALUES($1,$2,6,'2027-03-03',3,2027,FALSE,FALSE) RETURNING worksheet_used_id`, [id, row.worksheetMasterId])).rows[0];
+            const automatic = await updateWorksheetEntryNumber({ ...payload, worksheetUsedId: continuation.worksheet_used_id, expectedActualWorksheetNo: 6, worksheetNo: 16 });
+            assert.equal(automatic.entry.cpws, false); assert.equal(automatic.entry.packetWorksheetNo, 11);
+            assert.equal(automatic.worksheetProgress.main.actualWorksheetNo, 26);
+            for (const worksheetNo of [0, 201, 1.5, '']) await assert.rejects(updateWorksheetEntryNumber({ ...payload, worksheetNo }), { statusCode: 400 });
+            await assert.rejects(updateWorksheetEntryNumber({ ...payload, worksheetNo: 46 }), { statusCode: 409 });
+            const other = await student('Wrong WS owner');
+            await assert.rejects(updateWorksheetEntryNumber({ ...payload, enrollmentId: other }), { statusCode: 404 });
+            assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.worksheet_used WHERE enrollment_id=$1', [id])).rows[0].n, 2);
+            const beforeQty = (await database.query('SELECT quantity FROM kumon.stock WHERE stock_type_id=1 AND master_id=$1', [corrected.entry.worksheetMasterId])).rows[0]?.quantity || 0;
+            await processPendingDates('ws', ['2027-03-03']);
+            assert.equal((await database.query('SELECT quantity FROM kumon.stock WHERE stock_type_id=1 AND master_id=$1', [corrected.entry.worksheetMasterId])).rows[0].quantity, beforeQty-1);
+            await assert.rejects(updateWorksheetEntryNumber({ ...payload, expectedWorksheetMasterId: corrected.entry.worksheetMasterId, expectedActualWorksheetNo: 26, worksheetNo: 46 }), { statusCode: 409 });
+        });
+        await t.test('Zun number corrections remain in the original level and reject numbers beyond Zun 100', async () => {
+            const id = await student('Correct Zun packet');
+            const zun = (await database.query("SELECT level_master_id FROM kumon.level_master WHERE level_type=2 AND level_code='ZI' ORDER BY level_master_id LIMIT 1")).rows[0];
+            await database.query('UPDATE kumon.enrollment SET current_zun_level_master_id=$2 WHERE enrollment_id=$1', [id,zun.level_master_id]);
+            const saved = await saveWorksheetEntries({ enrollmentId: id, receiveDate: '2027-03-04', patternCode: 'daily10', mainWorksheetNos: [1], zunWorksheetNos: [91] });
+            const row = saved.records.find(r => r.worksheetType === 'ZUN');
+            const payload = { enrollmentId:id, worksheetUsedId:row.worksheetUsedId, expectedWorksheetMasterId:row.worksheetMasterId, expectedActualWorksheetNo:row.actualWorksheetNo };
+            await assert.rejects(updateWorksheetEntryNumber({ ...payload, worksheetNo:101 }), { statusCode:400 });
+            const result = await updateWorksheetEntryNumber({ ...payload, worksheetNo:36 });
+            assert.equal(result.entry.worksheetType,'ZUN'); assert.equal(result.entry.packetWorksheetNo,31);
+            assert.equal(result.entry.levelMasterId,zun.level_master_id);
+            assert.equal((await getEnrollmentContext(id,30)).enrollment.currentZunLevelMasterId,zun.level_master_id);
+        });
+        await t.test('A failed WS correction summary rolls back the number and packet together', async sub => {
+            const id = await student('Correct WS rollback');
+            const row = (await saveWorksheetEntries({ enrollmentId:id, receiveDate:'2027-03-05', patternCode:'daily10', mainWorksheetNos:[1] })).records[0];
+            const before = (await database.query('SELECT * FROM kumon.worksheet_used WHERE worksheet_used_id=$1',[row.worksheetUsedId])).rows[0];
+            sub.mock.method(productionPool,'connect',async () => {
+                const connection=await database.connect();
+                return { release:()=>connection.release(),query(sql,params) {
+                    if (sql.includes('can_complete_ws_level')) throw new Error('correction summary failed');
+                    return connection.query(sql,params);
+                } };
+            });
+            await assert.rejects(updateWorksheetEntryNumber({ enrollmentId:id,worksheetUsedId:row.worksheetUsedId,worksheetNo:46,
+                expectedWorksheetMasterId:row.worksheetMasterId,expectedActualWorksheetNo:1 }),/correction summary failed/);
+            assert.deepEqual((await database.query('SELECT * FROM kumon.worksheet_used WHERE worksheet_used_id=$1',[row.worksheetUsedId])).rows[0],before);
+        });
+        for (const first of ['cut','edit']) await t.test(`WS correction and stock cut serialize when ${first} locks the record first`,async sub => {
+            const id=await student(`Correct stock race ${first}`), date=first==='cut'?'2027-03-06':'2027-03-07';
+            const row=(await saveWorksheetEntries({enrollmentId:id,receiveDate:date,patternCode:'daily10',mainWorksheetNos:[1]})).records[0];
+            let reachedFirst,reachedSecond,release;
+            const firstLocked=new Promise(resolve=>{reachedFirst=resolve;}),secondAttempted=new Promise(resolve=>{reachedSecond=resolve;}),hold=new Promise(resolve=>{release=resolve;});
+            sub.mock.method(productionPool,'connect',async()=>{
+                const connection=await database.connect();
+                return {release:()=>connection.release(),async query(sql,params){
+                    const operation=sql.includes('ORDER BY worksheet_used_id FOR UPDATE')?'cut':sql.includes('FOR UPDATE OF wu')?'edit':null;
+                    if(operation && operation!==first) reachedSecond();
+                    const result=await connection.query(sql,params);
+                    if(operation===first){reachedFirst();await hold;}
+                    return result;
+                }};
+            });
+            const edit=()=>updateWorksheetEntryNumber({enrollmentId:id,worksheetUsedId:row.worksheetUsedId,worksheetNo:46,expectedWorksheetMasterId:row.worksheetMasterId,expectedActualWorksheetNo:1});
+            const cut=()=>processPendingDates('ws',[date]);
+            let one,two;
+            try {
+                one=first==='cut'?cut():edit(); one.catch(()=>{}); await firstLocked;
+                two=first==='cut'?edit():cut(); two.catch(()=>{}); await secondAttempted; release();
+                const results=await Promise.allSettled([one,two]);
+                assert.equal(results[0].status,'fulfilled');
+                if(first==='cut'){assert.equal(results[1].status,'rejected');assert.equal(results[1].reason.statusCode,409);}
+                else assert.equal(results[1].status,'fulfilled');
+                const current=(await database.query('SELECT * FROM kumon.worksheet_used WHERE worksheet_used_id=$1',[row.worksheetUsedId])).rows[0];
+                assert.equal(current.is_stock_processed,true);assert.equal(current.actual_worksheet_no,first==='cut'?1:46);
+            } finally {release();await Promise.allSettled([one,two].filter(Boolean));}
+        });
         await t.test('A summary failure really rolls back inserted WS rows in PostgreSQL', async (sub) => {
             const id = await student('WS failure');
             sub.mock.method(productionPool, 'connect', async () => {
@@ -338,6 +520,28 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.equal(attempts.length, 1); assert.equal(attempts[0].at_master_id, master.at_master_id);
             await saveAtCompletion({ ...payload, atUsedId: attempts[0].at_used_id, score: 2 });
             assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.at_used WHERE enrollment_id=$1', [id])).rows[0].n, 1);
+        });
+        await t.test('Passing AT starts the new level at packet 1 instead of the original enrollment packet', async () => {
+            const master = (await database.query(`SELECT am.at_master_id,lm.level_master_id,lm.next_level_master_id,wm.worksheet_master_id
+                FROM kumon.at_master am JOIN kumon.level_master lm ON lm.level_master_id=am.level_master_id
+                JOIN kumon.worksheet_master wm ON wm.level_master_id=lm.level_master_id AND wm.worksheet_no=101
+                WHERE am.subject_id=1 AND lm.next_level_master_id IS NOT NULL ORDER BY lm.level_master_id LIMIT 1`)).rows[0];
+            const id = await student('Pass begins packet one');
+            await database.query('UPDATE kumon.enrollment SET current_level_master_id=$2,starting_worksheet_master_id=$3 WHERE enrollment_id=$1', [id, master.level_master_id, master.worksheet_master_id]);
+            assert.equal((await getEnrollmentContext(id, 30)).defaults.mainWorksheetNo, 101);
+            const payload = { enrollmentId: id, atDate: '2026-10-30', score: 1, usedTime: 1, atGroup: 1, isPass: false,
+                expectedAtMasterId: master.at_master_id, expectedLevelMasterId: master.level_master_id };
+            const failed = await saveAtCompletion(payload);
+            assert.equal((await getEnrollmentContext(id, 30)).defaults.mainWorksheetNo, 101);
+            await saveAtCompletion({ ...payload, atUsedId: failed.atUsedId, isPass: true });
+            const advanced = await getEnrollmentContext(id, 30);
+            assert.equal(advanced.enrollment.currentLevelMasterId, master.next_level_master_id);
+            assert.equal(advanced.defaults.mainWorksheetNo, 1);
+            assert.equal(advanced.enrollment.startingWorksheetMasterId, master.worksheet_master_id);
+            await saveWorksheetEntries({ enrollmentId: id, receiveDate: '2026-10-31', patternCode: 'daily10', mainWorksheetNos: [31] });
+            assert.equal((await getEnrollmentContext(id, 30)).defaults.mainWorksheetNo, 31);
+            await saveAtCompletion({ ...payload, atUsedId: failed.atUsedId, isPass: true, score: 2 });
+            assert.equal((await getEnrollmentContext(id, 30)).defaults.mainWorksheetNo, 31);
         });
         await t.test('WS rechecks context after a real lock wait and rolls back both new and legacy requests', async sub => {
             const next = (await database.query('SELECT next_level_master_id FROM kumon.level_master WHERE level_master_id=$1', [ws.level_master_id])).rows[0].next_level_master_id;

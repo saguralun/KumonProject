@@ -118,7 +118,12 @@ export function renderHistory(container, rows, monthSummary) {
                                 </span>
                             </td>
                             <td>${escapeHtml(row.levelCode)}</td>
-                            <td><strong>${escapeHtml(row.worksheetLabel)}</strong></td>
+                            <td>${isUnprocessedStockRecord(row) && Number(row.actualWorksheetNo) > 0 ? `<label class="history-ws-editor">
+                                <span>${escapeHtml(row.levelCode)}</span><input type="number" required min="1" max="${row.worksheetType === 'ZUN' ? 100 : 200}" step="1"
+                                    class="history-ws-input" value="${escapeHtml(row.actualWorksheetNo)}"
+                                    data-edit-history-number-id="${escapeHtml(row.worksheetUsedId)}"
+                                    aria-label="แก้เลข WS ${escapeHtml(row.levelCode)} • ${escapeHtml(row.worksheetDate)}" title="แก้เลข WS แล้วกด Enter เพื่อบันทึก • Esc เพื่อยกเลิก">
+                                </label>` : `<strong>${escapeHtml(row.worksheetLabel)}</strong>`}</td>
                             <td>${escapeHtml(row.packetWorksheetNo)}</td>
                             <td>${renderFlag(row.cpws, "จริง", "auto")}</td>
                             <td>${renderFlag(row.isStockProcessed, "ตัดแล้ว", "ยัง")}</td>

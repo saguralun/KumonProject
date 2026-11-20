@@ -8,7 +8,7 @@
 // into cross-file imports. Fully self-contained — nothing here needs
 // anything from worksheet.js (the reverse isn't true: worksheet.js imports
 // plenty from here), so there's no circular import for this pairing.
-import { els, setStatus, state } from "./worksheetState.js";
+import { els, setStatus, state, isHistoryEditPending } from "./worksheetState.js";
 import {
     buildPreviewRecords,
     escapeHtml,
@@ -552,6 +552,7 @@ export function updatePreview() {
         state.context
         && !state.isSaving
         && !state.isLoadingContext
+        && !isHistoryEditPending()
         && els.receiveDate.value
         && mainReady
         && cdReady
@@ -714,7 +715,7 @@ export function updateSecondaryActions() {
     );
     const canUseMainCompleteButton = canUseAtButton || canUseFreeLevelButton;
 
-    els.completeWsLevel.disabled = !canUseMainCompleteButton || state.isCompletingLevel;
+    els.completeWsLevel.disabled = !canUseMainCompleteButton || state.isCompletingLevel || isHistoryEditPending();
     els.completeWsLevel.classList.toggle("hidden", !canUseMainCompleteButton);
     setActionButton(
         els.completeWsLevel,
@@ -726,7 +727,7 @@ export function updateSecondaryActions() {
         && context.completionState?.zunCompletion?.canComplete
     );
 
-    els.completeZunLevel.disabled = !canUseZunButton || state.isCompletingZun;
+    els.completeZunLevel.disabled = !canUseZunButton || state.isCompletingZun || isHistoryEditPending();
     els.completeZunLevel.classList.toggle("hidden", !canUseZunButton);
     setActionButton(els.completeZunLevel, "🎯", "จบ Zun");
 

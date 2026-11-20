@@ -1383,6 +1383,10 @@ html[data-role="staff"] [data-staff-up] {
   outline: none;
 }
 
+.history-ws-editor { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; }
+.history-ws-input { width: 68px; min-height: 28px; padding: 2px 5px; border: 1px solid #b7cffd; border-radius: 6px; background: #fff; color: var(--text); font: inherit; }
+.history-ws-input:focus { border-color: #2563eb; outline: 2px solid #bfdbfe; outline-offset: 1px; }
+
 .history-table tbody tr {
   transition: background-color var(--ease);
 }

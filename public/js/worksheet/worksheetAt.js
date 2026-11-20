@@ -19,9 +19,9 @@ function isCurrentContext(scope) {
     return state.context === scope.context && state.contextRequestId === scope.requestId && !state.isLoadingContext;
 }
 
-async function refreshCompletedContext(scope, enrollmentId) {
+async function refreshCompletedContext(scope, enrollmentId, { resetMainLevelMasterId = null } = {}) {
     if (!isCurrentContext(scope)) return false;
-    const refresh = loadEnrollmentContext(enrollmentId);
+    const refresh = loadEnrollmentContext(enrollmentId, { resetMainLevelMasterId });
     const requestId = state.contextRequestId;
     await refresh;
     // The loader catches its own failures. A successful refresh must replace
@@ -256,7 +256,10 @@ export async function saveAtCompletion(event) {
 
         if (!isCurrent()) return;
         els.atModal.classList.add("hidden");
-        if (!await refreshCompletedContext(scope, enrollmentId)) return;
+        const resetMainLevelMasterId = result.isPass && result.nextLevelMasterId
+            && Number(result.nextLevelMasterId) !== Number(scope.context.enrollment.currentLevelMasterId)
+            ? result.nextLevelMasterId : null;
+        if (!await refreshCompletedContext(scope, enrollmentId, { resetMainLevelMasterId })) return;
         setStatus(
             result.isPass
                 ? (result.nextLevelMasterId ? "บันทึก AT ผ่าน และเลื่อน level แล้ว" : "บันทึก AT ผ่านแล้ว")
@@ -333,7 +336,7 @@ export async function completeWorksheetLevelWithoutAt() {
             expectedMainLevelMasterId: completion.currentLevelMasterId
         });
 
-        if (!await refreshCompletedContext(scope, context.enrollment.enrollmentId)) return;
+        if (!await refreshCompletedContext(scope, context.enrollment.enrollmentId, { resetMainLevelMasterId: result.nextLevelMasterId })) return;
         setStatus(`จบ ${result.previousLevelCode} แล้ว และเปลี่ยนเป็น ${result.nextLevelCode}`, "success");
     } catch (error) {
         if (isCurrentContext(scope)) setStatus(error.message, "error");

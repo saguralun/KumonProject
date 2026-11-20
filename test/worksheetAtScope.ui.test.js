@@ -13,10 +13,79 @@ const context = id => ({ enrollment: { enrollmentId: id, studentName: `Student $
   completionState: { atCompletion: { canComplete: true, bypassWorksheet191: true, atMasterId: id * 100, maxScore: 100, maxTime: 10 },
     zunCompletion: { canComplete: true } } });
 const load = (page, id) => page.evaluate(async id => { await (await import('/js/worksheet/worksheet.js')).loadEnrollmentContext(id); }, id);
+
+for (const embedded of [false, true]) test(`New levels start at WS 1 after passing; failures, historical edits and final levels keep their inputs (${embedded ? 'desktop' : 'browser'})`, { ...ui, timeout: 35000 }, async () => {
+  let scenario = 'advance', completed = false;
+  const f = await controlFixture('worksheet', async (req, res) => {
+    if (req.path === '/worksheet/enrollments/1/context') {
+      const value = context(1);
+      const advanced = scenario === 'edit' || completed && ['advance', 'free'].includes(scenario);
+      value.enrollment.currentLevelMasterId = advanced ? 11 : 10;
+      value.enrollment.currentLevelCode = advanced ? 'D' : 'C';
+      value.worksheetOptions.main = [1, 101, 191].map(worksheetNo => ({ worksheetNo }));
+      value.worksheetOptions.zun = [1, 21].map(worksheetNo => ({ worksheetNo }));
+      value.defaults.zunWorksheetNo = 21;
+      if (scenario === 'edit') value.completionState.latestAtCompletion = { atUsedId: 77, atMasterId: 100, levelMasterId: 10,
+        levelCode: 'C', atDate: '2026-10-20', score: 80, usedTime: 5, atGroup: 1, isPass: true, maxScore: 100, maxTime: 10 };
+      if (scenario === 'free') {
+        value.completionState.atCompletion.canComplete = false;
+        value.completionState.freeLevelCompletion = { canComplete: true, currentLevelMasterId: 10, currentLevelCode: 'C', nextLevelCode: 'D' };
+      }
+      res.json(value); return true;
+    }
+    if (req.path.endsWith('/worksheet-summary')) { res.json({ success: true, worksheetMonthSummary: summary }); return true; }
+    if (['/worksheet/at-completion', '/worksheet/level-completion'].includes(req.path)) {
+      completed = true;
+      assert.equal(req.body.enrollmentId, 1);
+      if (scenario === 'edit') assert.equal(req.body.atUsedId, 77);
+      res.json({ success: true, enrollmentId: 1, levelMasterId: 10, isPass: scenario !== 'fail',
+        nextLevelMasterId: scenario === 'final' ? null : 11, previousLevelCode: 'C', nextLevelCode: 'D' }); return true;
+    }
+    return false;
+  }, { embedded });
+  try {
+    const { page } = f, main = page.locator('[data-ws-input][data-kind=main]').first();
+    for (const name of ['advance', 'fail', 'edit', 'final', 'free']) {
+      scenario = name; completed = false; await load(page, 1);
+      await page.waitForFunction(() => document.activeElement?.matches('[data-ws-input][data-kind=main]'));
+      assert.equal(await main.inputValue(), '101');
+      const zunBefore = await page.locator('[data-ws-input][data-kind=zun]').first().inputValue();
+      if (name === 'free') {
+        await page.evaluate(() => { void import('/js/worksheet/worksheetAt.js').then(at => at.completeWorksheetLevelWithoutAt()); });
+        await f.choose(true);
+      } else {
+        if (name === 'edit') await page.evaluate(async () => (await import('/js/worksheet/worksheetAt.js')).openAtModal({ editLatest: true }));
+        else await page.locator('#completeWsLevel').click();
+        await page.waitForFunction(() => document.activeElement?.id === 'atScore');
+        await page.locator('#atScore').fill('80'); await page.locator('#atTime').fill('5');
+        if (name === 'fail') await page.locator('[data-at-pass=false]').click();
+        await page.locator('#atSaveButton').click();
+      }
+      await page.waitForFunction(async () => {
+        const { state } = await import('/js/worksheet/worksheetState.js');
+        return !state.isLoadingContext && !state.isCompletingLevel && /บันทึก AT|จบ C แล้ว/.test(document.getElementById('statusLine').textContent)
+          && document.getElementById('atModal').classList.contains('hidden');
+      });
+      const observed = await page.evaluate(async () => {
+        const { state } = await import('/js/worksheet/worksheetState.js');
+        return { defaults: state.context.defaults, level: state.context.enrollment.currentLevelMasterId,
+          status: document.getElementById('statusLine').textContent };
+      });
+      assert.equal(await main.inputValue(), ['advance', 'free'].includes(name) ? '1' : '101', `${name}: ${JSON.stringify(observed)}`);
+      assert.equal(await page.locator('#receiveDate').inputValue(), '2026-10-30');
+      assert.equal(await page.locator('[data-ws-input][data-kind=zun]').first().inputValue(), zunBefore);
+      assert.equal(await page.evaluate(async () => (await import('/js/worksheet/worksheetState.js')).state.context.defaults.zunWorksheetNo), 21);
+    }
+    assert.equal(f.writes().length, 5); assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
 async function start(page, kind) {
   await load(page, 1);
+  await page.waitForFunction(() => document.activeElement?.matches('[data-ws-input][data-kind=main]'));
   if (kind === 'at') {
     await page.locator('#completeWsLevel').click();
+    await page.waitForFunction(() => document.activeElement?.id === 'atScore');
     await page.locator('#atScore').fill('80'); await page.locator('#atTime').fill('5');
     await page.locator('#atSaveButton').click();
   } else {

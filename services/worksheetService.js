@@ -788,6 +788,11 @@ async function getDefaultReceiveDate(enrollmentId) {
                 ORDER BY worksheet_date DESC, worksheet_used_id DESC
                 LIMIT 1
             ),
+            (
+                SELECT en_start_date
+                FROM ${TABLE_SCHEMA}.enrollment
+                WHERE enrollment_id = $1
+            ),
             CURRENT_DATE
         )::date AS default_receive_date
     `, [enrollmentId]);
@@ -831,7 +836,7 @@ async function getDefaultWorksheetNo({
 
     if (
         Number(enrollment.currentLevelMasterId) === Number(levelMasterId)
-        && optionNumbers.has(enrollment.startingWorksheetNo)
+        && options.some((option) => Number(option.worksheetMasterId) === Number(enrollment.startingWorksheetMasterId))
     ) {
         return enrollment.startingWorksheetNo;
     }
@@ -2445,6 +2450,52 @@ export async function deleteWorksheetEntry({
     } finally {
         client.release();
     }
+}
+
+export async function updateWorksheetEntryNumber({ enrollmentId, worksheetUsedId, worksheetNo, expectedWorksheetMasterId, expectedActualWorksheetNo }) {
+    const id = normalizeWorksheetNo(worksheetUsedId), owner = normalizeWorksheetNo(enrollmentId);
+    const number = normalizeWorksheetNo(worksheetNo), expectedMaster = normalizeWorksheetNo(expectedWorksheetMasterId);
+    const expectedNumber = normalizeWorksheetNo(expectedActualWorksheetNo);
+    if (!id || !owner || id > 2147483647 || owner > 2147483647 || !number || number > 200 || !expectedMaster || !expectedNumber) throw httpError(400, 'เลข WS หรือข้อมูลรายการไม่ถูกต้อง');
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        await lockEnrollmentRow(client, owner);
+        const found = await client.query(`SELECT wu.*, wm.level_master_id FROM ${TABLE_SCHEMA}.worksheet_used wu
+            JOIN ${TABLE_SCHEMA}.worksheet_master wm ON wm.worksheet_master_id=wu.worksheet_master_id
+            WHERE wu.worksheet_used_id=$1 AND wu.enrollment_id=$2 FOR UPDATE OF wu`, [id, owner]);
+        const row = found.rows[0];
+        if (!row) throw httpError(404, 'ไม่พบ worksheet record ของ enrollment นี้');
+        if (row.is_stock_processed !== false) throw httpError(409, 'แก้เลข WS ไม่ได้ เพราะรายการนี้ตัด stock แล้ว');
+        if (Number(row.worksheet_master_id) !== expectedMaster || Number(row.actual_worksheet_no) !== expectedNumber) {
+            throw httpError(409, 'เลข WS เปลี่ยนหลังเปิดรายการ กรุณาโหลดประวัติใหม่');
+        }
+        const packetNo = worksheetBaseNo(number) + 1;
+        const master = await client.query(`SELECT worksheet_master_id FROM ${TABLE_SCHEMA}.worksheet_master
+            WHERE level_master_id=$1 AND worksheet_no=$2`, [row.level_master_id, packetNo]);
+        if (master.rows.length !== 1) throw httpError(400, 'เลข WS อยู่นอกช่วงของเลเวลในรายการนี้');
+        // Keep the same record, date, level and physical-packet flag. Only its
+        // actual number and the corresponding stock packet are corrected.
+        const updated = await client.query(`WITH inserted AS (
+            UPDATE ${TABLE_SCHEMA}.worksheet_used SET worksheet_master_id=$3, actual_worksheet_no=$4
+            WHERE worksheet_used_id=$1 AND enrollment_id=$2 AND is_stock_processed=FALSE RETURNING *
+        ) ${buildReturningQuery()}`, [id, owner, master.rows[0].worksheet_master_id, number]);
+        if (updated.rows.length !== 1) throw httpError(409, 'รายการเปลี่ยนระหว่างแก้เลข WS กรุณาโหลดประวัติใหม่');
+        const raw = await getEnrollmentRow(owner, { client });
+        const enrollment = raw ? mapEnrollment(raw) : null;
+        const [completionState, worksheetProgress, worksheetPacketSummary] = enrollment
+            ? await readOnConnection(client, [() => getLevelCompletionState(enrollment, client),
+                () => getWorksheetProgress(enrollment, client), () => getWorksheetPacketSummary(enrollment, client)])
+            : [null, null, null];
+        const gradeSyncStatus = enrollment ? computeGradeSyncStatus({ subjectCode: enrollment.subjectCode,
+            schoolGradeClass: enrollment.schoolGradeClass, currentLevelCode: enrollment.currentLevelCode,
+            progressPercent: worksheetProgress?.main?.percent }) : null;
+        const response = { success: true, entry: mapHistoryRow(updated.rows[0]), worksheetUsedId: id,
+            completionState, worksheetProgress, worksheetPacketSummary, gradeSyncStatus };
+        await client.query('COMMIT');
+        return response;
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
 }
 
 export async function updateWorksheetEntryDate({
