@@ -3,6 +3,7 @@ import { httpError } from "./httpError.js";
 import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
 import { normalizeKumonStudentId } from "./kumonStudentId.js";
 import { specialStatusForStartDate, canCorrectEnrollmentDateStatus } from '../public/js/enrollmentDateStatus.js';
+import { waitForSpecialStatusPreparation } from './specialStatusCatalogService.js';
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
@@ -411,6 +412,7 @@ async function assertEnrollmentMasters(client, data) {
 }
 
 export async function getStudentMasters() {
+    const specialStatusPreparation = await waitForSpecialStatusPreparation();
     const supportsScheduleActive = await hasOpeningScheduleActiveColumn();
     const scheduleActiveSelect = supportsScheduleActive
         ? "os.is_active"
@@ -531,6 +533,7 @@ export async function getStudentMasters() {
             levelMasterId: row.level_master_id,
             worksheetNo: row.worksheet_no
         })),
+        specialStatusCatalogError: specialStatusPreparation?.error || null,
         statuses: statuses.rows.map((row) => ({
             id: row.status_id,
             code: row.status_code,

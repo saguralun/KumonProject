@@ -39,9 +39,9 @@ import {
     populateStudentStrip,
     queueSearch,
     renderSearchResults,
+    runSearch,
     selectSearchResult,
     selectStudentSearchText,
-    setSearchMode,
     setSubjectFilter
 } from "./worksheetSearch.js";
 import {
@@ -446,14 +446,6 @@ function bindEvents() {
         }
     });
 
-    els.searchMode.addEventListener("click", (event) => {
-        const button = event.target.closest("[data-mode]");
-
-        if (button) {
-            setSearchMode(button.dataset.mode);
-        }
-    });
-
     els.studentSearch.addEventListener("input", () => {
         state.hasConfirmedSelection = false;
         queueSearch();
@@ -485,7 +477,7 @@ function bindEvents() {
         }
     });
     els.studentSearch.addEventListener("click", selectStudentSearchText);
-    els.studentSearch.addEventListener("keydown", (event) => {
+    els.studentSearch.addEventListener("keydown", async (event) => {
         if (event.key === "ArrowDown") {
             event.preventDefault();
             state.activeResultIndex = Math.min(
@@ -503,6 +495,10 @@ function bindEvents() {
 
         if (event.key === "Enter") {
             event.preventDefault();
+            if (!state.searchResults.length) {
+                window.clearTimeout(state.searchTimer);
+                if (!await runSearch()) return;
+            }
             selectSearchResult(state.activeResultIndex >= 0 ? state.activeResultIndex : 0);
         }
     });

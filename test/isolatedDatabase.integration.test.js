@@ -9,13 +9,15 @@ import { execFile } from 'node:child_process';
 import pg from 'pg';
 import productionPool from '../config/db.js';
 import { receiveReceiptPayment, cancelReceiptPayment, previewReceipt, getPaymentStatus } from '../services/paymentService.js';
-import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel, getEnrollmentContext, deleteWorksheetEntry, updateWorksheetEntryNumber } from '../services/worksheetService.js';
+import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel, getEnrollmentContext, deleteWorksheetEntry, updateWorksheetEntryNumber, searchEnrollments } from '../services/worksheetService.js';
 import { createDeliveryOrder, processDeliveryOrder } from '../services/stockReceiveService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
 import { applyEnrollmentStatusAction, searchStudents, updateEnrollment, createEnrollment, getStudentProfile } from '../services/studentService.js';
 import { paymentDatabaseStatus } from '../services/databaseStatusService.js';
 import { setAccountActive, updateAccountRole } from '../services/authService.js';
+import { ensureFrghStatus } from '../services/specialStatusCatalogService.js';
+import { buildMonthlyReport } from '../services/reportService.js';
 
 const run = promisify(execFile);
 const enabled = process.platform === 'win32' && process.env.TEST_ISOLATED_PG === '1';
@@ -79,6 +81,26 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
                 for (const row of original) await database.query('UPDATE kumon.app_user SET is_active=$2 WHERE user_id=$1', [row.user_id, row.is_active]);
             }
         });
+        await t.test('FRGH catalog preparation skips existing centers, backs up missing data once and preserves a center-owned ID', async () => {
+            const schemaSql="SELECT table_name,column_name,data_type FROM information_schema.columns WHERE table_schema='kumon' ORDER BY table_name,ordinal_position";
+            const schemaBefore=(await database.query(schemaSql)).rows;
+            assert.equal((await ensureFrghStatus({database,backup:()=>assert.fail('Existing FRGH must not back up')})).added,false);
+            await database.query("DELETE FROM kumon.status_master WHERE status_code='FRGH'");
+            const before=(await database.query('SELECT * FROM kumon.status_master ORDER BY status_id')).rows;
+            await assert.rejects(ensureFrghStatus({database,backup:async()=>{throw Error('fixture backup failed');}}),/fixture backup failed/);
+            assert.deepEqual((await database.query('SELECT * FROM kumon.status_master ORDER BY status_id')).rows,before);
+            await database.query("INSERT INTO kumon.status_master VALUES(15,'CENTER','Center custom status',2)");
+            let backups=0;
+            const backup=async()=>{
+                backups++;assert.equal((await database.query("SELECT COUNT(*)::int AS n FROM kumon.status_master WHERE status_code='FRGH'")).rows[0].n,0);
+                return {filename:'isolated-frgh.backup',sizeBytes:100};
+            };
+            const prepared=await Promise.all([ensureFrghStatus({database,backup}),ensureFrghStatus({database,backup})]);
+            assert.equal(backups,1);assert.equal(prepared.filter(r=>r.added).length,1);
+            assert.ok(prepared.every(r=>r.statusId===16));
+            assert.equal((await database.query('SELECT status_code FROM kumon.status_master WHERE status_id=15')).rows[0].status_code,'CENTER');
+            assert.deepEqual((await database.query(schemaSql)).rows,schemaBefore);
+        });
         const statuses = new Map((await database.query('SELECT status_code,status_id FROM kumon.status_master')).rows.map((row) => [row.status_code, row.status_id]));
         const ws = (await database.query(`SELECT wm.worksheet_master_id,wm.worksheet_no,wm.level_master_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id WHERE lm.subject_id=1 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1`)).rows[0];
         async function student(name) {
@@ -93,6 +115,36 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
                 currentStatusGroup2Id: row.current_status_group2_id, kumonStudentId: row.kumon_student_id, isKumonConnect: row.is_kumon_connect,
                 openingScheduleId1: row.opening_schedule_id1, openingScheduleId2: row.opening_schedule_id2, remark: row.remark };
         }
+        await t.test('Unified WS search finds IDs, names and nicknames together, ranks exact IDs first, and preserves subject/status filters', async () => {
+            const searchStudent = async (name, id) => {
+                const temporary = await student(name);
+                await database.query(`WITH moved AS (DELETE FROM kumon.enrollment WHERE enrollment_id=$1 RETURNING *)
+                    INSERT INTO kumon.enrollment(enrollment_id,student_id,subject_id,current_level_master_id,starting_worksheet_master_id,en_start_date,current_status_group1_id)
+                    OVERRIDING SYSTEM VALUE SELECT $2,student_id,subject_id,current_level_master_id,starting_worksheet_master_id,en_start_date,current_status_group1_id FROM moved`,[temporary,id]);
+            };
+            await searchStudent('ค้นรวม ไทย',500001);
+            await searchStudent('ค้นรวม ก',5000011);
+            const named = await student('Akira500001'), nicknamed = await student('ค้นรวม ชื่อเล่น');
+            await database.query("UPDATE kumon.student SET nickname='น้อง500001' WHERE student_id=(SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1)", [nicknamed]);
+            const inactive = await student('Inactive500001');
+            await database.query('UPDATE kumon.enrollment SET current_status_group1_id=$2 WHERE enrollment_id=$1', [inactive,statuses.get('A')]);
+            const rows = await searchEnrollments({ query:'500001',limit:30 });
+            assert.deepEqual(rows.slice(0,2).map(r=>r.enrollmentId),[500001,5000011]);
+            assert.deepEqual(new Set(rows.map(r=>r.enrollmentId)),new Set([500001,5000011,named,nicknamed]));
+            assert.equal((await searchEnrollments({query:'#500001'}))[0].enrollmentId,500001);
+            assert.equal((await searchEnrollments({query:'Akira500001'}))[0].enrollmentId,named);
+            assert.equal((await searchEnrollments({query:'น้อง500001'}))[0].enrollmentId,nicknamed);
+            assert.equal((await searchEnrollments({query:'ค้นรวม ไทย Test'}))[0].enrollmentId,500001);
+            const efl = (await database.query('SELECT wm.worksheet_master_id,wm.level_master_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id WHERE lm.subject_id=2 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1')).rows[0];
+            const person=(await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=500001')).rows[0].student_id;
+            const added = await createEnrollment(person,{...await enrollmentPayloadFor(500001),subjectId:2,currentLevelMasterId:efl.level_master_id,startingWorksheetMasterId:efl.worksheet_master_id});
+            assert.deepEqual((await searchEnrollments({query:'ค้นรวม ไทย',subject:'EFL'})).map(r=>r.enrollmentId),[added.enrollmentId]);
+            assert.ok((await searchEnrollments({query:'ค้นรวม',subject:'ME'})).every(r=>r.subjectCode==='ME'));
+            assert.deepEqual((await searchEnrollments({query:'500001',mode:'id'})).map(r=>r.enrollmentId),[500001,5000011]);
+            assert.deepEqual(new Set((await searchEnrollments({query:'500001',mode:'name'})).map(r=>r.enrollmentId)),new Set([named,nicknamed]));
+            assert.deepEqual(await searchEnrollments({query:"' OR 1=1--"}),[]);
+            assert.equal((await searchEnrollments({query:'',limit:2})).length,2);
+        });
         await t.test('Unused enrollment corrections sync H/FSH and preserve exemptions on the unchanged schema', async () => {
             const schemaSql = "SELECT table_name,column_name,data_type,is_nullable FROM information_schema.columns WHERE table_schema='kumon' ORDER BY table_name,ordinal_position";
             const schemaBefore = (await database.query(schemaSql)).rows;
@@ -263,6 +315,40 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             }
             const recent = (await searchStudents({ query: 'Directory absence', status: 'absent' }))[0].enrollments.find(e => e.enrollmentId === id);
             assert.deepEqual([recent.absenceSinceMonth, recent.absenceSinceYear], [10, 2026]);
+        });
+        await t.test('FRGH halves tuition and additional fees, waives registration, survives Report/receipt snapshots and restores on cancellation', async () => {
+            const center=(await database.query('SELECT * FROM kumon.center_master ORDER BY center_id LIMIT 1')).rows[0];
+            const grade=(await database.query('SELECT school_grade_id FROM kumon.school_grade_master WHERE addition_fee=TRUE ORDER BY school_grade_id LIMIT 1')).rows[0];
+            for(const code of ['FRGH','FRG','H','FSH','FS','F','P']){
+                const id=await student(`Fee ${code}`);
+                const person=(await database.query('SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1',[id])).rows[0].student_id;
+                await database.query('UPDATE kumon.student SET school_grade_id=$2 WHERE student_id=$1',[person,grade.school_grade_id]);
+                await database.query("UPDATE kumon.enrollment SET en_start_date='2026-11-15',current_status_group2_id=$2 WHERE enrollment_id=$1",[id,statuses.get(code)]);
+                const payload={enrollmentId:id,billingDate:'2026-11-15',billingMonth:11,billingYear:2026};
+                const draft=(await previewReceipt(payload)).receipt,detail=draft.receiptDetails[0];
+                const free=['F','FS','FSH'].includes(code),half=['H','FSH','FRGH'].includes(code),waived=['FRG','FRGH'].includes(code);
+                const tuition=free?0:Number(center.full_tuition)/(half?2:1),additional=free?0:Number(center.addition_full_tuition)/(half?2:1);
+                assert.equal(detail.tuitionFee,tuition,code);assert.equal(detail.additionalFee,additional,code);
+                assert.equal(detail.registrationFee,Number(center.registration_fee),code);
+                assert.equal(detail.discountAmount,waived?Number(center.registration_fee):0,code);
+                assert.equal(detail.netAmount,tuition+additional+(waived?0:Number(center.registration_fee)),code);
+                if(code!=='FRGH')continue;
+                const status=await getPaymentStatus({billingMonth:11,billingYear:2026,status:'unpaid'});
+                assert.equal(Number(status.rows.find(r=>r.studentId===person).expectedNetAmount),tuition+additional);
+                const paid=await receiveReceiptPayment(payload);
+                const stored=(await database.query('SELECT * FROM kumon.billing_detail WHERE billing_id=$1',[paid.billingId])).rows[0];
+                assert.equal(stored.status_group2_id,statuses.get('FRGH'));assert.equal(Number(stored.net_amount),detail.netAmount);
+                const record=(await buildMonthlyReport({month:11,year:2026})).find(r=>r.ID===id);
+                assert.equal(record.Status2,'FRGH');assert.equal(record.FreeEnrolment,'True');
+                await updateEnrollment(person,id,{...await enrollmentPayloadFor(id),currentStatusGroup1Id:statuses.get('C'),enStartDate:'2026-11-15'});
+                assert.deepEqual((await database.query('SELECT * FROM kumon.billing_detail WHERE billing_id=$1',[paid.billingId])).rows[0],stored);
+                // Cancel another unchanged FRGH receipt to verify exact status restoration.
+                const second=await student('FRGH cancel');
+                await database.query("UPDATE kumon.enrollment SET en_start_date='2026-11-15',current_status_group2_id=$2 WHERE enrollment_id=$1",[second,statuses.get('FRGH')]);
+                const receipt=await receiveReceiptPayment({...payload,enrollmentId:second});await cancelReceiptPayment({billingId:receipt.billingId});
+                const restored=(await database.query('SELECT current_status_group1_id,current_status_group2_id FROM kumon.enrollment WHERE enrollment_id=$1',[second])).rows[0];
+                assert.equal(restored.current_status_group1_id,statuses.get('N'));assert.equal(restored.current_status_group2_id,statuses.get('FRGH'));
+            }
         });
         await t.test('Paying two of three subjects commits exactly two details and leaves the third for a second receipt', async () => {
             const id = await student('Partial three');

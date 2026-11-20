@@ -1164,7 +1164,7 @@ export async function buildMonthlyReport({ month, year }) {
             ชื่อเล่น: row.nickname || "",
             Subject: row.subject_code || "",
             FreeStudy: boolText(status2Code === "FS"),
-            FreeEnrolment: boolText(status2Code === "FRG"),
+            FreeEnrolment: boolText(["FRG", "FRGH"].includes(status2Code)),
             PrevLevel: levelSnapshot
                 ? packetLabel(levelSnapshot.prev_level_code, displayWorksheetNo(levelSnapshot.prev_worksheet_no))
                 : "",

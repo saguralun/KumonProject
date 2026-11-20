@@ -219,5 +219,5 @@ export function isHalfMonthStatusId(statusId) {
         Number(row.id) === Number(statusId)
     );
 
-    return ["H", "FSH"].includes(status?.code);
+    return ["H", "FSH", "FRGH"].includes(status?.code);
 }

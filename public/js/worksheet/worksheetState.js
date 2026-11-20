@@ -7,7 +7,6 @@
 // when everything lived in one file.
 export const els = {
     subjectButtons: document.getElementById("subjectButtons"),
-    searchMode: document.getElementById("searchMode"),
     studentSearch: document.getElementById("studentSearch"),
     searchResults: document.getElementById("searchResults"),
     statusLine: document.getElementById("statusLine"),
@@ -64,7 +63,6 @@ export const els = {
 
 export const state = {
     subjectFilter: "ALL",
-    searchMode: "id",
     searchResults: [],
     activeResultIndex: -1,
     searchRequestId: 0,

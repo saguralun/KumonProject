@@ -147,6 +147,17 @@ restart-helper test, not necessary for this suite's application regression check
   Browser/Electron tests cover retry, duplicate submission, processed rows,
   late responses and failed history refresh. Disposable PostgreSQL tests cover
   stale snapshots, Zun bounds, rollback and both stock-cut/edit lock orders.
+  WS search uses one ID/name/nickname field, with exact IDs ahead of ID prefixes
+  and numeric names. Browser/Electron checks cover immediate Enter, subject
+  filters, responsive layout and obsolete responses; disposable PostgreSQL
+  tests cover ranking, Thai/full names, nicknames and legacy search modes.
+  FRGH combines half tuition/additional fees with free registration. Catalog
+  startup checks only this status, backs up before inserting a missing row,
+  preserves existing IDs/labels and leaves schema repair retired. Tests cover
+  missing/existing centers, occupied IDs, backup failure and concurrent starts;
+  receipts retain fee/status snapshots, Report marks free registration and
+  unchanged receipt cancellation restores FRGH. Browser/Electron checks cover
+  Add Subject and N/EO corrections with FRG/FRGH date alignment.
 
 - KSIS roster previews separate ID-less children by exact name and DOB, merge
   only repeated copies of that identity, and show missing IDs as neutral info.

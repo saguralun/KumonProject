@@ -29,10 +29,9 @@
   .enrollment-panel .enrollment-tab[data-status]:hover:not(:disabled) { background: var(--tab-tint); border-color: var(--tab-ink); }
   .enrollment-panel[data-subject] .panel-header .subtle { color: var(--subject-ink); }
 
-  /* Two bounded groups prevent subject filters and search modes blending. */
-  :root .worksheet-page .workspace-subjects, :root .worksheet-page .search-mode { padding: 6px; border: 1px solid #d1dce8; border-radius: 9px; gap: 4px; }
+  /* Keep subject filters distinct from the unified student search. */
+  :root .worksheet-page .workspace-subjects { padding: 6px; border: 1px solid #d1dce8; border-radius: 9px; gap: 4px; }
   :root .worksheet-page .workspace-subjects { background: #f1f5f9; }
-  :root .worksheet-page .search-mode { background: #f0f2ff; border-color: #d8dcf2; }
   .search-group-label { grid-column: 1 / -1; font-size: 10px; font-weight: 700; color: #526174; line-height: 1.2; padding: 0 2px 2px; }
   :root .worksheet-page .subject-button[data-subject]:not([data-subject="ALL"]) { color: var(--subject-ink); border-color: var(--subject-border); background: #fff; }
   :root .worksheet-page .subject-button[data-subject]:not([data-subject="ALL"]):hover:not(:disabled),

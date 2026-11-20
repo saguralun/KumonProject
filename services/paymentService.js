@@ -120,12 +120,12 @@ const paymentStatusCte = `
                     WHEN status2.status_code IN ('F', 'FS', 'FSH') THEN 0
                     ELSE
                         CASE
-                            WHEN status2.status_code IN ('H', 'FSH') THEN center.full_tuition / 2
+                            WHEN status2.status_code IN ('H', 'FSH', 'FRGH') THEN center.full_tuition / 2
                             ELSE center.full_tuition
                         END
                         + CASE
                             WHEN COALESCE(grade.addition_fee, false) = false THEN 0
-                            WHEN status2.status_code IN ('H', 'FSH') THEN center.addition_full_tuition / 2
+                            WHEN status2.status_code IN ('H', 'FSH', 'FRGH') THEN center.addition_full_tuition / 2
                             ELSE center.addition_full_tuition
                         END
                 END::numeric AS expected_net_amount,
@@ -601,9 +601,9 @@ function calculateReceiptDetailFee({
     const statusGroup1Code = enrollment.statusGroup1Code || null;
     const statusGroup2Code = enrollment.statusGroup2Code || null;
     const isFree = ["F", "FS", "FSH"].includes(statusGroup2Code);
-    const isHalfMonth = ["H", "FSH"].includes(statusGroup2Code);
+    const isHalfMonth = ["H", "FSH", "FRGH"].includes(statusGroup2Code);
     const isNewEnrollment = statusGroup1Code === "N";
-    const isFreeRegistration = statusGroup2Code === "FRG";
+    const isFreeRegistration = ["FRG", "FRGH"].includes(statusGroup2Code);
     const registrationFee = isNewEnrollment ? fullRegistrationFee : 0;
     const registrationDiscount = isNewEnrollment && isFreeRegistration ? fullRegistrationFee : 0;
 

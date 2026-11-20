@@ -1338,6 +1338,7 @@ async function init() {
         } else {
             startNewStudent();
         }
+        if (state.masters.specialStatusCatalogError) setStatus(state.masters.specialStatusCatalogError, 'error');
     } catch (error) {
         setStatus(error.message, "error");
     }

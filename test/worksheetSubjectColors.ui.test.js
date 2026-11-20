@@ -104,17 +104,15 @@ test("WS progress and packet bars follow ME/EFL/TRP on subject and Main/Zun swit
         await page.locator("#studentSubjectSelect").selectOption("1");
         await page.waitForFunction(() => document.querySelector(".worksheet-page").dataset.wsSubject === "ME");
         assert.equal(await page.locator(".worksheet-progress-bar").evaluate((element) => getComputedStyle(element).stroke), palette.ME.stroke);
-        const searchMode = page.locator('[data-mode="name"]');
-        await searchMode.click();
+        assert.equal(await page.locator('#searchMode').count(), 0);
         for (const subject of ['EFL', 'TRP', 'ME', 'ALL']) {
             await page.locator(`#subjectButtons [data-subject="${subject}"]`).click();
-            assert.equal(await searchMode.getAttribute('aria-pressed'), 'true');
             assert.equal(await page.locator(`#subjectButtons [data-subject="${subject}"]`).getAttribute('aria-pressed'), 'true');
             const { state } = await page.evaluate(async () => {
                 const { state } = await import('/js/worksheet/worksheetState.js');
-                return { state: { subjectFilter: state.subjectFilter, searchMode: state.searchMode, enrollmentId: state.context.enrollment.enrollmentId } };
+                return { state: { subjectFilter: state.subjectFilter, enrollmentId: state.context.enrollment.enrollmentId } };
             });
-            assert.deepEqual(state, { subjectFilter: subject, searchMode: 'name', enrollmentId: 1 });
+            assert.deepEqual(state, { subjectFilter: subject, enrollmentId: 1 });
         }
         await page.locator('#findIncompleteWs').click();
         const table = page.locator('#incompleteWsTableWrap');

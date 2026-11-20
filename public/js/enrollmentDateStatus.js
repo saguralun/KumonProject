@@ -12,8 +12,9 @@ export function specialStatusForStartDate(code, dateText) {
     const day = Number(String(dateText || '').slice(8, 10));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText || '') || day < 1 || day > 31) return code;
     if (day >= 11 && day <= 20) {
+        if (code === 'FRG' || code === 'FRGH') return 'FRGH';
         if (code === 'FS' || code === 'FSH') return 'FSH';
         return !code || code === 'H' ? 'H' : code;
     }
-    return code === 'H' ? '' : code === 'FSH' ? 'FS' : code;
+    return code === 'H' ? '' : code === 'FSH' ? 'FS' : code === 'FRGH' ? 'FRG' : code;
 }

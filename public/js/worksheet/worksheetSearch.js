@@ -36,29 +36,35 @@ export function renderSearchResults() {
 export async function runSearch() {
     const requestId = state.searchRequestId + 1;
     state.searchRequestId = requestId;
+    const query = els.studentSearch.value, subject = state.subjectFilter;
+    const isCurrent = () => requestId === state.searchRequestId && query === els.studentSearch.value && subject === state.subjectFilter;
 
     try {
         const data = await worksheetApi.searchEnrollments({
-            query: els.studentSearch.value,
-            mode: state.searchMode,
-            subject: state.subjectFilter,
+            query,
+            subject,
             limit: 30
         });
 
-        if (requestId !== state.searchRequestId) {
+        if (!isCurrent()) {
             return;
         }
 
         state.searchResults = data.rows || [];
         state.activeResultIndex = state.searchResults.length ? 0 : -1;
         renderSearchResults();
+        return true;
     } catch (error) {
-        setStatus(error.message, "error");
+        if (isCurrent()) setStatus(error.message, "error");
     }
 }
 
 export function queueSearch() {
     window.clearTimeout(state.searchTimer);
+    state.searchRequestId++;
+    state.searchResults = [];
+    state.activeResultIndex = -1;
+    els.searchResults.classList.add('hidden');
     state.searchTimer = window.setTimeout(runSearch, 140);
 }
 
@@ -76,6 +82,8 @@ export async function selectSearchResult(index) {
     if (!row) {
         return;
     }
+    window.clearTimeout(state.searchTimer);
+    state.searchRequestId++;
 
     els.studentSearch.value = `#${row.enrollmentId} ${row.studentName}`;
     els.searchResults.classList.add("hidden");
@@ -91,19 +99,6 @@ export function setSubjectFilter(subject) {
     queueSearch();
     els.studentSearch.focus();
     selectStudentSearchText();
-}
-
-export function setSearchMode(mode) {
-    state.searchMode = mode;
-    els.searchMode.querySelectorAll(".mode-button").forEach((button) => {
-        button.classList.toggle("active", button.dataset.mode === mode);
-        button.setAttribute("aria-pressed", String(button.dataset.mode === mode));
-    });
-    els.studentSearch.placeholder = mode === "id"
-        ? "Enrollment ID"
-        : "ชื่อเด็ก";
-    els.studentSearch.select();
-    queueSearch();
 }
 
 export function populateStudentStrip(context) {

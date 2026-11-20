@@ -13,7 +13,8 @@ for (const embedded of [false, true]) test(`Used N/EO date and special-status co
         statusGroup1Code: ['N', 'EO', 'C'][index], statusGroup1Name: ['New', 'Enrolling Other', 'Continue'][index], currentStatusGroup2Id: null }));
     const masters = { subjects, prefixes: [{ id: 1, name: 'ด.ช.' }], genders: [], grades: [], schedules: [], studentHints: {}, addressRows: [],
         statuses: [{ id: 1, code: 'N', group: 1 }, { id: 2, code: 'EO', group: 1 }, { id: 3, code: 'C', group: 1 },
-            { id: 9, code: 'F', group: 2 }, { id: 11, code: 'H', group: 2 }, { id: 12, code: 'FS', group: 2 }, { id: 13, code: 'FSH', group: 2 }],
+            { id: 9, code: 'F', group: 2 }, { id: 11, code: 'H', group: 2 }, { id: 12, code: 'FS', group: 2 }, { id: 13, code: 'FSH', group: 2 },
+            { id: 14, code: 'FRG', group: 2 }, { id: 15, code: 'FRGH', group: 2 }],
         levels: subjects.map(s => ({ id: s.id, subjectId: s.id, code: 'A', type: 1 })),
         worksheets: subjects.map(s => ({ id: s.id * 10, levelMasterId: s.id, worksheetNo: 1 })) };
     let rejectNext = true;
@@ -40,6 +41,9 @@ for (const embedded of [false, true]) test(`Used N/EO date and special-status co
             assert.equal(await form.locator('[name=enStartDate]').isEnabled(), true);
             assert.equal(await form.locator('[name=currentStatusGroup2Id]').isEnabled(), true);
             assert.equal(await page.locator('#deleteEnrollmentButton').isVisible(), false);
+            await form.locator('[name=currentStatusGroup2Id]').selectOption('15');
+            assert.equal(await form.locator('[name=enStartDate]').inputValue(),'2026-11-11');
+            await form.locator('[name=currentStatusGroup2Id]').selectOption('');
             await form.locator('[name=enStartDate]').fill('2026-11-15');
             assert.equal(await form.locator('[name=currentStatusGroup2Id]').inputValue(), '11');
             if (id === 10) {
@@ -58,6 +62,13 @@ for (const embedded of [false, true]) test(`Used N/EO date and special-status co
             await form.locator('[name=currentStatusGroup2Id]').selectOption('9');
             await form.locator('[name=enStartDate]').fill('2026-11-17');
             assert.equal(await form.locator('[name=currentStatusGroup2Id]').inputValue(), '9');
+            await form.locator('[name=currentStatusGroup2Id]').selectOption('15');
+            await form.locator('[name=enStartDate]').fill('2026-11-21');
+            assert.equal(await form.locator('[name=currentStatusGroup2Id]').inputValue(),'14');
+            await form.locator('[name=enStartDate]').fill('2026-11-15');
+            assert.equal(await form.locator('[name=currentStatusGroup2Id]').inputValue(),'15');
+            await form.locator('[name=currentStatusGroup2Id]').selectOption('9');
+            await form.locator('[name=enStartDate]').fill('2026-11-17');
             await page.locator('#saveEnrollmentButton').click();
             await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('บันทึก enrollment แล้ว') && !document.getElementById('saveEnrollmentButton').disabled);
             await page.reload(); await page.locator('[data-student-id="1"]').click();
@@ -86,7 +97,8 @@ for (const embedded of [false, true]) test(`Unused enrollments can be corrected,
         currentStatusGroup1Id: s.id === 1 ? 1 : 3, statusGroup1Code: s.id === 1 ? 'N' : 'C', statusGroup1Name: 'Active', currentStatusGroup2Id: null }));
     const masters = { subjects, prefixes: [{ id: 1, name: 'ด.ช.' }], genders: [], grades: [],
         statuses: [{ id: 1, code: 'N', group: 1 }, { id: 2, code: 'EO', group: 1 }, { id: 3, code: 'C', group: 1 },
-            { id: 9, code: 'F', group: 2 }, { id: 11, code: 'H', group: 2 }, { id: 12, code: 'FS', group: 2 }, { id: 13, code: 'FSH', group: 2 }],
+            { id: 9, code: 'F', group: 2 }, { id: 11, code: 'H', group: 2 }, { id: 12, code: 'FS', group: 2 }, { id: 13, code: 'FSH', group: 2 },
+            { id: 14, code: 'FRG', group: 2 }, { id: 15, code: 'FRGH', group: 2 }],
         levels: [...subjects.map(s => ({ id: s.id, subjectId: s.id, code: 'A', type: 1 })), { id: 90, subjectId: 1, code: 'ZI', type: 2 }, { id: 91, subjectId: 1, code: 'ZII', type: 2 }],
         worksheets: subjects.map(s => ({ id: s.id * 10, levelMasterId: s.id, worksheetNo: 1 })),
         dtMasters: [{ id: 3, subjectId: 3, testLevel: 'A', maxScore: 100, maxTime: 30 }], dtResults: [{ dtMasterId: 3, worksheetMasterId: 30 }],
@@ -168,6 +180,8 @@ for (const embedded of [false, true]) test(`Unused enrollments can be corrected,
         await add.locator('[name=dtMasterId]').selectOption('3');
         await add.locator('[name=dtDate]').fill('2026-11-01');
         await add.locator('[name=enStartDate]').fill('2026-11-15');
+        assert.equal(await add.locator('[name=currentStatusGroup2Id]').inputValue(),'11');
+        await add.locator('[name=currentStatusGroup2Id]').selectOption('15');
         await add.locator('[name=score]').fill('90'); await add.locator('[name=usedTime]').fill('10');
         assert.deepEqual(await add.locator('[name=currentZunLevelMasterId] option').allTextContents(), ['No Zun', 'ZI', 'ZII']);
         await add.locator('[name=currentZunLevelMasterId]').selectOption('90');
@@ -175,7 +189,7 @@ for (const embedded of [false, true]) test(`Unused enrollments can be corrected,
         await page.locator('#addEnrollmentSave').click();
         await page.waitForFunction(() => document.querySelector('#enrollmentForm [name=enrollmentId]').value === '30');
         assert.equal(await form.locator('[name=currentZunLevelMasterId]').inputValue(), '90');
-        assert.equal(await form.locator('[name=currentStatusGroup2Id]').inputValue(), '11');
+        assert.equal(await form.locator('[name=currentStatusGroup2Id]').inputValue(), '15');
         assert.equal(await form.locator('[name=enStartDate]').isEnabled(), true);
         assert.equal(f.writes().length, 5); assert.deepEqual(f.errors, []);
     } finally { await f.close(); }

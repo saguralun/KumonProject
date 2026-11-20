@@ -339,20 +339,6 @@ h1 {
   padding: 6px;
 }
 
-.search-mode {
-  display: grid;
-  grid-template-columns: repeat(2, 64px);
-  gap: 5px;
-}
-
-.mode-button {
-  min-height: 31px;
-  border-radius: 7px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.mode-button.active,
 .pattern-button.active {
   border-color: #a9c6ff;
   background: var(--blue-soft);
@@ -1731,14 +1717,6 @@ html[data-role="staff"] [data-staff-up] {
   .worksheet-pair-row,
   .input-layout {
     grid-template-columns: 1fr;
-  }
-
-  .search-mode {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .mode-button {
-    min-height: 40px;
   }
 
   .pattern-buttons {

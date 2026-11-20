@@ -25,7 +25,14 @@ test('Start Date uses H on days 11–20 and clears H outside that window', () =>
 test('Date changes keep explicit exemptions and map free-study half months both ways', () => {
     assert.equal(specialStatusForStartDate('FS', '2026-11-15'), 'FSH');
     assert.equal(specialStatusForStartDate('FSH', '2026-11-21'), 'FS');
-    for (const code of ['F', 'P', 'FRG']) for (const day of ['01', '15', '21']) {
+    for (const code of ['F', 'P']) for (const day of ['01', '15', '21']) {
         assert.equal(specialStatusForStartDate(code, `2026-11-${day}`), code);
     }
+});
+
+test('FRG/FRGH follow the half-month date while retaining free registration', () => {
+    assert.equal(specialStatusForStartDate('FRG','2026-11-15'),'FRGH');
+    assert.equal(specialStatusForStartDate('FRGH','2026-11-20'),'FRGH');
+    assert.equal(specialStatusForStartDate('FRGH','2026-11-01'),'FRG');
+    assert.equal(specialStatusForStartDate('FRGH','2026-11-21'),'FRG');
 });

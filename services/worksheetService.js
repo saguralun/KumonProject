@@ -220,9 +220,8 @@ function normalizeSubjectCode(value) {
 }
 
 function normalizeSearchMode(value) {
-    return String(value || "id").toLowerCase() === "name"
-        ? "name"
-        : "id";
+    const mode = String(value || 'all').toLowerCase();
+    return ['id', 'name'].includes(mode) ? mode : 'all';
 }
 
 export function normalizeDate(value) {
@@ -509,11 +508,11 @@ export async function getEnrollmentRow(enrollmentId, { activeOnly = true, client
 
 export async function searchEnrollments({
     query = "",
-    mode = "id",
+    mode = "all",
     subject = "ALL",
     limit = 20
 }) {
-    const trimmedQuery = String(query || "").trim();
+    const trimmedQuery = String(query || "").trim().replace(/^#\s*(\d+)$/, '$1');
     const searchMode = normalizeSearchMode(mode);
     const subjectCode = normalizeSubjectCode(subject);
     const pageSize = Math.min(Math.max(Number(limit) || 20, 1), 50);
@@ -529,23 +528,24 @@ export async function searchEnrollments({
         where.push(`subject.subject_code = $${params.length}`);
     }
 
+    params.push(`${trimmedQuery}%`);
+    const idPrefixIndex = params.length;
     if (trimmedQuery) {
-        if (searchMode === "id") {
-            params.push(`${trimmedQuery}%`);
-            where.push(`e.enrollment_id::text LIKE $${params.length}`);
-        } else {
+        const matches = [];
+        if (searchMode !== 'name') matches.push(`e.enrollment_id::text LIKE $${idPrefixIndex}`);
+        if (searchMode !== 'id') {
             params.push(`%${trimmedQuery}%`);
-            where.push(`(
-                student.first_name ILIKE $${params.length}
+            matches.push(`(student.first_name ILIKE $${params.length}
                 OR student.last_name ILIKE $${params.length}
                 OR COALESCE(student.nickname, '') ILIKE $${params.length}
-                OR CONCAT(student.first_name, ' ', student.last_name) ILIKE $${params.length}
-            )`);
+                OR CONCAT(student.first_name, ' ', student.last_name) ILIKE $${params.length})`);
         }
+        where.push(`(${matches.join(' OR ')})`);
     }
-
-    params.push(searchMode);
-    const modeParamIndex = params.length;
+    params.push(trimmedQuery);
+    const exactIndex = params.length;
+    params.push(searchMode !== 'name' && (!trimmedQuery || /^\d+$/.test(trimmedQuery)));
+    const numericSortIndex = params.length;
     params.push(pageSize);
     const limitParamIndex = params.length;
 
@@ -583,10 +583,13 @@ export async function searchEnrollments({
             ON status.status_id = e.current_status_group1_id
         WHERE ${where.join("\n          AND ")}
         ORDER BY
-            CASE WHEN $${modeParamIndex} = 'id' THEN e.enrollment_id END,
+            CASE WHEN $${numericSortIndex}::boolean AND e.enrollment_id::text = $${exactIndex} THEN 0
+                WHEN $${numericSortIndex}::boolean AND e.enrollment_id::text LIKE $${idPrefixIndex} THEN 1 ELSE 2 END,
+            CASE WHEN $${numericSortIndex}::boolean THEN e.enrollment_id END,
             student.first_name,
             student.last_name,
-            subject.subject_id
+            subject.subject_id,
+            e.enrollment_id
         LIMIT $${limitParamIndex}
     `, params);
 

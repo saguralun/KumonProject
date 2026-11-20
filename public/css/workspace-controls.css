@@ -24,7 +24,7 @@
   :root :is(.workspace-legend, .workspace-stats-legend) :is(.progress-legend-title, .stock-legend-title, .stats-legend-group, .legend-row, .stock-legend-row) { color: #425c66; margin: 0; letter-spacing: 0; }
   :root :is(#combinedLegend, #legendOut, #legendIn, #legendCurrent) { display: flex; flex-wrap: wrap; gap: 4px 16px; }
   .workspace-stats-legend > .workspace-filter-group { flex: 1 1 220px; }
-  :root .workspace .search-band { grid-template-columns: auto auto minmax(0, 1fr) auto !important; }
+  :root .workspace .search-band { grid-template-columns: auto minmax(0, 1fr) auto !important; }
   :root .workspace-subjects { display: grid; grid-template-columns: repeat(4, minmax(44px, 1fr)); gap: 4px; }
   :root .student-page .student-workspace {
     display: grid; grid-template-columns: 280px minmax(0, 1fr);
@@ -45,7 +45,7 @@
   .report-page .panel-header > .status1-summary { margin: 0; padding: 0; }
 }
 @media screen and (max-width: 900px) {
-  :root .workspace .search-band { grid-template-columns: auto minmax(0, 1fr) auto !important; }
+  :root .workspace .search-band { grid-template-columns: minmax(0, 1fr) auto !important; }
   :root .workspace-subjects { grid-column: 1 / -1; }
 }
 @media screen and (min-width: 821px) {
@@ -64,6 +64,5 @@
   :root .workspace-toolbar { gap: 8px; }
   :root .workspace-toolbar label { max-width: 100%; }
   :root .workspace .search-band { grid-template-columns: minmax(0, 1fr) auto !important; }
-  :root .workspace .search-mode { grid-column: 1 / -1; }
 }
 @media print { .workspace-toolbar, .workspace-subjects, .workspace-student-list { display: none !important; } }

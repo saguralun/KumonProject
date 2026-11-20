@@ -595,7 +595,8 @@ VALUES
 (11, 'H',   'Partial Payment (Half Month)', 2),
 (12, 'FS',  'Free Study',                   2),
 (13, 'FSH', 'Free Student (Half Month)',    2),
-(14, 'FRG', 'Free Registration',            2);
+(14, 'FRG', 'Free Registration',            2),
+(15, 'FRGH', 'Free Registration (Half Month)', 2);
 
 -- =========================================================
 -- School Grade Master

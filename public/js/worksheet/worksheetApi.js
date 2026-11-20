@@ -4,13 +4,14 @@
 export const worksheetApi = {
     async searchEnrollments({
         query,
-        mode,
         subject,
         limit = 20
     }) {
         const params = new URLSearchParams({
             query: query || "",
-            mode: mode || "id",
+            // Older running servers still need name mode until restart.
+            // Numeric input stays unified so digit-containing names remain searchable.
+            mode: !query || /^\s*#?\s*\d+\s*$/.test(query) ? 'all' : 'name',
             subject: subject || "ALL",
             limit: String(limit)
         });
