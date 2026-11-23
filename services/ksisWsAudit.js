@@ -99,7 +99,7 @@ export async function readSavedKsisWsPages(page, { month, year, scope = "current
         const document = await page.evaluate(readKsisDraftDocument);
         const period = ksisContextPeriod(document.context);
         if (!period || period.month !== Number(month) || period.year !== Number(year)) throw httpError(409, "เดือน/ปีใน KSIS ไม่ตรงกับ Report ไม่เริ่มตรวจ");
-        if (document.modalOpen || document.rows.some((row) => row.dirty)) throw httpError(409, "มีหน้าต่างย่อยหรือข้อมูลที่ยังไม่บันทึกใน KSIS กรุณาจัดการก่อนตรวจ ไม่รีเฟรชทิ้งข้อมูล");
+        if (document.modalOpen || document.hiddenDirty || document.rows.some((row) => row.dirty)) throw httpError(409, "มีหน้าต่างย่อยหรือข้อมูลที่ยังไม่บันทึกใน KSIS กรุณาจัดการก่อนตรวจ ไม่รีเฟรชทิ้งข้อมูล");
         return document;
     };
     const initial = await load();
@@ -131,9 +131,11 @@ export async function readSavedKsisWsPages(page, { month, year, scope = "current
             await page.locator("ul.pagination a").filter({ hasText: new RegExp(`^${label}$`) }).click({ timeout: 8000 });
             await page.waitForFunction(({ target, old }) => {
                 if (Number(window.document.querySelector("ul.pagination li.active")?.textContent.trim()) !== target) return false;
+                const visible = element => Boolean(element?.getClientRects().length && getComputedStyle(element).visibility === 'visible');
                 const ids = Array.from(window.document.querySelectorAll("table.vk-grid-content-student")).flatMap((table) => {
+                    if (!visible(table)) return [];
                     const id = table.rows[0]?.cells[2]?.textContent.trim();
-                    return Array.from(table.parentElement.querySelector("table.vk-grid-content-subject")?.rows || []).map((row) => [row.getAttribute("data-clrowid"), id,
+                    return Array.from(table.parentElement.querySelector("table.vk-grid-content-subject")?.rows || []).filter(visible).map((row) => [row.getAttribute("data-clrowid"), id,
                         ({ Math: "ME", "English EFL": "EFL", "Thai Reading": "TRP" })[row.cells[1]?.textContent.trim()] || ""]);
                 });
                 return ids.length > 0 && JSON.stringify(ids) !== old;

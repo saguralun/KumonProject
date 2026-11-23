@@ -93,7 +93,7 @@ export async function readSavedKsisAtPages(page, { month, year, subject, scope =
         if (page.url() !== KSIS_AT_URL) throw httpError(409, 'กรุณาเปิดหน้า AT ใน KSIS ก่อนตรวจ ไม่เปลี่ยนหน้าให้อัตโนมัติ');
         const doc = await page.evaluate(readKsisAtDocument), period = ksisContextPeriod(doc.context);
         if (!period || period.month !== Number(month) || period.year !== Number(year) || doc.subjectLabel !== subjects[subject]) throw httpError(409, 'เดือนหรือวิชา KSIS ไม่ตรงกับรายการตรวจ AT');
-        if (doc.modalOpen || doc.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'มีหน้าต่างย่อยหรือข้อมูล AT แก้ค้าง ไม่อ่านใหม่ทิ้งข้อมูล');
+        if (doc.modalOpen || doc.hiddenDirty || doc.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'มีหน้าต่างย่อยหรือข้อมูล AT แก้ค้าง ไม่อ่านใหม่ทิ้งข้อมูล');
         return doc;
     };
     const initial = await load();
@@ -119,7 +119,8 @@ export async function readSavedKsisAtPages(page, { month, year, subject, scope =
         await page.locator('#btnToolbarFilterSort').click({ timeout: 8000 });
         const modal = page.locator('.modal:visible').filter({ has: page.locator('#filterSubject') });
         if ((await modal.locator('#filterSubject option:checked').textContent())?.trim() !== subjects[subject]) throw httpError(409, 'ตัวกรองวิชา KSIS เปลี่ยน หยุดตรวจ');
-        if ((await page.evaluate(readKsisAtDocument)).students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'พบ AT แก้ค้าง ไม่อ่านใหม่ทิ้งข้อมูล');
+        const beforeRead = await page.evaluate(readKsisAtDocument);
+        if (beforeRead.hiddenDirty || beforeRead.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'พบ AT แก้ค้าง ไม่อ่านใหม่ทิ้งข้อมูล');
         let doc = await read(() => modal.locator('button[ng-click="vm.ok()"],button[data-ng-click="vm.ok()"]').click({ timeout: 8000 }));
         if (doc.page !== 1) throw httpError(409, 'KSIS ไม่กลับหน้าแรกหลังอ่านใหม่ ไม่ยืนยันขอบเขตการตรวจ');
         const move = async () => {

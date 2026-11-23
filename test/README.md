@@ -175,6 +175,10 @@ restart-helper test, not necessary for this suite's application regression check
   filling. The single final fill/save confirmation is still required. Off-page children
   are separated from missing DOB or same-name/DOB conflicts. Blank IDs never
   enter the ID-import save endpoint, and matching never changes stored IDs.
+  WS/AT readers exclude filtered-out headers and subject/test rows while still
+  including rows below the scroll. Hidden dirty rows block preparation, refresh
+  and batch saves. A six-row filtered fixture verifies the left preview count
+  and shared header both reflect the prepared page.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

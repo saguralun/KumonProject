@@ -142,8 +142,9 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     const scopeChanged = dialog.open && confirmation?.scope !== confirmationScope();
     if (dialog.open && (changed || busy || pending || scopeChanged)) dialog.close();
     source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : inspection?.message || (state.requiresLogin ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่' : result ? `${result.error || ''} • บันทึกแล้ว ${result.savedCount || 0} รายวิชา • หน้า ${result.page}` : 'ยังไม่ได้เตรียมข้อมูล'));
-    if (workspace.active) setStatus(source.textContent, state.error || pending ? 'error' : 'neutral');
     render();
+    if (workspace.active) setStatus(preview && !busy && !pending && !state.error
+      ? `เตรียม WS แล้ว • พร้อม ${eligibleRows().length} รายวิชา • หน้า ${preview.page}` : source.textContent, state.error || pending ? 'error' : 'neutral');
     if (scopeChanged) setStatus('รายการ WS เปลี่ยนระหว่างยืนยัน กรุณาตรวจ Preview และยืนยันใหม่', 'error');
     const attempt = result?.attemptId || JSON.stringify([result?.error, result?.page, result?.savedCount, result?.rows?.map((row) => row.key)]);
     if (active && pending && !busy && automaticallyChecked !== attempt) {

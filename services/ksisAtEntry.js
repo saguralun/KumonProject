@@ -23,7 +23,11 @@ async function boundedResult(promise) {
 }
 
 export function readKsisAtDocument() {
-    const visible = (element) => Boolean(element?.getClientRects().length && getComputedStyle(element).visibility !== 'hidden');
+    const visible = (element) => Boolean(element?.getClientRects().length && getComputedStyle(element).visibility === 'visible');
+    const tables = [...document.querySelectorAll('table.vk-grid-content-student')];
+    const hiddenDirty = tables.some(table => [...table.parentElement.querySelector('table.vk-grid-content-subject')?.rows || []]
+        .some(row => (!visible(table) || !visible(row)) && [...row.querySelectorAll('[data-ng-show*="isDirty"]')]
+            .some(marker => getComputedStyle(marker).display !== 'none')));
     const field = (cell) => {
         const control = [...cell?.querySelectorAll('select,input') || []].find(visible);
         return { value: control?.tagName === 'SELECT' ? control.selectedOptions[0]?.textContent.trim() || '' : control ? control.value.trim() : cell?.innerText.trim() || '',
@@ -34,27 +38,29 @@ export function readKsisAtDocument() {
     return { context: (document.querySelector('.container-header')?.textContent || '').replace(/\s+/g, ' ').trim(),
         subjectLabel: document.querySelector('.filter-label-container .filter-label-item')?.textContent.replace(/[\[\]]/g, '').trim() || '',
         page: Number(document.querySelector('ul.pagination li.active')?.textContent.trim() || 1),
-        modalOpen: [...document.querySelectorAll('.modal')].some(visible),
+        modalOpen: [...document.querySelectorAll('.modal')].some(visible), hiddenDirty,
         editable: Boolean(document.querySelector('#btnToolbarSave') && !document.querySelector('#btnToolbarSave').disabled),
-        students: [...document.querySelectorAll('table.vk-grid-content-student')].map((table, index) => {
+        students: tables.flatMap((table, index) => {
+            if (!visible(table)) return [];
             const cells = table.rows[0]?.cells || [];
-            const rows = [...table.parentElement.querySelector('table.vk-grid-content-subject')?.rows || []];
+            const rows = [...table.parentElement.querySelector('table.vk-grid-content-subject')?.rows || []].filter(visible);
+            if (!rows.length) return [];
             const tests = rows.map((row) => ({ key: row.getAttribute('data-clrowid'),
                 subject: ({ Math: 'ME', 'English EFL': 'EFL', 'Thai Reading': 'TRP' })[row.cells[1]?.innerText.trim()] || '',
                 dirty: [...row.querySelectorAll('[data-ng-show*="isDirty"]')].some(visible),
                 date: field(row.cells[2]), level: field(row.cells[3]), time: field(row.cells[4]), score: field(row.cells[6]), group: field(row.cells[8]),
                 passed: Boolean(row.cells[9]?.querySelector('input[type=checkbox]')?.checked),
                 notes: field(row.cells[10]).value, error: row.cells[11]?.innerText.trim() || '' }));
-            return { key: tests[0]?.key || '', studentKey: table.rows[0]?.getAttribute('data-studentguid') || `header:${index}`,
+            return [{ key: tests[0]?.key || '', studentKey: table.rows[0]?.getAttribute('data-studentguid') || `header:${index}`,
                 kumonId: cells[2]?.textContent.trim() || '', fullName: cells[1]?.textContent.trim() || '', birthDate: cells[4]?.textContent.trim() || '',
-                subject: tests[0]?.subject || '', tests };
+                subject: tests[0]?.subject || '', tests }];
         }) };
 }
 
 function assertDocument(document, period, subject) {
     const actual = ksisContextPeriod(document.context);
     if (!actual || actual.month !== Number(period.month) || actual.year !== Number(period.year)) throw httpError(409, 'เดือน/ปีใน KSIS ไม่ตรงกับ Report ไม่เริ่มกรอก AT');
-    if (document.modalOpen || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'KSIS มีหน้าต่างย่อยหรือข้อมูลที่แก้ค้างอยู่ กรุณาจัดการก่อนเตรียม AT');
+    if (document.modalOpen || document.hiddenDirty || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'KSIS มีหน้าต่างย่อยหรือข้อมูลที่แก้ค้างอยู่ กรุณาจัดการก่อนเตรียม AT');
     if (document.subjectLabel !== subjectNames[subject] || document.students.some((student) => student.tests.some((test) => test.subject !== subject))) throw httpError(409, `กรุณาเลือกวิชา ${subject} ในตัวกรองหน้า AT ของ KSIS ให้ตรงกันก่อน`);
     if (!document.editable) throw httpError(409, 'KSIS ยังไม่เปิดให้แก้ไขหรือบันทึก AT');
 }
@@ -117,7 +123,7 @@ export async function selectKsisAtSubject(page, subject, period) {
     if (!document) return null;
     const current = ksisContextPeriod(document.context);
     if (!current || current.month !== Number(period.month) || current.year !== Number(period.year)) throw httpError(409, 'เดือน/ปีใน KSIS ไม่ตรงกับ Report');
-    if (document.modalOpen || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'กรุณาจัดการ AT ที่แก้ค้างหรือหน้าต่างย่อยก่อนเปลี่ยนวิชา');
+    if (document.modalOpen || document.hiddenDirty || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'กรุณาจัดการ AT ที่แก้ค้างหรือหน้าต่างย่อยก่อนเปลี่ยนวิชา');
     if (document.subjectLabel === subjectNames[subject]) return document;
     let blocked = false;
     const route = (route) => {
@@ -239,7 +245,7 @@ export async function fillAndSaveKsisAt(page, rows, guard, initial) {
     const snapshot = async () => {
         if (page.url() !== KSIS_AT_URL) throw httpError(409, 'หน้า KSIS เปลี่ยน หยุดการกรอก AT');
         const document = await page.evaluate(readKsisAtDocument);
-        if (document.context !== initial.context || document.page !== initial.page || document.subjectLabel !== initial.subjectLabel || document.modalOpen) throw httpError(409, 'เดือน วิชา หรือหน้า AT เปลี่ยนระหว่างกรอก');
+        if (document.context !== initial.context || document.page !== initial.page || document.subjectLabel !== initial.subjectLabel || document.modalOpen || document.hiddenDirty) throw httpError(409, 'เดือน วิชา หรือหน้า AT เปลี่ยนหรือมีข้อมูลแก้ค้างในแถวที่ซ่อนอยู่');
         if (guard.blocked()) throw httpError(409, 'มีคำขอบันทึกระหว่างกรอก AT ถูกกันไว้ กรุณาตรวจข้อมูลค้าง');
         return document;
     };
@@ -337,14 +343,14 @@ export async function readKsisAtInspection(page, records, { period, subject, kum
     };
     await page.route('**/*', route);
     try {
-        if (current.page === 1 && !current.students.some((student) => student.tests.some((test) => test.dirty))) {
+        if (current.page === 1 && !current.hiddenDirty && !current.students.some((student) => student.tests.some((test) => test.dirty))) {
             // Reapply the unchanged native filter to read saved rows. Never discard dirty inputs or change pages.
             await page.locator('#btnToolbarFilterSort').click({ timeout: 8000 });
             const modal = page.locator('.modal:visible').filter({ has: page.locator('#filterSubject') });
             const selected = await modal.locator('#filterSubject option:checked').textContent();
             if (selected?.trim() !== subjectNames[subject]) throw httpError(409, 'ตัวกรอง KSIS ไม่ตรงกับวิชา หยุดตรวจโดยไม่แก้ตัวกรอง');
             const beforeRead = await page.evaluate(readKsisAtDocument);
-            if (blocked || beforeRead.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'พบข้อมูลแก้ค้างขณะเปิดตัวกรอง หยุดตรวจโดยไม่รีเฟรชทิ้งค่า');
+            if (blocked || beforeRead.hiddenDirty || beforeRead.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'พบข้อมูลแก้ค้างขณะเปิดตัวกรอง หยุดตรวจโดยไม่รีเฟรชทิ้งค่า');
             const response = page.waitForResponse((item) => item.url() === READ_URL && item.request().method() === 'POST', { timeout: 20000 }).catch(() => null);
             await modal.locator('button[ng-click="vm.ok()"],button[data-ng-click="vm.ok()"]').click({ timeout: 8000 });
             const read = await response;
@@ -367,7 +373,7 @@ export async function readKsisAtInspection(page, records, { period, subject, kum
             return { desired, actual, matches: exact.length === 1 && sameEvent.length === 1, persisted: refreshed && exact.length === 1 && !exact[0].dirty };
         });
         return { requiresLogin: false, name: student.fullName, kumonId, subject, period, context: current.context, page: current.page,
-            refreshed, dirty: student.tests.some((test) => test.dirty), comparisons, tests: student.tests, checkedAt: new Date().toISOString(), readOnly: true };
+            refreshed, dirty: Boolean(current.hiddenDirty) || student.tests.some((test) => test.dirty), comparisons, tests: student.tests, checkedAt: new Date().toISOString(), readOnly: true };
     } finally { await page.unroute('**/*', route); }
 }
 
@@ -386,7 +392,7 @@ export async function acknowledgeKsisAt({ userId }) {
     return withKsisPage({ sourceUrl: KSIS_AT_URL, userId, allowPendingDraft: true, requireCurrentPage: true }, async (page, session) => {
         if (session.pendingDraft && !session.pendingAt) throw httpError(409, 'กรุณาจัดการข้อมูลค้างในงาน WS ก่อน');
         const document = await loaded(page);
-        if (!document || document.modalOpen || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'ยังมีข้อมูล AT แก้ค้างอยู่ กรุณาบันทึกเองหรือยกเลิกบนเว็บก่อน');
+        if (!document || document.modalOpen || document.hiddenDirty || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'ยังมีข้อมูล AT แก้ค้างอยู่ กรุณาบันทึกเองหรือยกเลิกบนเว็บก่อน');
         await session.draftGuard?.release(); session.pendingDraft = false; session.draftGuard = null; session.pendingAt = false;
         return { acknowledged: true };
     });

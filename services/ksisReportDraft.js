@@ -16,7 +16,11 @@ const compactName = (value) => String(value || "").normalize("NFC").replace(/\s+
 const numericTestValue = (value) => value == null || String(value).trim() === "" ? NaN : Number(value);
 
 export function readKsisDraftDocument() {
-    const visible = (element) => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+    const visible = (element) => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility === "visible");
+    const tables = Array.from(document.querySelectorAll('table.vk-grid-content-student'));
+    const hiddenDirty = tables.some(table => Array.from(table.parentElement.querySelector('table.vk-grid-content-subject')?.rows || [])
+        .some(row => (!visible(table) || !visible(row)) && Array.from(row.querySelectorAll('[data-ng-show*="isDirty"]'))
+            .some(marker => getComputedStyle(marker).display !== 'none')));
     const field = (cell) => {
         const controls = Array.from(cell?.querySelectorAll("select,input") || []);
         const select = controls.find((element) => element.tagName === "SELECT" && visible(element));
@@ -30,11 +34,12 @@ export function readKsisDraftDocument() {
         .filter((element) => element.textContent.includes("ชื่อศูนย์") && element.textContent.includes("ประจำเดือน") && element.textContent.length < 250)
         .at(-1)?.textContent || "").replace(/\s+/g, " ").trim();
     return { context, page: Number(document.querySelector("ul.pagination li.active")?.textContent.trim() || 1),
-        modalOpen: Array.from(document.querySelectorAll(".modal")).some(visible),
-        rows: Array.from(document.querySelectorAll("table.vk-grid-content-student")).flatMap((table, studentIndex) => {
+        modalOpen: Array.from(document.querySelectorAll(".modal")).some(visible), hiddenDirty,
+        rows: tables.flatMap((table, studentIndex) => {
+            if (!visible(table)) return [];
             const studentCells = table.rows[0]?.cells || [];
             const subjectTable = table.parentElement.querySelector("table.vk-grid-content-subject");
-            return Array.from(subjectTable?.rows || []).map((row) => ({
+            return Array.from(subjectTable?.rows || []).filter(visible).map((row) => ({
                 key: row.getAttribute("data-clrowid"), kumonId: studentCells[2]?.textContent.trim() || "",
                 studentKey: `header:${studentIndex}`,
                 fullName: studentCells[1]?.textContent.trim() || "", birthDate: studentCells[4]?.textContent.trim() || "",
@@ -58,7 +63,7 @@ export function planKsisReportDraft(records, document, period, subject, { includ
     const websitePeriod = ksisContextPeriod(document.context);
     if (!websitePeriod || websitePeriod.month !== Number(period.month) || websitePeriod.year !== Number(period.year)) throw httpError(409, "เดือน/ปีใน KSIS ไม่ตรงกับรายงาน หยุดไว้ก่อน ยังไม่กรอก");
     if (document.modalOpen) throw httpError(409, "กรุณาปิดหน้าต่างย่อยใน KSIS ก่อนอ่าน Preview");
-    if (document.rows.some((row) => row.dirty)) throw httpError(409, "หน้า KSIS มีข้อมูลที่แก้ค้างอยู่ กรุณาจัดการข้อมูลเดิมก่อน ไม่เขียนทับ");
+    if (document.hiddenDirty || document.rows.some((row) => row.dirty)) throw httpError(409, "หน้า KSIS มีข้อมูลที่แก้ค้างอยู่ กรุณาจัดการข้อมูลเดิมก่อน ไม่เขียนทับ");
     const result = [];
     const subjects = subject === "ALL" ? REPORT_SUBJECTS : [subject];
     for (const record of subjects.flatMap((code) => records.filter((row) => row.Subject === code))) {
@@ -223,6 +228,7 @@ export async function saveKsisWsPage(page, guard) {
     await guard.waitForSaves();
     const document = await page.evaluate(readKsisDraftDocument);
     if (document.modalOpen) throw httpError(409, "มีหน้าต่างย่อยใน KSIS กรุณาตรวจก่อนบันทึก WS");
+    if (document.hiddenDirty) throw httpError(409, 'มีข้อมูลแก้ค้างในแถวที่ถูกกรองออก ไม่บันทึก WS ทับข้อมูลเดิม');
     let clickedMainSave = false;
     if (document.rows.some((row) => row.dirty)) {
         await guard.beginSave();
@@ -510,7 +516,7 @@ export async function inspectKsisWsDraft(page, session, { acknowledge = false } 
     if (!login) {
         if (page.url() !== REPORT_URL) return { ...state, message: 'กรุณาเปิดหน้า Report B ที่ต้องการตรวจ โปรแกรมจะไม่เปลี่ยนหน้าหรือรีเฟรชให้' };
         const document = await page.evaluate(readKsisDraftDocument);
-        if (document.modalOpen || document.rows.some((row) => row.dirty)) return { ...state, message: 'ยังมีข้อมูลแก้ค้างหรือหน้าต่างย่อยใน KSIS กรุณาบันทึกหรือยกเลิกด้วยตนเอง แล้วกดตรวจสถานะอีกครั้ง' };
+        if (document.modalOpen || document.hiddenDirty || document.rows.some((row) => row.dirty)) return { ...state, message: 'ยังมีข้อมูลแก้ค้างหรือหน้าต่างย่อยใน KSIS กรุณาบันทึกหรือยกเลิกด้วยตนเอง แล้วกดตรวจสถานะอีกครั้ง' };
         if (!document.rows.length || !ksisContextPeriod(document.context)) return { ...state, message: 'หน้า Report B ยังโหลดไม่ครบ กรุณารอแล้วตรวจสถานะอีกครั้ง' };
         state.page = document.page;
     }
