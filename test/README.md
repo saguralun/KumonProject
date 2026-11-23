@@ -179,6 +179,9 @@ restart-helper test, not necessary for this suite's application regression check
   including rows below the scroll. Hidden dirty rows block preparation, refresh
   and batch saves. A six-row filtered fixture verifies the left preview count
   and shared header both reflect the prepared page.
+  WS audit accepts one child's distinct subjects across page boundaries, even
+  for N/EO/IT without IDs. Same-page duplicate headers, repeated subject rows
+  and different local students sharing an identity remain reviewable.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

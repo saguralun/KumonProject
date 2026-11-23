@@ -79,6 +79,28 @@ test('The same student in multiple subjects or repeated on adjacent pages is not
     assert.equal(JSON.stringify({ records, documents }), before);
 });
 
+for (const Status1 of ['N', 'EO', 'IT']) test(`${Status1} subjects split across pages are one identity, while real duplicate identities stay blocked`, () => {
+    for (const hasId of [false, true]) {
+        const kumonId = hasId ? '7642650000001' : '';
+        const records = [record({ ID: 10, StudentId: 100, Status1, 'รหัสคุมอง': '' }),
+            record({ ID: 11, StudentId: 100, Subject: 'EFL', Status1: hasId ? 'C' : Status1, 'รหัสคุมอง': kumonId })];
+        const me = site({ key: 'child-me', studentKey: 'header:49', kumonId, status: { value: Status1 } });
+        const efl = site({ key: 'child-efl', studentKey: 'header:0', kumonId, subject: 'EFL', status: { value: hasId ? 'C' : Status1 } });
+        const documents = [{ page: 3, rows: [me] }, { page: 4, rows: [efl] }];
+        const before = structuredClone({ records, documents });
+        const result = compareKsisWs(records, documents, { scope: 'all' });
+        assert.equal(result.counts.matched, 2); assert.equal(result.counts.review, 0);
+        assert.deepEqual(result.rows.map(row => row.page), [3, 4]);
+        assert.deepEqual({ records, documents }, before);
+        const samePage = compareKsisWs(records, [{ page: 3, rows: [me, efl] }], { scope: 'all' });
+        assert.equal(samePage.rows.find(row => row.subject === 'ME').outcome, 'review');
+        const duplicateSubject = compareKsisWs(records, [...documents, { page: 5, rows: [{ ...me, key: 'different-me-row' }] }], { scope: 'all' });
+        assert.equal(duplicateSubject.rows.find(row => row.subject === 'ME').outcome, 'review');
+        const differentChildren = compareKsisWs([records[0], { ...records[1], StudentId: 200 }], documents, { scope: 'all' });
+        assert.equal(differentChildren.rows.find(row => row.subject === 'ME').outcome, 'review');
+    }
+});
+
 test('Blank subject placeholders do not shadow real enrollment data or inflate missing-report counts', () => {
     const blank = (extra = {}) => site({ level: { value: '' }, worksheet: { value: '' }, used: { value: '' }, status: { value: '' }, ...extra });
     const documents = [{ page: 1, rows: [blank(), blank({ subject: 'EFL', key: 'efl' })] }, { page: 2, rows: [site()] }];

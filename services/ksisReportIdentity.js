@@ -34,11 +34,21 @@ export function matchKsisReportIdentity(record, records, website) {
     const candidates = website.filter((row) => siteIdentity(row) === key);
     const targets = candidates.filter((row) => row.subject === record.Subject);
     const differentStudents = new Set(peers.map((row) => row.StudentId).filter((id) => id != null));
-    const differentHeaders = new Set(candidates.map((row) => row.studentKey).filter(Boolean));
+    // Header positions are local to each KSIS page. One child's subjects may
+    // straddle pages; only multiple headers on the same page imply ambiguity.
+    // Duplicate subject rows across pages are still rejected by targets.length.
+    const headersByPage = new Map();
+    for (const candidate of candidates) {
+        if (!candidate.studentKey) continue;
+        const page = Number.isInteger(candidate.page) && candidate.page > 0 ? candidate.page : 'current';
+        if (!headersByPage.has(page)) headersByPage.set(page, new Set());
+        headersByPage.get(page).add(candidate.studentKey);
+    }
+    const duplicateHeaders = [...headersByPage.values()].some(headers => headers.size > 1);
     const sameNameOnPage = !targets.length && website.some(row => row.subject === record.Subject && name(row.fullName) === localName(record));
     const reason = peers.filter((row) => row.Subject === record.Subject).length !== 1 || differentStudents.size > 1
         ? 'ชื่อ วันเกิด และรายวิชาซ้ำในรายงาน ไม่เลือกคู่ให้อัตโนมัติ'
-        : targets.length > 1 || differentHeaders.size > 1 ? 'พบชื่อและวันเกิดซ้ำใน KSIS ไม่เลือกคู่ให้อัตโนมัติ'
+        : targets.length > 1 || duplicateHeaders ? 'พบชื่อและวันเกิดซ้ำใน KSIS ไม่เลือกคู่ให้อัตโนมัติ'
             : byId && candidates.some((row) => !noId(row.kumonId) && normalizeKumonStudentId(row.kumonId) !== kumonId) ? 'รหัสคุมองใน Report และ KSIS ขัดแย้งกัน กรุณาตรวจคู่'
                 : sameNameOnPage ? 'พบชื่อและวิชาตรงกัน แต่วันเกิดไม่ตรงหรือไม่ครบใน KSIS กรุณาตรวจคู่' : '';
     return { targets, method: 'name_birth_date', studentKey: record.StudentId != null ? `local:${record.StudentId}` : `identity:${key}`, reason };
