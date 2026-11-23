@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process';
 import pg from 'pg';
 import productionPool from '../config/db.js';
 import { receiveReceiptPayment, cancelReceiptPayment, previewReceipt, getPaymentStatus } from '../services/paymentService.js';
-import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel, getEnrollmentContext, deleteWorksheetEntry, updateWorksheetEntryNumber, searchEnrollments } from '../services/worksheetService.js';
+import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel, getEnrollmentContext, deleteWorksheetEntry, updateWorksheetEntryNumber, searchEnrollments, getHistory, updateWorksheetEntryDate, getIncompleteWorksheetStudents } from '../services/worksheetService.js';
 import { createDeliveryOrder, processDeliveryOrder } from '../services/stockReceiveService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
@@ -425,6 +425,73 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.equal(result.restoredEnrollments, 0);
             assert.equal((await database.query('SELECT current_status_group1_id AS status FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].status, statuses.get('C'));
             assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.billing WHERE billing_id=$1', [newer.billingId])).rows[0].n, 1);
+        });
+        await t.test('WS history orders by ID after backdated saves, reloads and date corrections', async () => {
+            const id=await student('WS history ID order');
+            const first=(await saveWorksheetEntries({enrollmentId:id,receiveDate:'2027-12-20',patternCode:'daily10',mainWorksheetNos:[1]})).records[0];
+            const second=(await saveWorksheetEntries({enrollmentId:id,receiveDate:'2026-10-01',patternCode:'daily10',mainWorksheetNos:[11]})).records[0];
+            assert.ok(second.worksheetUsedId>first.worksheetUsedId);
+            assert.deepEqual((await getHistory(id,30)).map(r=>r.worksheetUsedId),[second.worksheetUsedId,first.worksheetUsedId]);
+            assert.deepEqual((await getHistory(id,1)).map(r=>r.worksheetUsedId),[second.worksheetUsedId]);
+            assert.deepEqual((await getEnrollmentContext(id,30)).history.map(r=>r.worksheetUsedId),[second.worksheetUsedId,first.worksheetUsedId]);
+            await updateWorksheetEntryDate({enrollmentId:id,worksheetUsedId:first.worksheetUsedId,worksheetDate:'2028-01-01'});
+            assert.deepEqual((await getHistory(id,30)).map(r=>r.worksheetUsedId),[second.worksheetUsedId,first.worksheetUsedId]);
+            const batch=(await saveWorksheetEntries({enrollmentId:id,receiveDate:'2026-09-01',patternCode:'twoDays10',mainWorksheetNos:[21]})).records;
+            assert.equal(batch.length,2);assert.ok(batch[0].worksheetUsedId>batch[1].worksheetUsedId);
+            const expected=[...batch.map(r=>r.worksheetUsedId),second.worksheetUsedId,first.worksheetUsedId];
+            assert.deepEqual((await getHistory(id,30)).map(r=>r.worksheetUsedId),expected);
+            const sameDay=(await saveWorksheetEntries({enrollmentId:id,receiveDate:'2028-01-01',patternCode:'daily20',mainWorksheetNos:[31,41]})).records;
+            assert.ok(sameDay[0].worksheetUsedId>sameDay[1].worksheetUsedId);
+            assert.deepEqual((await getHistory(id,30)).map(r=>r.worksheetUsedId),[...sameDay.map(r=>r.worksheetUsedId),...expected]);
+        });
+        await t.test('Latest WS follows Receive Date and same-day ID while Input history follows insertion ID', async () => {
+            const id = await student('Receive Date latest WS');
+            const year = new Date().getFullYear() - 2;
+            const newerDate = `${year}-11-20`, olderDate = `${year}-10-20`;
+            const save = async (date, number) => (await saveWorksheetEntries({
+                enrollmentId: id, receiveDate: date, patternCode: 'daily10', mainWorksheetNos: [number]
+            })).records[0];
+            const first = await save(olderDate, 131);
+            const latest = await save(newerDate, 121);
+            const backdated = await save(olderDate, 151);
+            const context = await getEnrollmentContext(id, 1);
+            // Even with a history limit of one, the latest calculation reads all WS.
+            assert.equal(context.history[0].worksheetUsedId, backdated.worksheetUsedId);
+            assert.equal(context.defaults.receiveDate, `${year}-11-21`);
+            assert.equal(context.defaults.mainWorksheetNo, 121);
+            assert.equal(context.worksheetProgress.main.actualWorksheetNo, 121);
+            assert.equal(context.worksheetProgress.main.displayWorksheetNo, 130);
+            const findIncomplete = async () => {
+                let result = await getIncompleteWorksheetStudents();
+                for (let page = 1; page <= result.regular.totalPages; page++) {
+                    if (page > 1) result = await getIncompleteWorksheetStudents({ regularPage: page });
+                    const row = result.regular.rows.find(row => row.enrollmentId === id);
+                    if (row) return row;
+                }
+                assert.fail('Fixture enrollment missing from incomplete WS');
+            };
+            let incomplete = await findIncomplete();
+            assert.equal(incomplete.latestWorksheetDate, newerDate);
+            assert.equal(incomplete.latestPacketWorksheetNo, 121);
+            const sameDay = await save(newerDate, 31);
+            let refreshed = await getEnrollmentContext(id, 30);
+            assert.deepEqual(refreshed.history.map(row => row.worksheetUsedId),
+                [sameDay.worksheetUsedId, backdated.worksheetUsedId, latest.worksheetUsedId, first.worksheetUsedId]);
+            assert.equal(refreshed.defaults.mainWorksheetNo, 31);
+            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 31);
+            incomplete = await findIncomplete();
+            assert.equal(incomplete.latestPacketWorksheetNo, 31);
+            // A newly entered ancient date stays visible, without becoming latest.
+            const incorrect = await save('0092-03-20', 191);
+            refreshed = await getEnrollmentContext(id, 1);
+            assert.equal(refreshed.history[0].worksheetUsedId, incorrect.worksheetUsedId);
+            assert.equal(refreshed.defaults.mainWorksheetNo, 31);
+            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 31);
+            await updateWorksheetEntryDate({ enrollmentId: id, worksheetUsedId: sameDay.worksheetUsedId, worksheetDate: olderDate });
+            refreshed = await getEnrollmentContext(id, 30);
+            assert.equal(refreshed.history[0].worksheetUsedId, incorrect.worksheetUsedId);
+            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 121);
+            assert.equal((await findIncomplete()).latestPacketWorksheetNo, 121);
         });
         await t.test('Ten real concurrent WS transactions finish with a ten-connection pool', async () => {
             const ids = await Promise.all(Array.from({ length: 10 }, (_, index) => student(`WS${index}`)));

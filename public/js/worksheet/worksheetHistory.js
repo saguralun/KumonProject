@@ -135,9 +135,18 @@ export function renderHistory(container, rows, monthSummary) {
     `;
 }
 
+function dateRank(value) {
+    const match = String(value || '').match(/^(\d{1,4})-(\d{2})-(\d{2})$/);
+    return match ? Number(match[1]) * 10000 + Number(match[2]) * 100 + Number(match[3]) : 0;
+}
+
+export function compareWorksheetReceiveDate(a, b) {
+    return dateRank(b.worksheetDate) - dateRank(a.worksheetDate) || Number(b.worksheetUsedId) - Number(a.worksheetUsedId);
+}
+
 export function prependHistoryRows(currentRows, newRows, limit) {
     return [
         ...(Array.isArray(newRows) ? newRows : []),
         ...(Array.isArray(currentRows) ? currentRows : [])
-    ].slice(0, limit);
+    ].sort((a, b) => Number(b.worksheetUsedId) - Number(a.worksheetUsedId)).slice(0, limit);
 }

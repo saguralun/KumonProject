@@ -604,15 +604,7 @@ async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, page, c
     const offset = (currentPage - 1) * limit;
     const result = await pool.query(`
         WITH latest_ws AS (
-            -- "Latest" means the WS row actually entered most recently
-            -- (highest worksheet_used_id = last inserted), not the one
-            -- with the highest worksheet_date. A multi-day pattern
-            -- ("5 วัน 10 แผ่น" etc.) saved in one sitting inserts several
-            -- rows spanning both past AND future dates in the same
-            -- transaction — e.g. entered today but dated up to 5 days
-            -- ahead — so sorting by worksheet_date DESC can surface a
-            -- forward-dated row that hasn't actually happened yet as the
-            -- "latest" one, making a kid look more current than they are.
+            -- Receive Date defines the latest WS; same-date rows use ID.
             SELECT DISTINCT ON (wu.enrollment_id)
                 wu.enrollment_id,
                 wu.worksheet_date,
@@ -625,7 +617,7 @@ async function queryIncompleteWorksheetStudents({ isKumonConnect, limit, page, c
             JOIN ${TABLE_SCHEMA}.level_master level
                 ON level.level_master_id = wm.level_master_id
             WHERE level.level_type = 1
-            ORDER BY wu.enrollment_id, wu.worksheet_used_id DESC
+            ORDER BY wu.enrollment_id, wu.worksheet_date DESC, wu.worksheet_used_id DESC
         )
         SELECT
             e.enrollment_id,
@@ -871,7 +863,7 @@ export async function getHistory(enrollmentId, limit = DEFAULT_HISTORY_LIMIT) {
         JOIN ${TABLE_SCHEMA}.level_master lm
             ON lm.level_master_id = wm.level_master_id
         WHERE wu.enrollment_id = $1
-        ORDER BY wu.worksheet_date DESC, wu.worksheet_used_id DESC
+        ORDER BY wu.worksheet_used_id DESC
         LIMIT $2
     `, [enrollmentId, pageSize]);
 
@@ -1064,30 +1056,20 @@ async function getWorksheetProgressForLevel({
     }
 
     const result = await client.query(`
-        WITH level_cpws AS (
-            SELECT
-                wu.actual_worksheet_no,
-                wu.worksheet_date
-            FROM ${TABLE_SCHEMA}.worksheet_used wu
-            JOIN ${TABLE_SCHEMA}.worksheet_master wm
-                ON wm.worksheet_master_id = wu.worksheet_master_id
-            WHERE wu.enrollment_id = $1
-              AND wm.level_master_id = $2
-              AND wu.cpws = TRUE
-        ),
-        latest AS (
-            SELECT MAX(worksheet_date) AS latest_worksheet_date
-            FROM level_cpws
-        )
-        SELECT MAX(level_cpws.actual_worksheet_no)::int AS max_actual_worksheet_no
-        FROM level_cpws
-        CROSS JOIN latest
-        WHERE level_cpws.worksheet_date >= latest.latest_worksheet_date - INTERVAL '12 months'
+        SELECT wu.actual_worksheet_no
+        FROM ${TABLE_SCHEMA}.worksheet_used wu
+        JOIN ${TABLE_SCHEMA}.worksheet_master wm
+            ON wm.worksheet_master_id = wu.worksheet_master_id
+        WHERE wu.enrollment_id = $1
+          AND wm.level_master_id = $2
+          AND wu.cpws = TRUE
+        ORDER BY wu.worksheet_date DESC, wu.worksheet_used_id DESC
+        LIMIT 1
     `, [
         enrollment.enrollmentId,
         levelMasterId
     ]);
-    const actualWorksheetNo = result.rows[0]?.max_actual_worksheet_no || null;
+    const actualWorksheetNo = result.rows[0]?.actual_worksheet_no || null;
     const displayWorksheetNo = actualWorksheetNo
         ? Math.min(maxWorksheetNo, Number(actualWorksheetNo) + 9)
         : 0;
@@ -1599,7 +1581,7 @@ function buildReturningQuery() {
             ON wm.worksheet_master_id = inserted.worksheet_master_id
         JOIN ${TABLE_SCHEMA}.level_master lm
             ON lm.level_master_id = wm.level_master_id
-        ORDER BY inserted.worksheet_date DESC, inserted.worksheet_used_id DESC
+        ORDER BY inserted.worksheet_used_id DESC
     `;
 }
 

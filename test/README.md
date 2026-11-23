@@ -158,6 +158,11 @@ restart-helper test, not necessary for this suite's application regression check
   receipts retain fee/status snapshots, Report marks free registration and
   unchanged receipt cancellation restores FRGH. Browser/Electron checks cover
   Add Subject and N/EO corrections with FRG/FRGH date alignment.
+  WS History uses worksheet_used_id descending on load, after saves and after
+  date correction, so newly entered rows stay visible even with a wrong date.
+  Latest WS, incomplete-WS results and the progress ring use Receive Date,
+  with ID as a same-date tie breaker, rather than the largest worksheet number.
+  Tests cover backdated inserts, same-day ties and history/context limits.
 
 - KSIS roster previews separate ID-less children by exact name and DOB, merge
   only repeated copies of that identity, and show missing IDs as neutral info.

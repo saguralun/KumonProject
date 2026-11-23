@@ -9,6 +9,7 @@
 // anything from worksheet.js (the reverse isn't true: worksheet.js imports
 // plenty from here), so there's no circular import for this pairing.
 import { els, setStatus, state, isHistoryEditPending } from "./worksheetState.js";
+import { compareWorksheetReceiveDate } from './worksheetHistory.js';
 import {
     buildPreviewRecords,
     escapeHtml,
@@ -124,20 +125,7 @@ function fallbackWorksheetProgressFromHistory(context, kind) {
         return null;
     }
 
-    const latestDateText = rows.reduce((latest, row) => (
-        row.worksheetDate > latest ? row.worksheetDate : latest
-    ), rows[0].worksheetDate);
-    const [year, month, day] = latestDateText.split("-").map(Number);
-    const cutoffDate = new Date(year, month - 1, day);
-    cutoffDate.setMonth(cutoffDate.getMonth() - 12);
-    const cutoffText = [
-        cutoffDate.getFullYear(),
-        String(cutoffDate.getMonth() + 1).padStart(2, "0"),
-        String(cutoffDate.getDate()).padStart(2, "0")
-    ].join("-");
-    const actualWorksheetNo = rows
-        .filter((row) => row.worksheetDate >= cutoffText)
-        .reduce((maxValue, row) => Math.max(maxValue, Number(row.actualWorksheetNo || 0)), 0);
+    const actualWorksheetNo = Number([...rows].sort(compareWorksheetReceiveDate)[0].actualWorksheetNo || 0);
 
     if (!actualWorksheetNo) {
         return null;
