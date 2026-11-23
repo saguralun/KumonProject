@@ -185,6 +185,10 @@ restart-helper test, not necessary for this suite's application regression check
   WS audit skips A/OT only when the Report itself is inactive (or the row exists
   only in KSIS). Active Report rows, including R, against KSIS A/OT are visible
   mismatches. The audit does not authorize or change KSIS statuses.
+  WS filling permits A -> R only when Report is R and KSIS exposes a writable
+  native R option. Preview and final confirmation show the return transition;
+  identity is rechecked, ST1 changes first, then newly available worksheet
+  fields are filled and verified. All other A rows keep their skip behavior.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

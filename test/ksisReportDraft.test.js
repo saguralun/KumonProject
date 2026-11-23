@@ -208,13 +208,47 @@ test("Draft permits only the observed Zun read POST, never arbitrary Get paths o
     for (const method of ["GET", "HEAD", "OPTIONS"]) assert.equal(isKsisDraftReadRequest(method, url, "xhr"), true);
 });
 
-test("Draft skips A in either source without changing A to R, even for KC", () => {
+test("Draft keeps A skipped except an explicit Report R return through a writable native ST1 selector", () => {
     const reportAbsent = planKsisReportDraft([record({ Status1: "A", IsKc: true })], document(), period, "ME")[0];
     assert.equal(reportAbsent.ready, false); assert.equal(reportAbsent.skipped, true);
-    const absent = document(); absent.rows[0].status.value = "A";
-    const returning = planKsisReportDraft([record({ Status1: "R" })], absent, period, "ME")[0];
-    assert.equal(returning.ready, false); assert.equal(returning.skipped, true);
-    assert.match(returning.reason, /ข้ามสถานะ A/);
+    const absent = document(); Object.assign(absent.rows[0], { fullName: 'ตัวอย่าง ทดสอบ', status: field('A', ['A', 'R']) });
+    // In A, KSIS may render old worksheet values as locked text without options.
+    absent.rows[0].level = { value: 'A', writable: false, options: null };
+    for (const IsKc of [false, true]) {
+        const returning = planKsisReportDraft([record({ Status1: 'R', IsKc })], absent, period, 'ME', { includeZun: false })[0];
+        assert.equal(returning.ready, true); assert.equal(returning.skipped, false);
+        assert.equal(returning.returningFromAbsent, true);
+        assert.equal(returning.desired.used, IsKc ? 1 : 8);
+        assert.equal(groupKsisStudentBatches([returning]).length, 1);
+    }
+    for (const Status1 of ['A', 'C', 'N', 'EO', 'IT']) {
+        const skipped = planKsisReportDraft([record({ Status1 })], absent, period, 'ME', { includeZun: false })[0];
+        assert.equal(skipped.skipped, true); assert.equal(skipped.ready, false);
+        assert.equal(groupKsisStudentBatches([skipped]).length, 0);
+    }
+    for (const status of [field('A', ['A']), { value: 'A', writable: false, options: ['A', 'R'] }]) {
+        const doc = { ...absent, rows: [{ ...absent.rows[0], status }] };
+        const blocked = planKsisReportDraft([record({ Status1: 'R' })], doc, period, 'ME', { includeZun: false })[0];
+        assert.equal(blocked.skipped, false); assert.equal(blocked.ready, false);
+        assert.match(blocked.reason, /ไม่อนุญาต ST1 R/);
+        assert.equal(groupKsisStudentBatches([blocked]).length, 0);
+    }
+});
+
+test('A to R follows the selected future Report period and its monthly status, including year rollover', () => {
+    for (const [month, year, label] of [[12, 2026, 'Dec'], [1, 2027, 'Jan']]) {
+        const doc = document(); doc.context = `ชื่อศูนย์ TEST ประจำเดือน ${label} - ${year}`;
+        doc.rows[0].status = field('A', ['A', 'R']);
+        const [returning] = planKsisReportDraft([record({ Status1: 'R', EnrollmentStatusCode: 'C' })], doc,
+            { month, year }, 'ME', { includeZun: false });
+        assert.equal(returning.ready, true); assert.equal(returning.returningFromAbsent, true);
+        // Current student status must not override the status of the selected Report month.
+        const [ordinary] = planKsisReportDraft([record({ Status1: 'C', EnrollmentStatusCode: 'R' })], doc,
+            { month, year }, 'ME', { includeZun: false });
+        assert.equal(ordinary.skipped, true); assert.equal(ordinary.returningFromAbsent, false);
+        assert.throws(() => planKsisReportDraft([record({ Status1: 'R' })], doc,
+            { month: month === 12 ? 11 : 2, year }, 'ME', { includeZun: false }), { statusCode: 409 });
+    }
 });
 
 test("KC uses exactly one WS while paper WS totals remain unchanged", () => {

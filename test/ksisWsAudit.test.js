@@ -137,7 +137,7 @@ test('OT is skipped like A even without worksheet data, including KSIS-only rows
     assert.equal(JSON.stringify({ absent, actual }), before);
 });
 
-test('R re-enrollments in Report remain mismatches against A/OT in KSIS without authorizing status changes', () => {
+test('R re-enrollments remain audit mismatches against A/OT, and filling still requires a native R option', () => {
     for (const actualStatus of ['A', 'OT']) {
         const records = [record({ ID: 1, StudentId: 100, Subject: 'ME', CurrentLevel: 'B40', WksUsed: 18, Status1: 'R' }),
             record({ ID: 2, StudentId: 100, Subject: 'EFL', CurrentLevel: '7A150', WksUsed: 19, Status1: 'R' })];
@@ -157,7 +157,7 @@ test('R re-enrollments in Report remain mismatches against A/OT in KSIS without 
         if (actualStatus === 'A') {
             const preview = planKsisReportDraft(records, { context: 'ชื่อศูนย์ TEST ประจำเดือน Nov - 2026', page: 7, rows: targets },
                 { month: 11, year: 2026 }, 'ALL', { includeZun: false });
-            assert.ok(preview.every(row => row.skipped && !row.ready));
+            assert.ok(preview.every(row => !row.skipped && !row.ready && /ไม่อนุญาต ST1 R/.test(row.reason)));
         }
         assert.deepEqual({ records, documents }, before);
     }

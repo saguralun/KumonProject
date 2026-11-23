@@ -14,6 +14,9 @@ const previews = new Map();
 const hash = (data) => createHash("sha256").update(JSON.stringify(data)).digest("hex");
 const compactName = (value) => String(value || "").normalize("NFC").replace(/\s+/g, "");
 const numericTestValue = (value) => value == null || String(value).trim() === "" ? NaN : Number(value);
+const isReturnFromAbsent = (before, desired) => before === 'A' && desired === 'R';
+const skipDraftRow = row => row.skipped || row.desired.status === 'A'
+    || row.before?.status.value === 'A' && !isReturnFromAbsent(row.before.status.value, row.desired.status);
 
 export function readKsisDraftDocument() {
     const visible = (element) => Boolean(element && element.getClientRects().length && getComputedStyle(element).visibility === "visible");
@@ -81,15 +84,17 @@ export function planKsisReportDraft(records, document, period, subject, { includ
             zun: (includeZun === true ? [["ZI", record.UsedZI, record.ZIWorksheetNo], ["ZII", record.UsedZII, record.ZIIWorksheetNo]] : [])
                 .filter(([, used]) => Number(used) > 0).map(([level, used, worksheet]) => ({ level, used: Number(used), worksheet: Number(worksheet) })) };
         const target = targets[0];
-        const skipped = record.Status1 === "A" || targets.some((row) => row.status.value === "A");
+        const returningFromAbsent = isReturnFromAbsent(target?.status.value, desired.status);
+        const skipped = record.Status1 === "A" || targets.some((row) => row.status.value === "A" && !isReturnFromAbsent(row.status.value, desired.status));
         let reason = matched.reason || (!target ? "ไม่อยู่ในหน้า KSIS ปัจจุบัน" : !target.key ? "ไม่พบตัวระบุแถว KSIS"
                 : normalizeKsisBirthDate(record["วันเกิด"]) && normalizeKsisBirthDate(target.birthDate) !== normalizeKsisBirthDate(record["วันเกิด"]) ? "วันเกิดไม่ตรงกัน"
                     : target.status.value !== desired.status && (!target.status.options?.includes(desired.status) || !target.status.writable) ? `KSIS ไม่อนุญาต ST1 ${desired.status}`
                         : !Number.isInteger(desired.used) || desired.used < 0 ? "จำนวน WS ไม่ถูกต้อง"
                             : desired.worksheet !== null && (desired.worksheet < 10 || desired.worksheet > 200 || desired.worksheet % 10 !== 0) ? "หน้าปัจจุบันต้องเป็น packet + 9"
-                                : desired.level && !target.level.options?.includes(desired.level) && target.level.value !== desired.level ? "KSIS ไม่มีระดับที่ตรงกัน"
+                                : !returningFromAbsent && desired.level && !target.level.options?.includes(desired.level) && target.level.value !== desired.level ? "KSIS ไม่มีระดับที่ตรงกัน"
                                     : desired.zun.some((row) => !Number.isInteger(row.used) || !Number.isInteger(row.worksheet) || row.worksheet < 10 || row.worksheet > 100 || row.worksheet % 10 !== 0) ? "ข้อมูล Zun Zun ไม่ถูกต้อง: ชุด 1–91 (ถึงหน้า 10–100)" : "");
-        // Inactive KSIS rows lock worksheet fields. Never invent a status conversion or force hidden controls.
+        // A -> R is allowed only for Report R through a writable native ST1
+        // selector. Its worksheet fields may appear only after changing ST1.
         if (!reason && desired.at.some((test) => !test.date || !test.level || !Number.isFinite(test.time) || test.time < 0
             || !Number.isFinite(test.score) || test.score < 0 || !Number.isInteger(test.group) || test.group < 1 || test.group > 5)) reason = "ข้อมูล AT ไม่ครบหรือไม่ถูกต้อง กรุณาตรวจวันที่ ระดับ เวลา คะแนน และ Group";
         if (!reason && new Set(desired.at.map((test) => JSON.stringify(test))).size !== desired.at.length) reason = "พบ AT ซ้ำในรายงาน กรุณาตรวจก่อนกรอก";
@@ -100,7 +105,7 @@ export function planKsisReportDraft(records, document, period, subject, { includ
             birthDate: record['วันเกิด'] || '', matchMethod: matched.method, studentKey: matched.studentKey,
             outsidePage: !target && !matched.reason,
             requiresIdentityConfirmation: matched.method === 'name_birth_date' && (Boolean(matched.reason) || targets.length !== 1),
-            key: target?.key, isKc: record.IsKc === true, skipped, desired, before: target || null, ready: !reason, reason });
+            key: target?.key, isKc: record.IsKc === true, skipped, returningFromAbsent, desired, before: target || null, ready: !reason, reason });
     }
     return result;
 }
@@ -253,7 +258,7 @@ export function groupKsisStudentBatches(rows, size = 10) {
     if (!Number.isInteger(size) || size < 1) throw new RangeError("Invalid student batch size");
     const students = new Map();
     for (const row of rows) {
-        if (!row.ready || row.skipped || row.requiresIdentityConfirmation && !row.identityConfirmed || row.desired.status === "A" || row.before?.status.value === "A") continue;
+        if (!row.ready || skipDraftRow(row) || row.requiresIdentityConfirmation && !row.identityConfirmed) continue;
         const student = ksisDraftStudentKey(row);
         if (!students.has(student)) students.set(student, []);
         students.get(student).push(row);
@@ -353,12 +358,13 @@ export async function fillKsisReportRows(page, rows, guard, { includeSupplementa
     let currentRow;
     try {
         for (const row of rows) {
-            if (row.skipped || row.desired.status === "A" || row.before?.status.value === "A") continue;
+            if (skipDraftRow(row)) continue;
             currentRow = row;
             if (row.requiresIdentityConfirmation && !row.identityConfirmed) throw httpError(409, 'ยังไม่ได้ยืนยันคู่ชื่อและวันเกิด ไม่เริ่มกรอก');
             step = "ตรวจแถวรายวิชา";
             if (page.url() !== REPORT_URL) throw httpError(409, "หน้า KSIS เปลี่ยนระหว่างกรอก หยุดทันที");
-            if (row.matchMethod === 'name_birth_date' || row.requiresIdentityConfirmation) {
+            if (row.matchMethod === 'name_birth_date' || row.requiresIdentityConfirmation
+                || isReturnFromAbsent(row.before?.status.value, row.desired.status)) {
                 const actual = (await page.evaluate(readKsisDraftDocument)).rows.filter((item) => item.key === row.key);
                 if (actual.length !== 1 || actual[0].fullName !== row.before.fullName || actual[0].subject !== row.subject
                     || actual[0].kumonId !== row.before.kumonId || normalizeKsisBirthDate(actual[0].birthDate) !== normalizeKsisBirthDate(row.birthDate)) {
@@ -369,9 +375,23 @@ export async function fillKsisReportRows(page, rows, guard, { includeSupplementa
             if (await target.count() !== 1) throw httpError(409, "ไม่พบแถวรายวิชาเดิมใน KSIS");
             const currentStatus = (await page.evaluate(readKsisDraftDocument)).rows.find((item) => item.key === row.key)?.status;
             if (!currentStatus) throw httpError(409, 'อ่าน ST1 ใน KSIS ไม่ได้ หยุดก่อนกรอก');
+            const returningFromAbsent = isReturnFromAbsent(row.before?.status.value, row.desired.status);
+            if (returningFromAbsent && !['A', 'R'].includes(currentStatus.value)) throw httpError(409, 'ST1 เปลี่ยนหลัง Preview กรุณาเตรียมข้อมูลใหม่ก่อนกลับมาเรียน');
+            if (currentStatus.value === 'A' && row.desired.status !== 'R') throw httpError(409, 'KSIS เปลี่ยนเป็น A หยุดก่อนกรอกสถานะอื่น');
             if (currentStatus.value !== row.desired.status) {
                 if (!currentStatus.writable || !currentStatus.options?.includes(row.desired.status)) throw httpError(409, `KSIS ไม่อนุญาต ST1 ${row.desired.status}`);
                 await selectLabel(target.locator("td").nth(9).locator("select:visible"), row.desired.status, " ST1");
+            }
+            if (returningFromAbsent) {
+                if (guard.blocked()) throw httpError(409, 'KSIS ส่งคำขอที่ไม่อนุญาตระหว่างเปลี่ยน A เป็น R หยุดให้ตรวจ');
+                step = 'รอ KSIS ยืนยันสถานะกลับมาเรียน R';
+                await page.waitForFunction(key => {
+                    const row = Array.from(document.querySelectorAll('tr[data-clrowid]')).find(row => row.getAttribute('data-clrowid') === key);
+                    const cell = row?.cells[9];
+                    const select = Array.from(cell?.querySelectorAll('select') || [])
+                        .find(select => select.getClientRects().length && getComputedStyle(select).visibility === 'visible');
+                    return (select ? select.selectedOptions[0]?.textContent.trim() : cell?.innerText.trim()) === 'R';
+                }, row.key, { timeout: 8000 });
             }
             if (!["A", "OT", "D", "CP"].includes(row.desired.status)) {
                 if (row.desired.level) {
