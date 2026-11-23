@@ -58,7 +58,9 @@ export function compareKsisWs(records, documents, { subject = "ALL", scope = "cu
             actual: actual ? { level: actual.level.value, worksheet: actual.worksheet.value, used: actual.used.value, status: actual.status.value } : null,
             differences: [], outcome: "matched", reason: "" };
         if (scope === "current" && !actual && matched.method === 'kumon_id' && !matched.reason) { outsidePage++; continue; }
-        if (isAbsent(record.Status1) || targets.some((target) => isAbsent(target.status.value))) {
+        // Skip inactive Report rows only. An active/R Report row against A/OT
+        // in KSIS is a real status mismatch and must remain visible to review.
+        if (isAbsent(record.Status1)) {
             row.outcome = "skipped"; row.reason = "ข้ามสถานะ A/OT";
         } else if (matched.reason) {
             row.outcome = "review"; row.reason = matched.reason === 'รหัสและวิชาซ้ำใน KSIS'

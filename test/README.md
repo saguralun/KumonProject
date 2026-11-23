@@ -182,6 +182,9 @@ restart-helper test, not necessary for this suite's application regression check
   WS audit accepts one child's distinct subjects across page boundaries, even
   for N/EO/IT without IDs. Same-page duplicate headers, repeated subject rows
   and different local students sharing an identity remain reviewable.
+  WS audit skips A/OT only when the Report itself is inactive (or the row exists
+  only in KSIS). Active Report rows, including R, against KSIS A/OT are visible
+  mismatches. The audit does not authorize or change KSIS statuses.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

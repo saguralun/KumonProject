@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compareKsisWs, isKsisAuditReadRequest } from "../services/ksisWsAudit.js";
+import { planKsisReportDraft } from '../services/ksisReportDraft.js';
 
 const record = (extra = {}) => ({ "รหัสคุมอง": "7642650000001", "ชื่อจริง": "ตัวอย่าง", "นามสกุล": "ทดสอบ", "วันเกิด": "01/01/2020",
     Subject: "ME", CurrentLevel: "C90", WksUsed: 8, Status1: "C", ...extra });
@@ -56,9 +57,9 @@ test("WS audit independently compares level, packet endpoint, used and ST1 and d
     assert.equal(compareKsisWs([record({ IsKc: true, WksUsed: 99 })], docs([site({ used: { value: "1" } })])).counts.matched, 1);
 });
 
-test("WS audit skips A/OT from either source without converting stored statuses and isolates ambiguous matches", () => {
+test("WS audit skips inactive Report rows, flags active-versus-inactive KSIS rows and isolates ambiguous matches", () => {
     assert.equal(compareKsisWs([record({ Status1: "A" })], docs([site()])).counts.skipped, 1);
-    assert.equal(compareKsisWs([record()], docs([site({ status: { value: "A" } })])).counts.skipped, 1);
+    assert.equal(compareKsisWs([record()], docs([site({ status: { value: "A" } })])).counts.mismatch, 1);
     for (const [records, documents] of [[ [record()], docs([site({ birthDate: "02/01/2020" })]) ],
         [ [record(), record()], docs([site()]) ], [ [record()], docs([site(), site({ key: 'another' })]) ],
         [ [record({ CurrentLevel: "" })], docs([site()]) ], [ [record({ CurrentLevel: "C81" })], docs([site()]) ],
@@ -128,12 +129,40 @@ test('OT is skipped like A even without worksheet data, including KSIS-only rows
     const absent = record({ Status1: 'OT', CurrentLevel: '', WksUsed: 0 });
     const actual = site({ level: { value: 'D' }, worksheet: { value: '170' }, used: { value: '' }, status: { value: 'OT' } });
     const before = JSON.stringify({ absent, actual });
-    for (const [records, documents] of [[[absent], docs([actual])], [[record()], docs([actual])], [[], docs([actual])]]) {
+    for (const [records, documents] of [[[absent], docs([actual])], [[], docs([actual])]]) {
         const result = compareKsisWs(records, documents, { scope: 'all' });
         assert.equal(result.counts.skipped, 1); assert.equal(result.counts.review, 0); assert.equal(result.counts.mismatch, 0);
         assert.match(result.rows[0].reason, /A\/OT/);
     }
     assert.equal(JSON.stringify({ absent, actual }), before);
+});
+
+test('R re-enrollments in Report remain mismatches against A/OT in KSIS without authorizing status changes', () => {
+    for (const actualStatus of ['A', 'OT']) {
+        const records = [record({ ID: 1, StudentId: 100, Subject: 'ME', CurrentLevel: 'B40', WksUsed: 18, Status1: 'R' }),
+            record({ ID: 2, StudentId: 100, Subject: 'EFL', CurrentLevel: '7A150', WksUsed: 19, Status1: 'R' })];
+        const targets = [site({ key: 'return-me', level: { value: 'A' }, worksheet: { value: '50' }, used: { value: '' }, status: { value: actualStatus } }),
+            site({ key: 'return-efl', subject: 'EFL', level: { value: '7A' }, worksheet: { value: '120' }, used: { value: '' }, status: { value: actualStatus } })];
+        const documents = [{ page: 7, rows: targets }];
+        const before = structuredClone({ records, documents });
+        for (const scope of ['current', 'all']) {
+            const result = compareKsisWs(records, documents, { scope });
+            assert.equal(result.counts.mismatch, 2); assert.equal(result.counts.skipped, 0);
+            for (const row of result.rows) {
+                const status = row.differences.find(field => field.field === 'status');
+                assert.equal(status.expected, 'R'); assert.equal(status.actual, actualStatus);
+                assert.ok(row.differences.some(field => field.field === 'used'));
+            }
+        }
+        if (actualStatus === 'A') {
+            const preview = planKsisReportDraft(records, { context: 'ชื่อศูนย์ TEST ประจำเดือน Nov - 2026', page: 7, rows: targets },
+                { month: 11, year: 2026 }, 'ALL', { includeZun: false });
+            assert.ok(preview.every(row => row.skipped && !row.ready));
+        }
+        assert.deepEqual({ records, documents }, before);
+    }
+    // An ordinary active row is also not hidden when KSIS still marks it OT.
+    assert.equal(compareKsisWs([record()], docs([site({ status: { value: 'OT' } })])).counts.mismatch, 1);
 });
 
 test("WS audit separates off-page, missing KSIS, missing Report and subjects without guessing matches by name", () => {

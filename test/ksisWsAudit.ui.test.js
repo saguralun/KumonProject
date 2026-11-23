@@ -5,7 +5,42 @@ import express from "express";
 import { once } from "node:events";
 import os from "node:os";
 import path from "node:path";
-import { readSavedKsisWsPages } from "../services/ksisWsAudit.js";
+import { readSavedKsisWsPages, compareKsisWs } from "../services/ksisWsAudit.js";
+import { controlFixture } from './support/controlFixture.js';
+
+test('WS issues show both R-versus-A subjects instead of hiding them in skipped rows', {
+    skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000
+}, async () => {
+    const records = ['ME', 'EFL'].map((Subject, index) => ({ ID: index + 1, StudentId: 100,
+        'รหัสคุมอง': '7642650000001', 'ชื่อจริง': 'เด็กกลับมาเรียน', 'นามสกุล': 'ทดสอบ', 'วันเกิด': '01/01/2020',
+        Subject, Status1: 'R', CurrentLevel: index === 0 ? 'B40' : '7A150', WksUsed: index === 0 ? 18 : 19 }));
+    const rows = records.map((record, index) => ({ key: `return-${index}`, kumonId: '7642650000001', fullName: 'เด็กกลับมาเรียน ทดสอบ',
+        birthDate: '01/01/2020', subject: record.Subject, level: { value: index === 0 ? 'A' : '7A' },
+        worksheet: { value: index === 0 ? '50' : '120' }, used: { value: '' }, status: { value: 'A' } }));
+    const audit = compareKsisWs(records, [{ page: 7, rows }], { scope: 'all' });
+    const f = await controlFixture('ksis', async (req, res) => {
+        if (req.path !== '/ksis/ws-audit') return false;
+        res.json({ ...audit, context: 'ชื่อศูนย์ TEST ประจำเดือน Nov - 2026', period: { month: 11, year: 2026 },
+            scope: 'all', subject: 'ALL', pagesRead: 1, originalPage: 7, verifiedAt: new Date().toISOString(), readOnly: true });
+        return true;
+    });
+    try {
+        await f.page.locator('#ksisAuditButton').click();
+        await f.page.locator('#ksisAuditAll').click();
+        await f.page.waitForFunction(() => document.querySelectorAll('#ksisAuditRows tbody tr').length === 2);
+        await f.page.locator('#ksisAuditFilter').selectOption('issues');
+        assert.equal(await f.page.locator('#ksisAuditRows tbody tr').count(), 2);
+        assert.match(await f.page.locator('#ksisAuditCounts').innerText(), /ไม่ตรงกัน\s*2/);
+        for (const row of await f.page.locator('#ksisAuditRows tbody tr').all()) {
+            const status = row.locator('td').nth(5);
+            assert.deepEqual(await status.locator('.audit-value').allTextContents(), ['R', 'A']);
+            assert.match(await status.getAttribute('class'), /audit-difference/);
+            assert.equal(await row.locator('.match-state').innerText(), 'ไม่ตรงกัน');
+        }
+        assert.ok(f.requests.every(request => ['GET', 'HEAD'].includes(request.method) || request.path === '/ksis/ws-audit'));
+        assert.deepEqual(f.errors, []);
+    } finally { await f.close(); }
+});
 
 const url = "https://kao.ksis.kumon.com/kth/#/reportbeditgrid";
 function fixture(initial, dirty = false, autoSave = false) {
