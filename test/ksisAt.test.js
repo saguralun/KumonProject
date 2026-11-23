@@ -51,14 +51,13 @@ test('AT refuses wrong month, subject, dirty data, modal, locked report, invalid
     }
 });
 
-test('AT handles multiple tests per pupil without a false duplicate identity, and requires confirmations for no-ID matches', () => {
+test('AT handles multiple tests per pupil and accepts unique no-ID identity matches automatically', () => {
     const multi = document([blank(), blank({ key: 'guid-class-1' }), blank({ key: 'guid-class-2' })]);
     assert.equal(planKsisAt([record()], multi, period, 'ME')[0].outcome, 'ready');
     const site = document(); site.students[0].kumonId = '';
     const rows = planKsisAt([record({ 'รหัสคุมอง': '', Status1: 'N' })], site, period, 'ME');
-    assert.equal(rows[0].requiresIdentityConfirmation, true); assert.equal(rows[0].outcome, 'ready');
-    assert.deepEqual(selectConfirmedKsisAt(rows), []);
-    assert.equal(selectConfirmedKsisAt(rows, [rows[0].id]).length, 1);
+    assert.equal(rows[0].requiresIdentityConfirmation, false); assert.equal(rows[0].outcome, 'ready');
+    assert.equal(selectConfirmedKsisAt(rows).length, 1);
     assert.throws(() => selectConfirmedKsisAt(rows, ['wrong']), { statusCode: 400 });
     assert.throws(() => selectConfirmedKsisAt(rows, [rows[0].id, rows[0].id]), { statusCode: 400 });
     site.students[0].birthDate = '02/01/2020';
@@ -70,9 +69,8 @@ test('AT can use name, DOB and subject when either side has no ID, even for C, w
         const source = record({ 'รหัสคุมอง': localId });
         const site = document(); site.students[0].kumonId = siteId;
         const [row] = planKsisAt([source], site, period, 'ME');
-        assert.equal(row.outcome, 'ready'); assert.equal(row.requiresIdentityConfirmation, true);
-        assert.deepEqual(selectConfirmedKsisAt([row]), []);
-        assert.equal(selectConfirmedKsisAt([row], [row.id]).length, 1);
+        assert.equal(row.outcome, 'ready'); assert.equal(row.requiresIdentityConfirmation, false);
+        assert.equal(selectConfirmedKsisAt([row]).length, 1);
         assert.equal(source['รหัสคุมอง'], localId); assert.equal(site.students[0].kumonId, siteId);
     }
     const [row] = planKsisAt([record({ 'รหัสคุมอง': '7642650000002' })], document(), period, 'ME');

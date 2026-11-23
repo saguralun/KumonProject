@@ -71,7 +71,7 @@ test('WS fills the editable Kendo input when the readonly display stays visible,
     } finally { await browser.close(); }
 });
 
-test('Visible fixed R/IT/N/EO statuses override hidden selects and allow only confirmed WS fills, retaining recognized old warnings', {
+test('Visible fixed R/IT/N/EO statuses override hidden selects and allow unique identity WS fills, retaining recognized old warnings', {
     skip: process.env.TEST_BROWSER_UI !== '1', timeout: 25000
 }, async () => {
     const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
@@ -96,7 +96,7 @@ test('Visible fixed R/IT/N/EO statuses override hidden selects and allow only co
                 'วันเกิด': '01/01/2020', CurrentLevel: 'C90', WksUsed: 8, Status1 }], doc, { month: 10, year: 2026 }, 'ME', { includeZun: false });
             assert.equal(rows[0].ready, true);
             const guard = await installKsisDraftGuard(page);
-            const confirmed = selectConfirmedKsisDraftRows(rows, [{ enrollmentId: 1, key: 'student-me' }]);
+            const confirmed = selectConfirmedKsisDraftRows(rows);
             const result = await fillKsisReportRows(page, confirmed, guard);
             assert.deepEqual(result.completedKeys, ['student-me']); assert.equal(result.notices.length, 1);
             const actual = (await page.evaluate(readKsisDraftDocument)).rows[0];
@@ -116,7 +116,7 @@ test('Visible fixed R/IT/N/EO statuses override hidden selects and allow only co
     } finally { await browser.close(); }
 });
 
-test('Confirmed ID-less students fill the exact subject row, while unconfirmed rows never change or save', {
+test('Automatically matched ID-less students fill the exact row and still stop if identity changes after Preview', {
     skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000
 }, async () => {
     const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
@@ -136,10 +136,11 @@ test('Confirmed ID-less students fill the exact subject row, while unconfirmed r
             'วันเกิด': '01/01/2020', CurrentLevel: 'C90', WksUsed: 8, Status1: 'N' }], await page.evaluate(readKsisDraftDocument), { month: 10, year: 2026 }, 'ME', { includeZun: false });
         assert.equal(rows[0].ready, true);
         const guard = await installKsisDraftGuard(page, { allowBatchSave: true });
-        await assert.rejects(fillKsisReportRows(page, rows, guard), /ยังไม่ได้ยืนยันคู่/);
+        // An existing older preview still retains its explicit confirmation guard.
+        await assert.rejects(fillKsisReportRows(page, rows.map(row => ({ ...row, requiresIdentityConfirmation: true })), guard), /ยังไม่ได้ยืนยันคู่/);
         assert.equal((await page.evaluate(readKsisDraftDocument)).rows[0].used.value, '0');
         assert.equal(saves, 0);
-        const confirmed = selectConfirmedKsisDraftRows(rows, [{ enrollmentId: 1, key: 'student-me' }]);
+        const confirmed = selectConfirmedKsisDraftRows(rows);
         await page.locator('table.vk-grid-content-student').evaluate((table) => { table.rows[0].cells[1].textContent = 'เด็กคนอื่น ทดสอบ'; });
         await assert.rejects(fillKsisReportRows(page, confirmed, guard), /เปลี่ยนหลังยืนยันคู่/);
         assert.equal(saves, 0);

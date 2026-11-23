@@ -167,9 +167,14 @@ restart-helper test, not necessary for this suite's application regression check
 - KSIS roster previews separate ID-less children by exact name and DOB, merge
   only repeated copies of that identity, and show missing IDs as neutral info.
   WS/AT planning and audits accept an ID missing on either side regardless of
-  active status. Unique name/DOB/subject matches still require per-preview
-  identity review before filling; duplicate identities, bad dates and conflicting
-  known IDs remain blocked. Blank IDs never enter the ID-import save endpoint.
+  active status. Unique exact name/DOB/subject matches are ready without a
+  per-row checkbox; duplicate identities, bad dates and conflicting
+  known IDs remain blocked for existing-student statuses. N/EO/IT bypass IDs
+  (including temporary or conflicting values) and match exact name/DOB/subject;
+  they retain duplicate protection and identity rechecks immediately before
+  filling. The single final fill/save confirmation is still required. Off-page children
+  are separated from missing DOB or same-name/DOB conflicts. Blank IDs never
+  enter the ID-import save endpoint, and matching never changes stored IDs.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

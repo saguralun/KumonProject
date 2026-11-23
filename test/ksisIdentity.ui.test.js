@@ -7,7 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { planKsisReportDraft, selectConfirmedKsisDraftRows } from '../services/ksisReportDraft.js';
 
-test('ID-less preview shows both identities, requires unchecked per-subject confirmation, sends only selected matches and resets on new preview', {
+test('Unique ID-less matches need no per-row checkbox, retain both identities and require one final save confirmation', {
     skip: process.env.TEST_BROWSER_UI !== '1', timeout: 30000
 }, async () => {
     const field = (value, options = null) => ({ value, options, writable: true });
@@ -34,28 +34,24 @@ test('ID-less preview shows both identities, requires unchecked per-subject conf
             if (url.pathname.endsWith('/draft/fill')) {
                 const body = route.request().postDataJSON(); fillRequests.push(body);
                 const selected = selectConfirmedKsisDraftRows(rows, body.confirmedIdentityMatches);
-                data = { success: true, saved: true, pendingDraft: false, page: 1, studentsFilled: 1, studentsSaved: 1, filled: 1, savedCount: 1, batchesSaved: 1,
+                data = { success: true, saved: true, pendingDraft: false, page: 1, studentsFilled: 1, studentsSaved: 1, filled: 2, savedCount: 2, batchesSaved: 1,
                     rows: selected.map((row) => ({ ...row, outcome: row.ready ? 'saved' : 'blocked', resultReason: row.reason })) };
             }
             await route.fulfill({ contentType: 'application/json', body: JSON.stringify(data) });
         });
         await page.goto(`http://127.0.0.1:${server.address().port}/ksis.html`);
-        await page.locator('#ksisDraftPreview').click(); await page.locator('[data-confirm-identity]').first().waitFor();
-        assert.equal(await page.locator('[data-confirm-identity]').count(), 2);
-        assert.equal(await page.locator('[data-confirm-identity]:checked').count(), 0);
+        await page.locator('#ksisDraftPreview').click();
+        await page.getByText('จับคู่ชื่อและวันเกิดตรงกันแล้ว', { exact: true }).first().waitFor();
+        assert.equal(await page.locator('[data-confirm-identity]').count(), 0);
         assert.equal(await page.locator('#ksisDraftRows .match-conflict').count(), 1); // genuinely missing DOB only
-        assert.equal(await page.locator('#ksisDraftRows .match-info').count(), 2);
-        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
+        assert.equal(await page.locator('#ksisDraftRows .match-exact').count(), 2);
+        assert.equal(await page.locator('#ksisDraftFill').isEnabled(), true);
         assert.match(await page.locator('#ksisDraftRows').innerText(), /Report: นักเรียนตัวอย่าง ทดสอบ • 01\/01\/2563/);
         assert.match(await page.locator('#ksisDraftRows').innerText(), /KSIS: นักเรียนตัวอย่าง ทดสอบ • 01\/01\/2020/);
         assert.match(await page.locator('#ksisDraftRows').innerText(), /เด็กวันเกิดไม่ครบ/);
         assert.equal(fillRequests.length, 0);
-        await page.getByRole('checkbox', { name: 'ยืนยันคู่ นักเรียนตัวอย่าง ทดสอบ ME', exact: true }).check();
-        assert.equal(await page.locator('#ksisDraftFill').isEnabled(), true);
-        assert.match(await page.locator('#ksisDraftSource').innerText(), /พร้อม 1 รายวิชา • รอยืนยันชื่อ 1 รายวิชา/);
-        await page.getByRole('checkbox', { name: 'ยืนยันคู่ นักเรียนตัวอย่าง ทดสอบ ME', exact: true }).uncheck();
-        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
-        await page.getByRole('checkbox', { name: 'ยืนยันคู่ นักเรียนตัวอย่าง ทดสอบ ME', exact: true }).check();
+        assert.match(await page.locator('#ksisDraftSource').innerText(), /พร้อม 2 รายวิชา/);
+        assert.doesNotMatch(await page.locator('#ksisDraftSource').innerText(), /รอยืนยันชื่อ/);
         for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
             await page.setViewportSize(viewport);
             assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
@@ -67,16 +63,20 @@ test('ID-less preview shows both identities, requires unchecked per-subject conf
         assert.equal(await page.locator('#ksisDraftRows').evaluate((element) => element.scrollWidth <= element.clientWidth + 1), true);
         await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ksis-identity-preview-test.png'), fullPage: true });
         await page.locator('#ksisDraftFill').click(); await page.locator('#ksisDraftDialog[open]').waitFor();
-        assert.match(await page.locator('#ksisDraftConfirmText').innerText(), /1 รายวิชา • ยืนยันคู่ชื่อแล้ว 1 รายวิชา/);
+        assert.match(await page.locator('#ksisDraftConfirmText').innerText(), /2 รายวิชา/);
         assert.equal(fillRequests.length, 0);
+        await page.locator('#ksisDraftCancel').click();
+        assert.equal(fillRequests.length, 0);
+        await page.locator('#ksisDraftFill').click();
         await page.locator('#ksisDraftConfirm').click();
         await page.waitForFunction(() => document.querySelector('#ksisDraftRows')?.textContent.includes('กรอกและบันทึกแล้ว'));
         assert.equal(fillRequests.length, 1);
-        assert.deepEqual(fillRequests[0].confirmedIdentityMatches, [{ enrollmentId: 1, key: 'new-ME' }]);
-        assert.match(await page.locator('#ksisDraftRows').innerText(), /ยังไม่ได้ยืนยันคู่ชื่อและวันเกิด/);
-        await page.locator('#ksisDraftPreview').click(); await page.locator('[data-confirm-identity]').first().waitFor();
-        assert.equal(await page.locator('[data-confirm-identity]:checked').count(), 0);
-        assert.equal(await page.locator('#ksisDraftFill').isDisabled(), true);
+        assert.deepEqual(fillRequests[0].confirmedIdentityMatches, []);
+        assert.match(await page.locator('#ksisDraftRows').innerText(), /วันเกิดไม่ครบ/);
+        await page.locator('#ksisDraftPreview').click();
+        await page.getByText('จับคู่ชื่อและวันเกิดตรงกันแล้ว', { exact: true }).first().waitFor();
+        assert.equal(await page.locator('[data-confirm-identity]').count(), 0);
+        assert.equal(await page.locator('#ksisDraftFill').isEnabled(), true);
         assert.deepEqual(errors, []);
     } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 });

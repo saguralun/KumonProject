@@ -93,7 +93,8 @@ export function planKsisReportDraft(records, document, period, subject, { includ
         if (skipped) reason = "ข้ามสถานะ A ให้จัดการสถานะเองใน KSIS";
         result.push({ enrollmentId: record.ID, kumonId, name: `${record["ชื่อจริง"]} ${record["นามสกุล"]}`, subject: record.Subject,
             birthDate: record['วันเกิด'] || '', matchMethod: matched.method, studentKey: matched.studentKey,
-            requiresIdentityConfirmation: matched.method === 'name_birth_date',
+            outsidePage: !target && !matched.reason,
+            requiresIdentityConfirmation: matched.method === 'name_birth_date' && (Boolean(matched.reason) || targets.length !== 1),
             key: target?.key, isKc: record.IsKc === true, skipped, desired, before: target || null, ready: !reason, reason });
     }
     return result;
@@ -351,7 +352,7 @@ export async function fillKsisReportRows(page, rows, guard, { includeSupplementa
             if (row.requiresIdentityConfirmation && !row.identityConfirmed) throw httpError(409, 'ยังไม่ได้ยืนยันคู่ชื่อและวันเกิด ไม่เริ่มกรอก');
             step = "ตรวจแถวรายวิชา";
             if (page.url() !== REPORT_URL) throw httpError(409, "หน้า KSIS เปลี่ยนระหว่างกรอก หยุดทันที");
-            if (row.requiresIdentityConfirmation) {
+            if (row.matchMethod === 'name_birth_date' || row.requiresIdentityConfirmation) {
                 const actual = (await page.evaluate(readKsisDraftDocument)).rows.filter((item) => item.key === row.key);
                 if (actual.length !== 1 || actual[0].fullName !== row.before.fullName || actual[0].subject !== row.subject
                     || actual[0].kumonId !== row.before.kumonId || normalizeKsisBirthDate(actual[0].birthDate) !== normalizeKsisBirthDate(row.birthDate)) {

@@ -96,8 +96,9 @@ export function planKsisAt(records, document, period, subject) {
             rows.push({ id: `${record.ID}:${suffix || '0'}`, enrollmentId: record.ID, subject, name: `${record['ชื่อจริง']} ${record['นามสกุล']}`,
                 kumonId: normalizeKumonStudentId(record['รหัสคุมอง']), birthDate: record['วันเกิด'], targetBirthDate: student?.birthDate || '', targetName: student?.fullName || '',
                 studentKey: student?.studentKey, key: student?.key, matchMethod: matched.method,
-                requiresIdentityConfirmation: matched.method === 'name_birth_date', desired,
-                outcome: reason ? 'review' : identical.length ? 'existing' : 'ready', reason });
+                requiresIdentityConfirmation: matched.method === 'name_birth_date' && (Boolean(matched.reason) || matched.targets.length !== 1), desired,
+                outsidePage: !student && !matched.reason,
+                outcome: !student && !matched.reason ? 'outside_page' : reason ? 'review' : identical.length ? 'existing' : 'ready', reason });
         }
     }
     return rows;
