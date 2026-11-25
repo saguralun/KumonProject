@@ -104,11 +104,21 @@ export function renderHistory(container, rows, monthSummary) {
                                     ? `
                                         <input
                                             type="date"
+                                            required
                                             class="history-date-input"
                                             value="${escapeHtml(row.worksheetDate)}"
                                             data-edit-history-date-id="${escapeHtml(row.worksheetUsedId)}"
                                             aria-label="Edit worksheet date"
+                                            aria-describedby="history-date-draft-${escapeHtml(row.worksheetUsedId)}"
+                                            title="Enter บันทึก • Esc ยกเลิก • Tab เก็บค่าค้างไว้"
                                         >
+                                        <div class="history-date-draft" id="history-date-draft-${escapeHtml(row.worksheetUsedId)}" data-history-date-draft-id="${escapeHtml(row.worksheetUsedId)}" hidden>
+                                            <div>ยังไม่บันทึก • เดิม ${escapeHtml(formatDateDisplay(row.worksheetDate))}</div>
+                                            <div class="history-date-actions">
+                                                <button type="button" data-save-history-date-id="${escapeHtml(row.worksheetUsedId)}">บันทึกวันที่</button>
+                                                <button type="button" data-cancel-history-date-id="${escapeHtml(row.worksheetUsedId)}">ยกเลิก</button>
+                                            </div>
+                                        </div>
                                     `
                                     : escapeHtml(formatDateDisplay(row.worksheetDate))}
                             </td>

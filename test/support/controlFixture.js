@@ -40,6 +40,8 @@ export async function controlFixture(pageName, handle, { embedded = false } = {}
     writes: () => requests.filter(request => !['GET', 'HEAD'].includes(request.method)),
     choose: async accepted => { await page.locator(accepted ? '#appDialogConfirm' : '#appDialogCancel').click(); },
     close: async () => {
+      // Fixture teardown explicitly discards only its synthetic form values.
+      await page.evaluate(() => window.kumonLeaveGuard?.allowNextUnload()).catch(() => {});
       await desktop?.application.close(); await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
       const relative = path.relative(path.resolve(os.tmpdir()), path.resolve(root));
       if (relative && !relative.startsWith('..') && !path.isAbsolute(relative)) await fs.rm(root, { recursive: true, force: true });

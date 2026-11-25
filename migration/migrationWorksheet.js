@@ -12,6 +12,20 @@ import {
     insertRowsInBatches,
     summaryValue
 } from "./migrationImportCommon.js";
+import {
+    clean,
+    nullable,
+    lookupKey,
+    masterKey,
+    previewKey,
+    pad2,
+    isValidDate,
+    parsePositiveInteger,
+    parseMonth,
+    sortedLevelCodes,
+    issueList,
+    countIssueMaps
+} from "./migrationValueHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,49 +104,6 @@ function registerCacheCleanup() {
     process.once("exit", cleanupCacheFileSync);
 }
 
-function clean(value) {
-    if (value === undefined || value === null) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/\uFEFF/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-function nullable(value) {
-    const text = clean(value);
-
-    return text || null;
-}
-
-function lookupKey(value) {
-    return clean(value).toLowerCase();
-}
-
-function masterKey(...parts) {
-    return parts.map((part) => lookupKey(part)).join("|");
-}
-
-function previewKey(...parts) {
-    return masterKey(...parts);
-}
-
-function pad2(value) {
-    return String(value).padStart(2, "0");
-}
-
-function isValidDate(year, month, day) {
-    const date = new Date(Date.UTC(year, month - 1, day));
-
-    return (
-        date.getUTCFullYear() === year &&
-        date.getUTCMonth() === month - 1 &&
-        date.getUTCDate() === day
-    );
-}
-
 function parseDateToAd(value, label) {
     const text = clean(value);
 
@@ -196,55 +167,6 @@ function retentionCutoffDate() {
     return dateKeyFromDate(cutoff);
 }
 
-function parsePositiveInteger(value, label) {
-    const text = clean(value);
-
-    if (!text) {
-        return {
-            value: null,
-            error: `${label} is required.`
-        };
-    }
-
-    if (!/^\d+$/.test(text)) {
-        return {
-            value: null,
-            error: `${label} must be a positive integer: ${text}`
-        };
-    }
-
-    const numberValue = Number(text);
-
-    if (!Number.isSafeInteger(numberValue) || numberValue < 1) {
-        return {
-            value: null,
-            error: `${label} must be a positive integer: ${text}`
-        };
-    }
-
-    return {
-        value: numberValue,
-        error: null
-    };
-}
-
-function parseMonth(value, label) {
-    const parsed = parsePositiveInteger(value, label);
-
-    if (parsed.error) {
-        return parsed;
-    }
-
-    if (parsed.value < 1 || parsed.value > 12) {
-        return {
-            value: parsed.value,
-            error: `${label} must be 1-12: ${parsed.value}`
-        };
-    }
-
-    return parsed;
-}
-
 function parseYear(value, label) {
     const parsed = parsePositiveInteger(value, label);
 
@@ -294,12 +216,6 @@ function parseBooleanWithDefault(value, label, defaultValue) {
         defaulted: false,
         error: `${label} must be TRUE or FALSE: ${clean(value)}`
     };
-}
-
-function sortedLevelCodes(levels) {
-    return levels
-        .map((level) => level.level_code)
-        .sort((a, b) => b.length - a.length || a.localeCompare(b));
 }
 
 function parseLevelCode(value, candidateCodes) {
@@ -367,22 +283,6 @@ function addIssue(issueMap, value, row, message) {
             message
         });
     }
-}
-
-function issueList(issueMap) {
-    return [...issueMap.values()]
-        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-}
-
-function issueCount(issueMap) {
-    return [...issueMap.values()]
-        .reduce((sum, issue) => sum + issue.count, 0);
-}
-
-function countIssueMaps(issueMaps) {
-    return Object.fromEntries(
-        Object.entries(issueMaps).map(([key, value]) => [key, issueCount(value)])
-    );
 }
 
 function addError(row, issues, category, value, message) {

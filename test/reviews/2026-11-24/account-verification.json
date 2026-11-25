@@ -1,0 +1,121 @@
+{
+  "date": "2026-11-24",
+  "kind": "two-machine-permission-edits-and-account-separation",
+  "baseCommit": "6afa0847489b23cfc0b524cf478e15771f4402f5",
+  "uncommittedWorkingTree": true,
+  "productionDataOperations": false,
+  "productionSchemaChanges": false,
+  "commitPushOrProductionRestart": false,
+  "before": [
+    {
+      "log": "logs/round4-two-pages-before.log",
+      "sha256": "3827f182ec88b2c350e3beb0f08fdba89ced5557d7cba238ef6f9caaac267ea3",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "log": "logs/round4-permissions-before.log",
+      "sha256": "6ce06a080fb30c0ac1e1f1542943ec0699bedb3d3f648268b485a3d1f17b79d8",
+      "tests": 2,
+      "pass": 1,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "log": "logs/round4-account-before.log",
+      "sha256": "3a32b4993f23f783f9905b04f4dd0c7ade43cb7e77171db6c3b99d34bfd66040",
+      "tests": 1,
+      "pass": 0,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0
+    }
+  ],
+  "runs": {
+    "services": {
+      "log": "logs/round4-services.log",
+      "sha256": "b1068477599ad1c2bd91e650e0eeca6aec9fbb976f85aeae71d69a40ba90d3b9",
+      "tests": 345,
+      "pass": 344,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    "addedCreateHttp": {
+      "log": "logs/round4-create-http.log",
+      "sha256": "295356ac027e8a9beb22ab1eb49655dd5cc0d57c873bd5b0f9fbb19efdd2df26",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "database": {
+      "log": "logs/round4-isolated.log",
+      "sha256": "0f9009916815897546c456268ee35f2be71d678397a1fe6678903aacf69ccd11",
+      "tests": 45,
+      "pass": 45,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "ui": {
+      "log": "logs/round4-ui-final.log",
+      "sha256": "02b5984d159a2f7949fc526651bb2c7d9f873a452aa951b6e47a3f0ef6c253be",
+      "tests": 9,
+      "pass": 9,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "addedCreateUi": {
+      "log": "logs/round4-create-ui-final.log",
+      "sha256": "ebcfbe5a5642c36b9665452b31065682bf3eebf58a9bc16406227629f8cce3eb",
+      "tests": 1,
+      "pass": 1,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    }
+  },
+  "totals": {
+    "passed": 400,
+    "skipped": 1,
+    "failed": 0,
+    "cancelled": 0,
+    "services": 345,
+    "database": 45,
+    "ui": 10
+  },
+  "deduplication": "344 service checks plus one newly added HTTP check; 45 isolated PostgreSQL parent/subtests; 9 affected UI checks plus one newly added create-controls check. Focused rechecks are not counted again.",
+  "code": {
+    "services/authService.js": "c1348a7377362eac1636e912f898415b5f801510ca143b2650089ecda22119cd",
+    "services/roleService.js": "4a63ed340c0a535b1ed79b9e39c98433340a273a3d176a6ddc88cfb396c4f533",
+    "routes/userRoutes.js": "502984065a23c8b30a7481fabbd42789e8ba6153b1fdae03dbcec55d32a82b7e",
+    "routes/roleRoutes.js": "a33e8b3508b0178abeabfcd8b17bab9260b123c19944d72f16e4b6aa12448dea",
+    "public/js/users.js": "27b3e9f7304b810e4fdb1db9841c8558e6db025fada248c80e9bfcdedd804b88",
+    "public/users.html": "5f67572656ab53d6ce4fcc11bb58c65058ea892b0821d5d119542c8c90de898c",
+    "public/css/users.css": "df238a80f7685b2f7030da202db1c968c3d36bb8dacff092dc0a4d759272f20d",
+    "test/authPasswordReset.test.js": "8998c18658e55755f4e1e0cc481917190a58706b826cf5ee51d814cb194ef9cf",
+    "test/rolePermissionEdits.test.js": "7d737c3cfbe646867cf8f4dda0b0521c4c9f685c76a0f70eb46566b9f85d6a99",
+    "test/roleCacheConcurrency.test.js": "849c7abb58a94117c6d23b32adc5109a5b18fb5125e3762df76bd19496e2f926",
+    "test/usersAccountSafety.ui.test.js": "db498e1fc49ad2503ad81ca3956f01f29156a1bc408a4e02678f04420b9b64c8",
+    "test/support/authPasswordResetDatabaseChecks.js": "8e49433f9e768f0c2cb6b09d954f4b1be6212946d06e811029a0959210fa42f7",
+    "test/support/accountSeparationDatabaseChecks.js": "07a941ed445c0a9b5fe505e58d12aa19526be221cba15f9086cc47ee8bfe1cf8",
+    "test/isolatedDatabase.integration.test.js": "355eca39b6e3b98699cc5a503841b1777f1ce9aab4a59ad2174229e5d2259cec",
+    "test/ACCOUNT-FIXES-2026-11-24.md": "af4913b501f83c37bc1fb88de766c2d65cb745eaa11d91c581ceea10ef45341d",
+    "test/README.md": "2c55f384421a1d35ab43bd6d7bbef65f6376ec8255577ff5066a978c8d6c8246"
+  },
+  "limitations": [
+    "Synthetic accounts and isolated PostgreSQL only; no real users, payments, printers or KSIS saves.",
+    "Existing Windows helper restart test skipped; no production application restart."
+  ],
+  "initialUiFailures": {
+    "resetCleanup": "Queued dialog close event retained the secret momentarily; application clears it synchronously, complete affected reset UI run passed.",
+    "createControls": "Test observed the loading placeholder; wait now requires the returned row before identical role/activation assertions, full create-controls check passed."
+  }
+}

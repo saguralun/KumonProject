@@ -38,11 +38,15 @@ function accountsFixture(t, initial, { failWrite = false, failRollback = false }
                 if (normalized.startsWith('SELECT COUNT(*)')) {
                     return { rows: [{ count: working.filter(row => row.role === 'admin' && row.is_active && row.user_id !== Number(params[0])).length }] };
                 }
+                if (normalized === "SELECT to_regclass('session') IS NOT NULL AS session_table_exists") {
+                    return { rows: [{ session_table_exists: true }] };
+                }
                 if (normalized.startsWith('SELECT')) {
                     const row = working.find(row => normalized.includes('WHERE username') ? row.username === params[0] : row.user_id === Number(params[0]));
                     return { rows: row ? [{ ...row }] : [] };
                 }
                 if (failWrite) throw Error('fixture write failure');
+                if (normalized.startsWith('DELETE FROM "session"')) return { rows: [] };
                 if (normalized.startsWith('INSERT INTO app_user')) {
                     let row = working.find(row => row.username === params[0]);
                     if (!row) { row = { user_id: working.length + 1, username: params[0] }; working.push(row); }

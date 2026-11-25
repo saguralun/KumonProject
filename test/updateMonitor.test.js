@@ -37,3 +37,28 @@ test('Update monitoring retries, throttles focus, serializes requests and never 
   await settle(); assert.equal(requests.length, 4);
   assert.ok(requests.every(request => request.url === '/api/system/update-check' && request.options.cache === 'no-store'));
 });
+
+test('Offline version feedback retains the last success time and a manual read retry bypasses only the throttle', async t => {
+  const document = new EventTarget(), window = new EventTarget(), states = [], versions = [], requests = [];
+  document.hidden = false;
+  for (const [key, value] of Object.entries({ document, window })) {
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, key);
+    Object.defineProperty(globalThis, key, { value, configurable: true });
+    t.after(() => { if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key]; });
+  }
+  let now = 1000, offline = false;
+  t.mock.method(Date, 'now', () => now);
+  t.mock.method(globalThis, 'setInterval', () => 1); t.mock.method(globalThis, 'clearInterval', () => {});
+  t.mock.method(globalThis, 'fetch', async (url, options) => {
+    requests.push({ url, options });
+    return { ok: !offline, json: async () => offline ? { checked: false } : { checked: true, upToDate: false } };
+  });
+  const monitor = startUpdateMonitor(data => versions.push(data), { onCheckState: data => states.push(data) });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(states.at(-1).lastSuccessAt, 1000); assert.equal(states.at(-1).checked, true);
+  offline = true; now = 2000; await monitor.check();
+  assert.equal(states.at(-1).checked, false); assert.equal(states.at(-1).lastSuccessAt, 1000); assert.equal(versions.length, 1);
+  offline = false; now = 3000; await monitor.check();
+  assert.equal(states.at(-1).lastSuccessAt, 3000); assert.equal(states.at(-1).checked, true); assert.equal(versions.length, 2);
+  assert.equal(requests.length, 3); assert.ok(requests.every(r => !r.options.method)); monitor();
+});

@@ -1,3 +1,5 @@
+import { describeKsisAudit } from './ksisAuditDescription.js';
+
 const labels = { matched: "ตรงกัน", mismatch: "ไม่ตรงกัน", review: "ต้องตรวจ", missing_ksis: "ไม่พบใน KSIS", missing_report: "ไม่พบใน Report", skipped: "ข้าม A/OT" };
 const classes = { matched: "match-exact", mismatch: "match-conflict", review: "match-review", missing_ksis: "match-conflict", missing_report: "match-review", skipped: "match-matched" };
 
@@ -34,8 +36,8 @@ export function setupKsisAudit({ shared, getPeriod, setStatus, onStateChange }) 
         source.textContent = "กรุณาเข้าสู่ระบบ KSIS ที่เปิดไว้ แล้วกดตรวจอีกครั้ง";
         setStatus("กรุณาเข้าสู่ระบบ KSIS ก่อนตรวจ WS"); return;
       }
-      result = data;
-      source.textContent = `${data.context} • ${scope === "all" ? "ทุกหน้าตามตัวกรอง KSIS" : `หน้าที่เลือก ${data.originalPage}`} • อ่าน ${data.pagesRead} หน้า • ${data.period.month}/${data.period.year} • ${data.subject} • ตรวจเมื่อ ${new Date(data.verifiedAt).toLocaleString("th-TH")} • อ่านอย่างเดียว${data.outsidePage ? ` • นอกหน้าที่ตรวจ ${data.outsidePage} รายวิชา` : ""}${data.ignoredBlankRows ? ` • ไม่นับช่องวิชาว่าง ${data.ignoredBlankRows} แถว` : ""}${data.repeatedRows ? ` • รวมแถวเดิมที่แสดงซ้ำ ${data.repeatedRows} แถว` : ""}`;
+      result = { ...data, scope: data.scope || scope };
+      source.textContent = describeKsisAudit(result);
       const issues = data.rows.filter((row) => !["matched", "skipped"].includes(row.outcome)).length;
       setStatus(`ตรวจ WS แล้ว • ตรง ${data.counts.matched} • ต้องตรวจ ${issues} รายวิชา`, issues ? "neutral" : "success");
     } catch (error) { source.textContent = error.message; setStatus(error.message, "error"); }
@@ -54,7 +56,7 @@ export function setupKsisAudit({ shared, getPeriod, setStatus, onStateChange }) 
     result = state.result; busy = workspace.busy;
     if (state.subject) subject.value = state.subject;
     for (const id of ['ksisAuditCurrent', 'ksisAuditAll', 'ksisAuditSubject']) get(id).disabled = busy;
-    source.textContent = state.error || (busy ? 'กำลังตรวจ WS...' : result ? `${result.context} • อ่าน ${result.pagesRead} หน้า • ตรวจเมื่อ ${new Date(result.verifiedAt).toLocaleString('th-TH')} • อ่านอย่างเดียว` : 'ยังไม่ได้ตรวจข้อมูล');
+    source.textContent = state.error || (busy ? 'กำลังตรวจ WS...' : result ? describeKsisAudit(result) : 'ยังไม่ได้ตรวจข้อมูล');
     onStateChange({ busy }); render();
   });
 }

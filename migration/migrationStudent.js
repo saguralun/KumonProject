@@ -9,6 +9,16 @@ import {
     statusFromIssueCounts
 } from "./migrationPreviewCommon.js";
 import { readSourceRecords } from "./migrationImportCommon.js";
+import {
+    clean,
+    nullable,
+    lookupKey,
+    pad2,
+    isValidDate,
+    issueList,
+    issueCount,
+    hasValidationErrors
+} from "./migrationValueHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -83,43 +93,8 @@ const STUDENT_TEXT_LIMITS = [
     { key: "address_zipcode", label: "Zipcode", max: 10 }
 ];
 
-function clean(value) {
-    if (value === undefined || value === null) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/\uFEFF/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-function nullable(value) {
-    const text = clean(value);
-
-    return text || null;
-}
-
-function lookupKey(value) {
-    return clean(value).toLowerCase();
-}
-
 function studentKey(firstName, lastName) {
     return `${lookupKey(firstName)}|${lookupKey(lastName)}`;
-}
-
-function pad2(value) {
-    return String(value).padStart(2, "0");
-}
-
-function isValidDate(year, month, day) {
-    const date = new Date(Date.UTC(year, month - 1, day));
-
-    return (
-        date.getUTCFullYear() === year &&
-        date.getUTCMonth() === month - 1 &&
-        date.getUTCDate() === day
-    );
 }
 
 function parseDateToAd(value) {
@@ -195,16 +170,6 @@ function addIssue(issueMap, value, student, message) {
             message
         });
     }
-}
-
-function issueList(issueMap) {
-    return [...issueMap.values()]
-        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-}
-
-function issueCount(issueMap) {
-    return [...issueMap.values()]
-        .reduce((sum, issue) => sum + issue.count, 0);
 }
 
 function issueMessage(issueMap) {
@@ -460,12 +425,6 @@ const STUDENT_COLUMNS = [
     { key: "created_at", label: "Created At", defaultValue: "DB default" },
     { key: "updated_at", label: "Updated At", defaultValue: "DB default" }
 ];
-
-function hasValidationErrors(previewResult) {
-    return previewResult.validation.some((item) =>
-        String(item.status || "").toUpperCase() === "ERROR"
-    );
-}
 
 function validationErrorCount(previewResult) {
     return previewResult.validation

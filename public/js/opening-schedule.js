@@ -1,3 +1,4 @@
+const requestApi = (url, options) => requestJson(url, options, "เกิดข้อผิดพลาด");
 const els = {
   form: document.getElementById("scheduleForm"),
   weekdaySelect: document.getElementById("weekdaySelect"),
@@ -14,25 +15,7 @@ const els = {
   weekdayGrid: document.getElementById("weekdayGrid"),
   refreshButton: document.getElementById("refreshButton")
 };
-
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || data.success === false) {
-    throw new Error(data.error || "เกิดข้อผิดพลาด");
-  }
-
-  return data;
-}
-
-function setStatus(text, isError = false) {
-  els.statusLine.textContent = text;
-  els.statusLine.classList.toggle("is-error", isError);
-}
+const setStatus = createStatusSetter(els.statusLine);
 
 // เวลาจบ = เวลาเริ่ม + ช่วงเวลา (30 / 60 นาที) คำนวณให้อัตโนมัติ ผู้ใช้แก้เองไม่ได้
 function syncEndTime() {
@@ -119,13 +102,13 @@ async function loadSchedules() {
   setStatus("กำลังโหลด...");
 
   try {
-    const data = await requestJson("/api/system/opening-schedules");
+    const data = await requestApi("/api/system/opening-schedules");
     renderWeekdayOptions(data.weekdays);
     renderSummary(data.summary);
     renderWeekdays(data.schedulesByWeekday);
     setStatus("พร้อมใช้งาน");
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, "error");
     els.weekdayGrid.innerHTML = `<div class="empty-day">${escapeHtml(error.message)}</div>`;
   }
 }
@@ -136,7 +119,7 @@ async function addSchedule(event) {
 
   try {
     const formData = new FormData(els.form);
-    const data = await requestJson("/api/system/opening-schedules", {
+    const data = await requestApi("/api/system/opening-schedules", {
       method: "POST",
       body: JSON.stringify({
         weekdayId: formData.get("weekdayId"),
@@ -151,7 +134,7 @@ async function addSchedule(event) {
     renderWeekdays(data.schedulesByWeekday);
     setStatus("เพิ่มเวลาเปิดแล้ว");
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, "error");
   } finally {
     els.addButton.disabled = false;
   }
@@ -164,7 +147,7 @@ async function toggleSchedule(input) {
   input.disabled = true;
 
   try {
-    const data = await requestJson(`/api/system/opening-schedules/${scheduleId}/active`, {
+    const data = await requestApi(`/api/system/opening-schedules/${scheduleId}/active`, {
       method: "POST",
       body: JSON.stringify({ isActive })
     });
@@ -173,7 +156,7 @@ async function toggleSchedule(input) {
     renderWeekdays(data.schedulesByWeekday);
     setStatus(isActive ? "เปิดเวลาเรียนแล้ว" : "ปิดเวลาเรียนแล้ว");
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, "error");
     input.checked = !isActive;
     input.disabled = false;
   }
@@ -189,7 +172,7 @@ async function deleteSchedule(button) {
   button.disabled = true;
 
   try {
-    const data = await requestJson(`/api/system/opening-schedules/${scheduleId}`, {
+    const data = await requestApi(`/api/system/opening-schedules/${scheduleId}`, {
       method: "DELETE"
     });
 
@@ -197,7 +180,7 @@ async function deleteSchedule(button) {
     renderWeekdays(data.schedulesByWeekday);
     setStatus("ลบเวลาเปิดแล้ว");
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, "error");
     button.disabled = false;
   }
 }

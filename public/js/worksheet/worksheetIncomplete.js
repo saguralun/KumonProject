@@ -6,11 +6,18 @@ import { els, setStatus } from "./worksheetState.js";
 import { escapeHtml, formatDateDisplay } from "./worksheetInput.js";
 import { worksheetApi } from "./worksheetApi.js";
 import { loadEnrollmentContext } from "./worksheet.js";
+import { createModalDialog } from "../modalDialog.js";
 
 // Each section pages independently (regular vs KC have very different
 // counts — e.g. 127 vs 23 pending — so a shared page number would put one
 // section on a page far past its own last one).
 const page = { regular: 1, kc: 1 };
+let requestRevision = 0;
+const incompleteDialog = createModalDialog(els.incompleteWsModal, {
+    initialFocus: () => els.incompleteWsClose,
+    returnFocus: () => els.findIncompleteWs,
+    onCancel: closeIncompleteWsModal
+});
 
 function latestWorksheetText(row) {
     if (!row.latestWorksheetDate) {
@@ -42,7 +49,7 @@ function incompleteWsTable(rows) {
                 ${rows.map((row) => `
                     <tr data-incomplete-enrollment-id="${escapeHtml(row.enrollmentId)}" data-subject="${escapeHtml(row.subjectCode)}">
                         <td>#${escapeHtml(row.enrollmentId)}</td>
-                        <td>${escapeHtml(row.studentName)}</td>
+                        <td><button type="button" class="incomplete-student-button" data-select-incomplete-id="${escapeHtml(row.enrollmentId)}" aria-label="เลือก ${escapeHtml(row.studentName)} วิชา ${escapeHtml(row.subjectCode)}">${escapeHtml(row.studentName)}</button></td>
                         <td><span class="incomplete-subject">${escapeHtml(row.subjectCode)}</span></td>
                         <td>${escapeHtml(row.currentLevelCode || "-")}</td>
                         <td>${escapeHtml(latestWorksheetText(row))}</td>
@@ -112,6 +119,23 @@ function renderIncompleteWsSections(data) {
 }
 
 async function loadIncompleteWs() {
+    const revision = ++requestRevision;
+    const isCurrent = () => revision === requestRevision && els.incompleteWsModal.open;
+    const restoreTableFocus = () => {
+        if (!els.incompleteWsTableWrap.contains(document.activeElement)) return null;
+        const active = document.activeElement;
+        return () => {
+            if (active.isConnected) return;
+            const buttons = [...els.incompleteWsTableWrap.querySelectorAll('button:not(:disabled)')];
+            const replacement = buttons.find(button => active.dataset.incompletePage
+                && button.dataset.incompleteSection === active.dataset.incompleteSection
+                && button.dataset.incompletePage === active.dataset.incompletePage)
+                || buttons.find(button => active.dataset.incompletePage && button.dataset.incompleteSection === active.dataset.incompleteSection)
+                || buttons.find(button => button.dataset.selectIncompleteId === active.dataset.selectIncompleteId)
+                || els.incompleteWsClose;
+            replacement.focus({ preventScroll: true });
+        };
+    };
     els.incompleteWsSubtitle.textContent = "กำลังเช็ก WS ล่าสุดก่อนวันที่ 21 ของเดือนนี้";
 
     try {
@@ -119,25 +143,32 @@ async function loadIncompleteWs() {
             regularPage: page.regular,
             kcPage: page.kc
         });
-
+        if (!isCurrent()) return;
+        const restoreFocus = restoreTableFocus();
         els.incompleteWsSubtitle.textContent = `เช็กถึง ${formatDateDisplay(data.cutoffDate)}`;
         renderIncompleteWsSections(data);
+        restoreFocus?.();
     } catch (error) {
+        if (!isCurrent()) return;
+        const restoreFocus = restoreTableFocus();
+        els.incompleteWsSubtitle.textContent = "ค้นหา WS ค้างไม่สำเร็จ กรุณาปิดแล้วลองใหม่";
         els.incompleteWsTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+        restoreFocus?.();
         setStatus(error.message, "error");
     }
 }
 
 export async function openIncompleteWsModal() {
-    els.incompleteWsModal.classList.remove("hidden");
     page.regular = 1;
     page.kc = 1;
     els.incompleteWsTableWrap.innerHTML = `<div class="empty-state">กำลังค้นหา...</div>`;
+    incompleteDialog.show();
     await loadIncompleteWs();
 }
 
 export function closeIncompleteWsModal() {
-    els.incompleteWsModal.classList.add("hidden");
+    requestRevision++;
+    incompleteDialog.close();
 }
 
 export async function selectIncompleteWsEnrollment(enrollmentId) {

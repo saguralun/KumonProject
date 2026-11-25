@@ -529,7 +529,45 @@ export function updateHalfMonthByStartDate() {
     syncEnrollmentDateStatus(els.addEnrollmentForm);
 }
 
+const halfMonthNotices = new WeakMap();
+const halfMonthOwner = form => `${form.elements.enrollmentId?.value || form.elements.studentId?.value}:${form.elements.subjectId.value}`;
+const noticeDate = value => {
+    const parts = localDateParts(value);
+    return parts ? `${String(parts.day).padStart(2, '0')}/${String(parts.month).padStart(2, '0')}/${parts.year + 543}` : value;
+};
+
+export function readHalfMonthNotice(form) {
+    return halfMonthNotices.get(form);
+}
+
+export function clearHalfMonthNotice(form) {
+    halfMonthNotices.delete(form);
+    const notice = form.querySelector('[data-half-month-note]');
+    if (notice) { notice.hidden = true; notice.replaceChildren(); }
+}
+
+export function restoreHalfMonthNotice(form, change) {
+    if (!change || change.owner !== halfMonthOwner(form)
+        || form.elements.enStartDate.value !== change.to
+        || form.elements.currentStatusGroup2Id.value !== change.statusId
+        || form.elements.currentStatusGroup2Id.disabled) return;
+    let notice = form.querySelector('[data-half-month-note]');
+    if (!notice) {
+        notice = document.createElement('div');
+        notice.className = 'half-month-note'; notice.dataset.halfMonthNote = '';
+        notice.setAttribute('role', 'status'); notice.setAttribute('aria-live', 'polite');
+        form.elements.enStartDate.closest('.fields-grid').after(notice);
+    }
+    const dates = document.createElement('strong');
+    dates.textContent = `${noticeDate(change.from)} → ${noticeDate(change.to)}`;
+    const reason = document.createElement('div');
+    reason.textContent = `ระบบปรับ Start Date ตาม ${change.code} • Half Month ใช้ช่วงวันที่ 11–20 จึงปรับวันที่นอกช่วงเป็นวันที่ 11`;
+    notice.replaceChildren(dates, reason); notice.hidden = false;
+    halfMonthNotices.set(form, change);
+}
+
 export function syncEnrollmentDateStatus(form) {
+    clearHalfMonthNotice(form);
     const statusField = form.elements.currentStatusGroup2Id;
     const previous = (state.masters?.statuses || []).find(row => Number(row.id) === Number(statusField.value));
     const nextCode = specialStatusForStartDate(previous?.code || '', form.elements.enStartDate.value);
@@ -545,6 +583,8 @@ export function alignStartDateForHalfMonth() {
 }
 
 export function alignEnrollmentDateForHalfStatus(form) {
+    clearHalfMonthNotice(form);
+    const from = form.elements.enStartDate.value;
     const parts = localDateParts(form.elements.enStartDate.value);
 
     if (!parts || !isHalfMonthStatusId(form.elements.currentStatusGroup2Id.value)) {
@@ -554,6 +594,9 @@ export function alignEnrollmentDateForHalfStatus(form) {
     if (parts.day < 11 || parts.day > 20) {
         setFormValue(form, "enStartDate", formatDateInput({ ...parts, day: 11 }));
         setAutoFilled(form, "enStartDate", true);
+        const statusId = form.elements.currentStatusGroup2Id.value;
+        const code = state.masters.statuses.find(row => String(row.id) === statusId)?.code || '';
+        restoreHalfMonthNotice(form, { owner: halfMonthOwner(form), from, to: form.elements.enStartDate.value, statusId, code });
     } else {
         setAutoFilled(form, "enStartDate", false);
     }
@@ -561,6 +604,7 @@ export function alignEnrollmentDateForHalfStatus(form) {
 
 export function refreshAddEnrollmentOptions() {
     const form = els.addEnrollmentForm;
+    clearHalfMonthNotice(form);
     const previousSubjectId = form.elements.subjectId.value;
     const usedSubjects = existingSubjectIds();
     const availableSubjects = (state.masters?.subjects || []).filter((subject) =>
@@ -627,6 +671,7 @@ export function refreshAddStartingWorksheetFromDt() {
 
 export function fillAddEnrollmentDefaults() {
     const form = els.addEnrollmentForm;
+    clearHalfMonthNotice(form);
     const student = state.profile?.student;
     const hasEnrollment = (state.profile?.enrollments || []).length > 0;
     const group1Statuses = state.masters.statuses.filter((row) => Number(row.group) === 1);

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/worksheet.css?v=20261030-project-audit">
+  <link rel="stylesheet" href="/css/worksheet.css?v=20261125-date-drafts">
   <link rel="stylesheet" href="/css/app-scale.css?v=20261030-project-audit">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-update-anytime">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
@@ -144,7 +144,7 @@
         </div>
 
         <div class="date-control">
-          <span class="field-label">Receive Date</span>
+          <span class="field-label">วันที่รับ (Receive Date)</span>
           <div class="date-stepper">
             <button type="button" class="icon-button" id="datePrev" aria-label="Previous day">◀</button>
             <input id="receiveDate" type="date" disabled>
@@ -162,16 +162,17 @@
         <aside class="preview-panel">
           <div class="preview-header">
             <div>
-              <div class="panel-title">Preview</div>
-              <div class="subtle" id="previewCount">0 records</div>
+              <div class="panel-title">ตรวจรายการ</div>
+              <div class="subtle" id="previewCount">0 รายการ</div>
             </div>
             <div class="preview-actions">
               <button type="button" class="receive-cd-button hidden" id="receiveCd" disabled>
                 <span class="button-icon">💿</span><span>รับ CD</span>
               </button>
-              <button type="button" class="save-button" id="saveButton" disabled>💾 Save</button>
+              <button type="button" class="save-button" id="saveButton" aria-describedby="saveHint" disabled>💾 บันทึก</button>
             </div>
           </div>
+          <div class="save-hint" id="saveHint" role="status" aria-live="polite">เลือกเด็กเพื่อเริ่มกรอก WS</div>
           <div class="preview-list" id="previewList">
             <div class="empty-state">ยังไม่มีรายการ</div>
           </div>
@@ -181,12 +182,13 @@
       <section class="history-panel">
         <div class="history-header">
           <div>
-            <div class="panel-title">WS History</div>
+            <div class="panel-title">ประวัติ WS</div>
             <div class="subtle" id="historySubtitle">ล่าสุด 30 รายการ</div>
           </div>
           <div class="history-month-summary" id="historyMonthSummary">เดือนนี้: ยังไม่มีข้อมูล</div>
+          <button type="button" class="secondary-button hidden" id="editLastAtButton" disabled>แก้ AT ล่าสุด</button>
           <label class="history-limit">
-            Show
+            แสดง
             <select id="historyLimit">
               <option value="20">20</option>
               <option value="30" selected>30</option>
@@ -207,7 +209,7 @@
     </section>
   </main>
 
-  <div class="modal-backdrop hidden" id="atModal" role="dialog" aria-modal="true" aria-labelledby="atModalTitle">
+  <dialog class="modal-backdrop hidden" id="atModal" tabindex="-1" aria-labelledby="atModalTitle" aria-describedby="atModalSubtitle">
     <div class="at-dialog">
       <form class="at-form" id="atForm">
         <div class="at-dialog-header">
@@ -215,8 +217,10 @@
             <div class="panel-title" id="atModalTitle">จบ WS Level</div>
             <div class="subtle" id="atModalSubtitle">Achievement Test</div>
           </div>
-          <button type="button" class="icon-button at-close-button" id="atCancel" aria-label="Close">✕</button>
+          <button type="button" class="icon-button at-close-button" id="atCancel" aria-label="ปิด AT">✕</button>
         </div>
+
+        <div class="at-modal-message hidden" id="atModalMessage" role="alert"></div>
 
         <div class="at-student-grid">
           <label>
@@ -265,37 +269,39 @@
           <button type="button" class="at-result-button active" data-at-pass="true">ผ่าน</button>
         </div>
 
+        <div class="save-hint" id="atSaveHint" role="status" aria-live="polite">กรอกคะแนน เวลา และ Group ก่อนบันทึก</div>
         <div class="at-dialog-footer">
           <button type="button" class="secondary-button hidden" id="atEditLatest">แก้รอบล่าสุด</button>
-          <button type="submit" class="save-button" id="atSaveButton">💾 บันทึก AT</button>
+          <button type="submit" class="save-button" id="atSaveButton" aria-describedby="atSaveHint">💾 บันทึก AT</button>
         </div>
       </form>
     </div>
-  </div>
+  </dialog>
 
-  <div class="modal-backdrop hidden" id="incompleteWsModal" role="dialog" aria-modal="true" aria-labelledby="incompleteWsTitle">
+  <dialog class="modal-backdrop hidden" id="incompleteWsModal" tabindex="-1" aria-labelledby="incompleteWsTitle" aria-describedby="incompleteWsSubtitle">
     <div class="incomplete-ws-dialog">
       <div class="incomplete-ws-header">
         <div>
           <div class="panel-title" id="incompleteWsTitle">เด็กที่ยังไม่ได้กรอก WS</div>
-          <div class="subtle" id="incompleteWsSubtitle">เช็ก WS ล่าสุดก่อนวันที่ 21 ของเดือนนี้</div>
+          <div class="subtle" id="incompleteWsSubtitle" aria-live="polite">เช็ก WS ล่าสุดก่อนวันที่ 21 ของเดือนนี้</div>
         </div>
-        <button type="button" class="icon-button at-close-button" id="incompleteWsClose" aria-label="Close">✕</button>
+        <button type="button" class="icon-button at-close-button" id="incompleteWsClose" aria-label="ปิดรายการ WS ค้าง">✕</button>
       </div>
 
       <div class="incomplete-ws-table-wrap" id="incompleteWsTableWrap">
         <div class="empty-state">กดปุ่มเพื่อค้นหา</div>
       </div>
     </div>
-  </div>
+  </dialog>
 
   <script src="/js/appDialogs.js?v=20261023-all-actions"></script>
-  <script src="/js/authClient.js?v=20261030-code-only-update"></script>
+  <script src="/js/leaveGuard.js?v=20261124-unsaved-work"></script>
+  <script src="/js/authClient.js?v=20261124-unsaved-work"></script>
   <script src="/js/appMenu.js?v=20261023-dialog-focus"></script>
   <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
   <script src="/js/httpUtil.js?v=20261030-project-audit"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/worksheet/worksheetTabletReflow.js?v=20260903-tablet-reflow"></script>
+  <script src="/js/worksheet/worksheetTabletReflow.js?v=20261124-ui-clarity"></script>
   <!-- No ?v= cache-bust query string here, deliberately: worksheetAt.js/
        worksheetSearch.js/worksheetIncomplete.js import back from this
        exact file ("./worksheet.js", circular, no query string of their

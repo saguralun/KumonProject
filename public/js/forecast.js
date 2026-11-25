@@ -11,6 +11,7 @@ const els = {
   statusLine: document.getElementById("statusLine"),
   resultSubtitle: document.getElementById("resultSubtitle"),
   forecastSummary: document.getElementById("forecastSummary"),
+  forecastWarnings: document.getElementById("forecastWarnings"),
   forecastTableWrap: document.getElementById("forecastTableWrap"),
   cdForecastTableWrap: document.getElementById("cdForecastTableWrap"),
   forecastDetailModal: document.getElementById("forecastDetailModal"),
@@ -34,6 +35,25 @@ let activeSubjectCode = null;
 let lastOrderPlan = [];
 let lastCdOrderPlan = [];
 let currentView = "forecast";
+
+function missingForecastCount(data = lastForecastData) {
+  return Math.max(Number(data?.summary?.missingAverage || 0), data?.missingAverage?.length || 0);
+}
+function forecastReady() {
+  if (lastForecastData && !missingForecastCount()) return true;
+  setStatus('Forecast ข้อมูลยังไม่ครบ กรุณาตรวจค่าเฉลี่ยและคำนวณใหม่ก่อนสั่งซื้อหรือส่งออก', 'error');
+  return false;
+}
+function renderForecastWarnings(data) {
+  const missing = missingForecastCount(data);
+  els.forecastWarnings.classList.toggle('hidden', !missing);
+  els.forecastWarnings.innerHTML = !missing ? '' : `
+    <strong>ข้อมูล Forecast ยังไม่ครบ ${formatNumber(missing)} รายวิชา</strong>
+    <div>ผลที่แสดงเป็นเพียงส่วนที่คำนวณได้ จำนวนที่ขาดไม่ใช่ศูนย์ ยังไม่เปิดสั่งซื้อ/Expect Stock/Export จนกว่าข้อมูลครบ</div>
+    <div>ตรวจค่าเฉลี่ยของชุดด้านล่าง แล้วกดคำนวณใหม่ ระบบจะไม่เติมค่าเฉลี่ยที่เดาเอง</div>
+    <ul>${(data.missingAverage || []).map(row => `<li>Enrollment #${escapeHtml(row.enrollmentId)} • ${escapeHtml(row.subject)} • ${escapeHtml(row.level)} • ชุด ${escapeHtml(row.packet)}</li>`).join('')}</ul>
+    ${missing > (data.missingAverage?.length || 0) ? '<div>แสดงรายละเอียดบางส่วนจากรายการทั้งหมด</div>' : ''}`;
+}
 
 const setStatus = createStatusSetter(els.statusLine);
 
@@ -726,6 +746,7 @@ function renderOrderSuggestionTable() {
 }
 
 async function loadOrderSuggestion() {
+  if (!forecastReady()) return;
   els.exportOrderButton.disabled = true;
   els.orderSuggestionTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
   els.orderCdSuggestionTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
@@ -765,6 +786,7 @@ function renderExpectedStockTable() {
 }
 
 async function loadExpectedStock() {
+  if (!forecastReady()) return;
   els.exportExpectedStockButton.disabled = true;
   els.expectedStockTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
   els.expectedStockCdTableWrap.innerHTML = `<div class="empty-state">กำลังคำนวณ...</div>`;
@@ -792,6 +814,7 @@ async function loadExpectedStock() {
 async function generateForecast({ force = false } = {}) {
   const days = Number(els.forecastDays.value);
   lastForecastData = null; lastOrderPlan = []; lastCdOrderPlan = [];
+  renderForecastWarnings(null);
   els.orderButton.disabled = els.expectedStockButton.disabled = true;
   els.exportForecastButton.disabled = els.exportOrderButton.disabled = els.exportExpectedStockButton.disabled = true;
 
@@ -810,7 +833,9 @@ async function generateForecast({ force = false } = {}) {
     const data = await requestJson(`/api/forecast?${params.toString()}`);
 
     lastForecastData = data;
-    els.exportForecastButton.disabled = false;
+    const incomplete = missingForecastCount(data) > 0;
+    renderForecastWarnings(data);
+    els.exportForecastButton.disabled = incomplete;
 
     const subjects = getAvailableSubjects(data);
 
@@ -819,19 +844,19 @@ async function generateForecast({ force = false } = {}) {
     }
 
     renderActiveSubject();
-    els.orderButton.disabled = false;
+    els.orderButton.disabled = incomplete;
     els.orderButton.title = "";
-    els.expectedStockButton.disabled = false;
+    els.expectedStockButton.disabled = incomplete;
     els.expectedStockButton.title = "";
 
     els.resultSubtitle.textContent = [
       `Forecast ${days} วัน`,
-      "ทุกวิชา 100%",
+      incomplete ? 'ผลคำนวณยังไม่ครบ' : 'ทุกวิชา',
       "ไม่รวม KC",
       `${data.summary.totalPrepareQty} ชุด`,
       `cache ${formatDateTime(data.cache.calculatedAt)}`
     ].join(" • ");
-    setStatus(`${data.cache.cacheAction} • Forecast แล้ว`);
+    setStatus(incomplete ? `Forecast ยังไม่ครบ ขาดค่าเฉลี่ย ${missingForecastCount(data)} รายวิชา โปรดตรวจรายละเอียด` : `${data.cache.cacheAction} • Forecast แล้ว`, incomplete ? 'error' : 'neutral');
   } catch (error) {
     els.forecastTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.cdForecastTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
@@ -924,6 +949,7 @@ async function runExport(button, filename, sheets) {
 }
 
 function exportForecastExcel() {
+  if (!forecastReady()) return;
   const rows = (lastForecastData && lastForecastData.rows) || [];
   const cdRows = (lastForecastData && lastForecastData.cdRows) || [];
   const sheets = [
@@ -939,6 +965,7 @@ function exportForecastExcel() {
 }
 
 function exportOrderExcel() {
+  if (!forecastReady()) return;
   const sheets = [
     ...WS_EXPORT_SUBJECTS.map((code) =>
       pivotToSheetPayload(`WS - ${code}`, buildOrderPivot(lastOrderPlan.filter((row) => row.subject === code)))
@@ -952,6 +979,7 @@ function exportOrderExcel() {
 }
 
 function exportExpectedStockExcel() {
+  if (!forecastReady()) return;
   const sheets = [
     ...WS_EXPORT_SUBJECTS.map((code) =>
       pivotToSheetPayload(
@@ -984,6 +1012,7 @@ function lockForecastControls() {
 }
 
 function showOrderView() {
+  if (!forecastReady()) return;
   currentView = "order";
   els.forecastResultsView.classList.add("hidden");
   els.expectedStockResultsView.classList.add("hidden");
@@ -994,6 +1023,7 @@ function showOrderView() {
 }
 
 function showExpectedStockView() {
+  if (!forecastReady()) return;
   currentView = "expected";
   els.forecastResultsView.classList.add("hidden");
   els.orderResultsView.classList.add("hidden");

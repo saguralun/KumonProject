@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/backup.css?v=20261030-download-save">
+  <link rel="stylesheet" href="/css/backup.css?v=20261124-target-recovery">
   <link rel="stylesheet" href="/css/app-scale.css?v=20261030-project-audit">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-update-anytime">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
@@ -88,17 +88,18 @@
             <div class="panel-title">📥 Import / Restore</div>
             <div class="subtle">
               อัพโหลดไฟล์ <code>.backup</code> เพื่อ<strong>แทนที่ข้อมูลทั้งหมดในฐานข้อมูลนี้ด้วยข้อมูลในไฟล์</strong> —
-              ใช้ตอนจะดึงข้อมูลจริงจากเครื่องอื่นมาลงเครื่องนี้ (เช่น เอาข้อมูลจาก production มาลง dev เพื่อทดลองใช้งาน)
+              ปลายทางคือฐานข้อมูลที่เครื่องแม่ของหน้านี้ใช้อยู่ รวมถึงผู้ใช้ทุกเครื่องที่เชื่อมเครื่องแม่นี้
             </div>
           </div>
         </div>
 
         <div class="import-warning">
-          ⚠️ การ import จะ<strong>ลบข้อมูลปัจจุบันในเครื่องนี้ทั้งหมด</strong>แล้วแทนที่ด้วยข้อมูลในไฟล์ที่อัพโหลด — แก้กลับไม่ได้ด้วยตัวเอง
-          (ระบบจะสำรองข้อมูลปัจจุบันไว้ให้อัตโนมัติก่อน restore ทุกครั้ง เผื่อไฟล์ที่อัพโหลดผิด/เก่าเกินไป)
+          ⚠️ Restore จะ<strong>แทนที่ข้อมูลในฐานข้อมูลปลายทางของเครื่องแม่</strong>ด้วยข้อมูลในไฟล์ที่อัปโหลด
+          แม้เปิดหน้านี้ผ่าน LAN ก็มีผลต่อฐานเดียวกัน ระบบจะสำรองข้อมูลก่อน Restore และแสดงไฟล์สำรองให้ดาวน์โหลดไว้กู้กลับ
           แนะนำให้แจ้งคนอื่นที่กำลังใช้งานระบบอยู่ให้ออกจากหน้าจอก่อน
         </div>
 
+        <div class="import-target" id="backupTarget" role="status">กำลังตรวจเครื่องแม่และฐานข้อมูลปลายทาง...</div>
         <form id="importForm" class="import-form">
           <label>
             <span>ไฟล์ .backup</span>
@@ -111,17 +112,18 @@
           <button type="submit" class="danger-button" id="importSubmit" disabled>🗑️ Restore ทับข้อมูลปัจจุบัน</button>
         </form>
         <div class="form-message hidden" id="importMessage"></div>
+        <div class="import-target hidden" id="preImportRecovery" role="status"></div>
       </section>
     </section>
   </main>
 
   <script src="/js/appDialogs.js?v=20261023-all-actions"></script>
-  <script src="/js/authClient.js?v=20261030-code-only-update"></script>
+  <script src="/js/authClient.js?v=20261124-unsaved-work"></script>
   <script src="/js/appMenu.js?v=20261023-dialog-focus"></script>
   <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
   <script src="/js/httpUtil.js?v=20261030-project-audit"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
   <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/backup.js?v=20261030-download-direct"></script>
+  <script src="/js/backup.js?v=20261124-target-recovery"></script>
 </body>
 </html>

@@ -8,6 +8,19 @@ import {
 } from "./migrationPreviewCommon.js";
 import { readSourceRecords } from "./migrationImportCommon.js";
 import { normalizeKumonStudentId } from "../services/kumonStudentId.js";
+import {
+    clean,
+    nullable,
+    lookupKey,
+    masterKey,
+    pad2,
+    isValidDate,
+    sortedLevelCodes,
+    issueList,
+    issueCount,
+    hasValidationErrors,
+    validationItem
+} from "./migrationValueHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -72,31 +85,6 @@ const COMPLETER_LEVEL_BY_SUBJECT = {
     TRP: "III"
 };
 
-function clean(value) {
-    if (value === undefined || value === null) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/\uFEFF/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-function nullable(value) {
-    const text = clean(value);
-
-    return text || null;
-}
-
-function lookupKey(value) {
-    return clean(value).toLowerCase();
-}
-
-function masterKey(...parts) {
-    return parts.map((part) => lookupKey(part)).join("|");
-}
-
 function studentKey(firstName, lastName) {
     return masterKey(firstName, lastName);
 }
@@ -109,20 +97,6 @@ function toBoolean(value) {
     const text = lookupKey(value);
 
     return ["true", "t", "yes", "y", "1"].includes(text);
-}
-
-function pad2(value) {
-    return String(value).padStart(2, "0");
-}
-
-function isValidDate(year, month, day) {
-    const date = new Date(Date.UTC(year, month - 1, day));
-
-    return (
-        date.getUTCFullYear() === year &&
-        date.getUTCMonth() === month - 1 &&
-        date.getUTCDate() === day
-    );
 }
 
 function parseDateToAd(value) {
@@ -347,16 +321,6 @@ function addWarningIssue(warnings, warningRows, category, value, enrollment, mes
     warningRows.add(enrollment.key);
 }
 
-function issueList(issueMap) {
-    return [...issueMap.values()]
-        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-}
-
-function issueCount(issueMap) {
-    return [...issueMap.values()]
-        .reduce((sum, issue) => sum + issue.count, 0);
-}
-
 function buildPreviewStudentIds(records) {
     const previewStudentIds = new Map();
 
@@ -376,12 +340,6 @@ function buildPreviewStudentIds(records) {
     }
 
     return previewStudentIds;
-}
-
-function sortedLevelCodes(levels) {
-    return levels
-        .map((level) => level.level_code)
-        .sort((a, b) => b.length - a.length || a.localeCompare(b));
 }
 
 async function loadMasterData(records, db = pool) {
@@ -1221,31 +1179,6 @@ function buildEnrollmentPreview(enrollment, masters, issues, warnings, blockingR
     };
 }
 
-function validationItem(label, count, warningCount = 0) {
-    if (count > 0) {
-        return {
-            label,
-            status: "ERROR",
-            errors: count
-        };
-    }
-
-    if (warningCount > 0) {
-        return {
-            label,
-            status: "WARNING",
-            errors: 0,
-            warnings: warningCount
-        };
-    }
-
-    return {
-        label,
-        status: "READY",
-        errors: 0
-    };
-}
-
 const ENROLLMENT_COLUMNS = [
     { key: "row_number", label: "#" },
     { key: "enrollment_id", label: "Enrollment ID" },
@@ -1274,12 +1207,6 @@ const ENROLLMENT_COLUMNS = [
     { key: "created_at", label: "Created At", defaultValue: "DB default" },
     { key: "updated_at", label: "Updated At", defaultValue: "DB default" }
 ];
-
-function hasValidationErrors(previewResult) {
-    return previewResult.validation.some((item) =>
-        String(item.status || "").toUpperCase() === "ERROR"
-    );
-}
 
 async function syncEnrollmentIdentitySequence(client) {
     const sequenceResult = await client.query(`

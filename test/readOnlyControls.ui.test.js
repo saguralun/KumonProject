@@ -62,7 +62,13 @@ for (const embedded of [false, true]) {
     const download = async (id, excel = false) => {
       const waiting = f.page.waitForEvent('download'); await f.page.locator(`#${id}`).click(); const item = await waiting;
       const buffer = await fs.readFile(await item.path()); assert.ok(buffer.length > 0);
-      if (excel) { const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(buffer); assert.ok(workbook.worksheets.length > 0); }
+      if (excel) {
+        const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(buffer); assert.ok(workbook.worksheets.length > 0);
+        if (id === 'exportLevelSummaryButton') {
+          assert.equal(workbook.worksheets[0].getCell('E1').value, 'จำนวนรายวิชา');
+          assert.equal(workbook.worksheets[0].getCell('E2').value, 1, 'The label change must preserve numeric counts and column positions');
+        }
+      }
       await f.downloadsIdle();
       await item.delete();
     };

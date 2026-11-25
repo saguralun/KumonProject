@@ -190,12 +190,16 @@ export function validateKsisAtSave(body, expected) {
 }
 
 export async function installKsisAtGuard(page) {
-    let armed = null, writes = 0, blocked = 0, reply = null, handedOff = false, diagnostic = null;
+    let armed = null, writes = 0, blocked = 0, reply = null, handedOff = false, diagnostic = null, pendingWrites = 0;
     const route = async (route) => {
         const request = route.request();
         if (['GET', 'HEAD', 'OPTIONS'].includes(request.method()) || request.method() === 'POST' && ['xhr', 'fetch'].includes(request.resourceType()) && READ_POST_URLS.includes(request.url())) return route.fallback();
         if (request.method() === 'POST' && request.url() === SAVE_URL && ['xhr', 'fetch'].includes(request.resourceType())) {
-            if (handedOff && await page.evaluate(() => document.documentElement.dataset.kumonAtManualSave === 'yes').catch(() => false)) return route.fallback();
+            if (handedOff && page.url() === KSIS_AT_URL && await page.evaluate(() => document.documentElement.dataset.kumonAtManualSave === 'yes').catch(() => false)) {
+                pendingWrites++;
+                void request.response().then(response => response?.finished()).catch(() => {}).finally(() => { pendingWrites--; });
+                return route.fallback();
+            }
             const expected = armed;
             let payload;
             try { payload = request.postDataJSON(); } catch { payload = null; }
@@ -204,7 +208,7 @@ export async function installKsisAtGuard(page) {
                 if (page.url() !== KSIS_AT_URL || current.context !== expected.context || current.page !== expected.page || current.subjectLabel !== expected.subjectLabel) {
                     blocked++; return route.abort('blockedbyclient');
                 }
-                armed = null; writes++;
+                armed = null; writes++; pendingWrites++;
                 diagnostic = { key: expected.key, requestSent: true, status: null, rows: [], confirmed: false };
                 reply = request.response().then(async (response) => {
                     if (!response) return false;
@@ -215,14 +219,14 @@ export async function installKsisAtGuard(page) {
                         hasTestGuid: typeof item.testGuid === 'string' && Boolean(item.testGuid), error: String(item.error || '').slice(0, 2000), errorCodeType: item.errorCodeType })) : [];
                     diagnostic.confirmed = response.ok() && validateKsisAtSave(body, expected);
                     return diagnostic.confirmed;
-                }).catch(() => false);
+                }).catch(() => false).finally(() => { pendingWrites--; });
                 return route.fallback();
             }
         }
         blocked++; return route.abort('blockedbyclient');
     };
     await page.route('**/*', route);
-    return { blocked: () => blocked, writes: () => writes, diagnostic: () => structuredClone(diagnostic),
+    return { blocked: () => blocked, writes: () => writes, pendingWrites: () => pendingWrites, diagnostic: () => structuredClone(diagnostic),
         arm: (expected) => { armed = expected; reply = null; },
         async result() { return reply ? await boundedResult(reply) : false; },
         async handoff() {
@@ -325,10 +329,23 @@ export async function applyKsisAt({ userId, previewId, confirmedIdentityMatches,
     });
 }
 
-export async function readKsisAtInspection(page, records, { period, subject, kumonId }) {
-    if (!Object.hasOwn(subjectNames, subject) || !/^\d{13}$/.test(kumonId || '')) throw httpError(400, 'กรุณาระบุวิชาและรหัสคุมอง 13 หลักที่ต้องการตรวจ');
-    const record = records.filter((item) => item.Subject === subject && normalizeKumonStudentId(item['รหัสคุมอง']) === kumonId);
+function validateInspectionSelector({ subject, kumonId, enrollmentId }) {
+    const hasEnrollment = enrollmentId !== undefined && enrollmentId !== null && enrollmentId !== '';
+    if (!Object.hasOwn(subjectNames, subject)
+        || hasEnrollment && (!Number.isSafeInteger(Number(enrollmentId)) || Number(enrollmentId) < 1)
+        || kumonId && !/^\d{13}$/.test(kumonId)
+        || !hasEnrollment && !/^\d{13}$/.test(kumonId || '')) {
+        throw httpError(400, 'กรุณาระบุวิชาและรายวิชานักเรียนหรือรหัสคุมอง 13 หลักที่ต้องการตรวจ');
+    }
+    return hasEnrollment ? Number(enrollmentId) : null;
+}
+
+export async function readKsisAtInspection(page, records, { period, subject, kumonId, enrollmentId }) {
+    const selectedEnrollment = validateInspectionSelector({ subject, kumonId, enrollmentId });
+    const record = records.filter((item) => item.Subject === subject && (selectedEnrollment
+        ? Number(item.ID) === selectedEnrollment : normalizeKumonStudentId(item['รหัสคุมอง']) === kumonId));
     if (record.length !== 1) throw httpError(409, 'ไม่พบรายวิชาเดียวที่ตรงกับรหัสนี้ใน Report ไม่เลือกแทนให้');
+    if (selectedEnrollment && kumonId && normalizeKumonStudentId(record[0]['รหัสคุมอง']) !== kumonId) throw httpError(409, 'รายวิชากับรหัสคุมองที่เลือกไม่ตรงกัน');
     let current = await loaded(page);
     if (!current) return { requiresLogin: true };
     const websitePeriod = ksisContextPeriod(current.context);
@@ -372,28 +389,58 @@ export async function readKsisAtInspection(page, records, { period, subject, kum
             const actual = exact[0] || sameEvent[0] || null;
             return { desired, actual, matches: exact.length === 1 && sameEvent.length === 1, persisted: refreshed && exact.length === 1 && !exact[0].dirty };
         });
-        return { requiresLogin: false, name: student.fullName, kumonId, subject, period, context: current.context, page: current.page,
+        return { requiresLogin: false, name: student.fullName, kumonId: normalizeKumonStudentId(record[0]['รหัสคุมอง']), enrollmentId: Number(record[0].ID), subject, period, context: current.context, page: current.page,
             refreshed, dirty: Boolean(current.hiddenDirty) || student.tests.some((test) => test.dirty), comparisons, tests: student.tests, checkedAt: new Date().toISOString(), readOnly: true };
     } finally { await page.unroute('**/*', route); }
 }
 
-export async function inspectKsisAt({ userId, month, year, subject, kumonId }) {
-    if (!Object.hasOwn(subjectNames, subject) || !/^\d{13}$/.test(kumonId || '')) throw httpError(400, 'กรุณาระบุวิชาและรหัสคุมอง 13 หลักที่ต้องการตรวจ');
+export async function inspectKsisAt({ userId, month, year, subject, kumonId, enrollmentId }) {
+    validateInspectionSelector({ subject, kumonId, enrollmentId });
     const records = await buildMonthlyReport({ month, year });
     return withKsisPage({ sourceUrl: KSIS_AT_URL, userId, allowPendingDraft: true, requireCurrentPage: true }, async (page, session) => {
-        const result = await readKsisAtInspection(page, records, { period: { month: Number(month), year: Number(year) }, subject, kumonId });
+        const result = await readKsisAtInspection(page, records, { period: { month: Number(month), year: Number(year) }, subject, kumonId, enrollmentId });
         const failed = session.atAttempt?.rows.find((row) => row.id === session.atAttempt.failedId);
         return { ...result, pendingDraft: session.pendingDraft === true,
-            lastSave: failed?.kumonId === kumonId ? session.draftGuard?.diagnostic?.() || null : null };
+            lastSave: (enrollmentId ? Number(failed?.enrollmentId) === Number(enrollmentId) : kumonId && failed?.kumonId === kumonId) ? session.draftGuard?.diagnostic?.() || null : null };
     });
 }
 
 export async function acknowledgeKsisAt({ userId }) {
-    return withKsisPage({ sourceUrl: KSIS_AT_URL, userId, allowPendingDraft: true, requireCurrentPage: true }, async (page, session) => {
+    // Inspect the existing page without navigating: an expired session may be on
+    // login, while navigating an entry grid can autosave or discard manual work.
+    return withKsisPage({ sourceUrl: KSIS_AT_URL, userId, allowPendingDraft: true, navigate: false }, async (page, session) => {
         if (session.pendingDraft && !session.pendingAt) throw httpError(409, 'กรุณาจัดการข้อมูลค้างในงาน WS ก่อน');
-        const document = await loaded(page);
-        if (!document || document.modalOpen || document.hiddenDirty || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'ยังมีข้อมูล AT แก้ค้างอยู่ กรุณาบันทึกเองหรือยกเลิกบนเว็บก่อน');
+        const source = new URL(KSIS_AT_URL), current = new URL(page.url());
+        const login = current.origin === source.origin && current.pathname === source.pathname && !current.search
+            && /^#\/login(?:[/?]|$)/.test(current.hash);
+        if (page.url() !== KSIS_AT_URL && !login) throw httpError(409, 'หน้า KSIS เปลี่ยน กรุณากลับหน้า AT หรือหน้าเข้าสู่ระบบ KSIS ก่อนรับทราบ');
+        const assertResolved = async () => {
+            const document = await page.evaluate(readKsisAtDocument);
+            if (document.modalOpen || document.hiddenDirty || document.students.some((student) => student.tests.some((test) => test.dirty))) throw httpError(409, 'ยังมีข้อมูล AT แก้ค้างอยู่ กรุณาบันทึกเองหรือยกเลิกบนเว็บก่อน');
+            if (session.draftGuard?.pendingWrites?.()) throw httpError(409, 'ยังมีคำขอบันทึก AT รอผล กรุณารอและตรวจผลก่อนรับทราบ');
+        };
+        if (!login && !await loaded(page)) throw httpError(409, 'กรุณาตรวจหน้า KSIS แล้วรับทราบอีกครั้ง');
+        await assertResolved();
+        if (login) {
+            if (!session.pendingDraft || !session.pendingAt) throw httpError(409, 'ไม่มีรอบ AT ค้างให้กู้ กรุณาเข้าสู่ระบบแล้วเตรียม AT ใหม่');
+            const loginUrl = current.href;
+            if (page.url() !== loginUrl) throw httpError(409, 'หน้า KSIS เปลี่ยนก่อนกู้ กรุณาตรวจข้อมูลแล้วรับทราบอีกครั้ง');
+            // The real authentication POST is not known. Reload only after the
+            // explicit acknowledgment, with the old write guard still installed.
+            // This removes stale timers without allowing any guessed login POST.
+            await page.reload({ waitUntil: 'domcontentloaded', timeout: 25000 });
+            if (page.url() !== loginUrl) throw httpError(409, 'หน้า KSIS เปลี่ยนระหว่างกู้ กรุณาตรวจข้อมูลแล้วรับทราบอีกครั้ง');
+            await assertResolved();
+        }
+        if (page.url() !== (login ? current.href : KSIS_AT_URL)) throw httpError(409, 'หน้า KSIS เปลี่ยนระหว่างรับทราบ กรุณาตรวจอีกครั้ง');
+        if (session.atAttempt) {
+            session.atAttempt.previousResultUnverified = true;
+            session.atAttempt.lastSave = session.draftGuard?.diagnostic?.() || session.atAttempt.lastSave || null;
+        }
         await session.draftGuard?.release(); session.pendingDraft = false; session.draftGuard = null; session.pendingAt = false;
-        return { acknowledged: true };
+        for (const [id, preview] of previews) if (preview.userId === Number(userId)) previews.delete(id);
+        return { acknowledged: true, pendingDraft: false, requiresLogin: login, previousResultUnverified: true,
+            message: login ? 'กู้รอบ AT ค้างแล้ว กรุณาเข้าสู่ระบบ KSIS และเตรียม AT ใหม่เพื่อตรวจผลเดิมก่อนกรอก ผลบันทึกรอบก่อนยังไม่ยืนยัน'
+                : 'จัดการข้อมูลค้างแล้ว กรุณาเตรียม AT ใหม่เพื่อตรวจผลเดิมก่อนกรอก ผลบันทึกรอบก่อนยังไม่ยืนยัน' };
     });
 }

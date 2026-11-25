@@ -5,6 +5,7 @@
 // module (studentMasters.js, studentAddEnrollment.js, studentAddStudent.js,
 // student-manager.js itself) imports from here.
 import { els } from "./student-manager.js";
+export { selectInputText, bindSelectAllInput } from "./inputSelection.js";
 
 // requestJson/escapeHtml/createStatusSetter come from httpUtil.js/
 // htmlUtil.js/statusUtil.js — plain classic scripts loaded before this
@@ -187,32 +188,6 @@ export function focusFirstInvalidField(field) {
 
     field.scrollIntoView({ behavior: "smooth", block: "center" });
     setTimeout(() => field.focus({ preventScroll: true }), 120);
-}
-
-export function selectInputText(input) {
-    if (!input) {
-        return;
-    }
-
-    input.select();
-}
-
-export function bindSelectAllInput(input, onFocus = null) {
-    if (!input) {
-        return;
-    }
-
-    input.addEventListener("focus", () => {
-        selectInputText(input);
-        onFocus?.();
-    });
-    input.addEventListener("mousedown", (event) => {
-        if (document.activeElement === input) {
-            event.preventDefault();
-            selectInputText(input);
-        }
-    });
-    input.addEventListener("click", () => selectInputText(input));
 }
 
 export function readForm(form) {

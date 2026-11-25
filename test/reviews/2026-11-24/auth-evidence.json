@@ -1,0 +1,753 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-24T01:13:13.637Z",
+  "status": "completed",
+  "method": "Actual authService and auth middleware, unchanged; exact SQL/stateful session doubles; real bcrypt; no HTTP server or database. A recorded 200 means the middleware called next through every gate, not an HTTP response.",
+  "safety": {
+    "workerEnvironment": "empty (no inherited secrets)",
+    "productionDbModuleEvaluated": false,
+    "dbModuleRedirects": 2,
+    "forbiddenImports": 0,
+    "networkAttempts": 0,
+    "unexpectedProductionSql": 0,
+    "unknownSqlNegativeControlRejected": true
+  },
+  "adminPasswordReset": {
+    "before": {
+      "user_id": 1,
+      "username": "audit-admin-session",
+      "display_name": "Synthetic Admin",
+      "role": "admin",
+      "is_active": true
+    },
+    "after": {
+      "user_id": 1,
+      "username": "audit-admin-session",
+      "display_name": "Synthetic Admin",
+      "role": "admin",
+      "is_active": true
+    },
+    "storedPasswordChanged": true,
+    "oldPasswordRejected": true,
+    "newPasswordAccepted": true,
+    "roleChanged": false,
+    "activeChanged": false,
+    "beforeReset": [
+      {
+        "session": "old-session-A",
+        "status": 200,
+        "accepted": true,
+        "calls": [
+          "refreshAccountSession",
+          "requireAuth",
+          "requireAdmin"
+        ],
+        "resultingRole": "admin",
+        "sessionEvents": [
+          "refresh-user"
+        ]
+      },
+      {
+        "session": "old-session-B",
+        "status": 200,
+        "accepted": true,
+        "calls": [
+          "refreshAccountSession",
+          "requireAuth",
+          "requireAdmin"
+        ],
+        "resultingRole": "admin",
+        "sessionEvents": [
+          "refresh-user"
+        ]
+      }
+    ],
+    "afterReset": [
+      {
+        "session": "old-session-A",
+        "status": 200,
+        "accepted": true,
+        "calls": [
+          "refreshAccountSession",
+          "requireAuth",
+          "requireAdmin"
+        ],
+        "resultingRole": "admin",
+        "sessionEvents": [
+          "refresh-user",
+          "refresh-user"
+        ]
+      },
+      {
+        "session": "old-session-B",
+        "status": 200,
+        "accepted": true,
+        "calls": [
+          "refreshAccountSession",
+          "requireAuth",
+          "requireAdmin"
+        ],
+        "resultingRole": "admin",
+        "sessionEvents": [
+          "refresh-user",
+          "refresh-user"
+        ]
+      }
+    ],
+    "oldSessionsAcceptedAfterReset": 2,
+    "observedFinding": "Both pre-reset Admin sessions still pass refreshAccountSession, requireAuth and requireAdmin after the password changes."
+  },
+  "existingUsernameCases": [
+    {
+      "label": "inactive-staff-default-role",
+      "roleArgument": "(omitted: service default)",
+      "before": {
+        "user_id": 2,
+        "username": "audit-inactive-staff-default-role",
+        "display_name": "audit-inactive-staff-default-role",
+        "role": "staff",
+        "is_active": false
+      },
+      "after": {
+        "user_id": 2,
+        "username": "audit-inactive-staff-default-role",
+        "display_name": "audit-inactive-staff-default-role",
+        "role": "admin",
+        "is_active": true
+      },
+      "roleChanged": true,
+      "activeChanged": true
+    },
+    {
+      "label": "inactive-staff-explicit-role",
+      "roleArgument": "staff",
+      "before": {
+        "user_id": 3,
+        "username": "audit-inactive-staff-explicit-role",
+        "display_name": "audit-inactive-staff-explicit-role",
+        "role": "staff",
+        "is_active": false
+      },
+      "after": {
+        "user_id": 3,
+        "username": "audit-inactive-staff-explicit-role",
+        "display_name": "audit-inactive-staff-explicit-role",
+        "role": "staff",
+        "is_active": true
+      },
+      "roleChanged": false,
+      "activeChanged": true
+    },
+    {
+      "label": "active-admin-explicit-staff",
+      "roleArgument": "staff",
+      "before": {
+        "user_id": 4,
+        "username": "audit-active-admin-explicit-staff",
+        "display_name": "audit-active-admin-explicit-staff",
+        "role": "admin",
+        "is_active": true
+      },
+      "after": {
+        "user_id": 4,
+        "username": "audit-active-admin-explicit-staff",
+        "display_name": "audit-active-admin-explicit-staff",
+        "role": "staff",
+        "is_active": true
+      },
+      "roleChanged": true,
+      "activeChanged": false
+    }
+  ],
+  "negativeControls": {
+    "noSession": {
+      "session": "no-session",
+      "status": 401,
+      "accepted": false,
+      "calls": [
+        "refreshAccountSession",
+        "requireAuth"
+      ],
+      "response": {
+        "success": false,
+        "error": "กรุณาเข้าสู่ระบบ"
+      },
+      "resultingRole": null,
+      "sessionEvents": []
+    },
+    "databaseUnavailable": {
+      "session": "old-session-A",
+      "status": 503,
+      "accepted": false,
+      "calls": [
+        "refreshAccountSession"
+      ],
+      "response": {
+        "success": false,
+        "error": "ตรวจสอบบัญชีไม่สำเร็จ กรุณาลองใหม่"
+      },
+      "resultingRole": "admin",
+      "sessionEvents": [
+        "refresh-user",
+        "refresh-user"
+      ]
+    },
+    "afterDeactivation": [
+      {
+        "session": "old-session-A",
+        "status": 401,
+        "accepted": false,
+        "calls": [
+          "refreshAccountSession",
+          "requireAuth"
+        ],
+        "response": {
+          "success": false,
+          "error": "กรุณาเข้าสู่ระบบ"
+        },
+        "resultingRole": null,
+        "sessionEvents": [
+          "refresh-user",
+          "refresh-user",
+          "regenerate"
+        ]
+      },
+      {
+        "session": "old-session-B",
+        "status": 401,
+        "accepted": false,
+        "calls": [
+          "refreshAccountSession",
+          "requireAuth"
+        ],
+        "response": {
+          "success": false,
+          "error": "กรุณาเข้าสู่ระบบ"
+        },
+        "resultingRole": null,
+        "sessionEvents": [
+          "refresh-user",
+          "refresh-user",
+          "regenerate"
+        ]
+      }
+    ]
+  },
+  "serviceCalls": [
+    {
+      "name": "upsertAccount",
+      "purpose": "create-admin",
+      "input": {
+        "username": "audit-admin-session",
+        "roleArgument": "admin"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "verifyAccountLogin",
+      "purpose": "login-old-session-A",
+      "input": {
+        "username": "audit-admin-session"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "verifyAccountLogin",
+      "purpose": "login-old-session-B",
+      "input": {
+        "username": "audit-admin-session"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "upsertAccount",
+      "purpose": "reset-existing-admin",
+      "input": {
+        "username": "audit-admin-session",
+        "roleArgument": "admin"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "verifyAccountLogin",
+      "purpose": "old-password-after-reset",
+      "input": {
+        "username": "audit-admin-session"
+      },
+      "outcome": "rejected",
+      "statusCode": 401
+    },
+    {
+      "name": "verifyAccountLogin",
+      "purpose": "new-password-after-reset",
+      "input": {
+        "username": "audit-admin-session"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "upsertAccount",
+      "purpose": "inactive-staff-default-role-create",
+      "input": {
+        "username": "audit-inactive-staff-default-role",
+        "roleArgument": "staff"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "setAccountActive",
+      "purpose": "inactive-staff-default-role-deactivate",
+      "input": {
+        "userId": 2,
+        "isActive": false
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "upsertAccount",
+      "purpose": "inactive-staff-default-role-reset-existing",
+      "input": {
+        "username": "audit-inactive-staff-default-role",
+        "roleArgument": "(omitted: service default)"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "upsertAccount",
+      "purpose": "inactive-staff-explicit-role-create",
+      "input": {
+        "username": "audit-inactive-staff-explicit-role",
+        "roleArgument": "staff"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "setAccountActive",
+      "purpose": "inactive-staff-explicit-role-deactivate",
+      "input": {
+        "userId": 3,
+        "isActive": false
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "upsertAccount",
+      "purpose": "inactive-staff-explicit-role-reset-existing",
+      "input": {
+        "username": "audit-inactive-staff-explicit-role",
+        "roleArgument": "staff"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "upsertAccount",
+      "purpose": "active-admin-explicit-staff-create",
+      "input": {
+        "username": "audit-active-admin-explicit-staff",
+        "roleArgument": "admin"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "upsertAccount",
+      "purpose": "active-admin-explicit-staff-reset-existing",
+      "input": {
+        "username": "audit-active-admin-explicit-staff",
+        "roleArgument": "staff"
+      },
+      "outcome": "returned"
+    },
+    {
+      "name": "setAccountActive",
+      "purpose": "control-deactivate-admin",
+      "input": {
+        "userId": 1,
+        "isActive": false
+      },
+      "outcome": "returned"
+    }
+  ],
+  "sqlTrace": [
+    {
+      "phase": "create-admin",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "create-admin",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "create-admin",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "create-admin",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "create-admin",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "login-old-session-A",
+      "operation": "login",
+      "sql": "SELECT user_id, username, password_hash, display_name, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "login-old-session-A",
+      "operation": "loginTime",
+      "sql": "UPDATE app_user SET last_login_at = CURRENT_TIMESTAMP WHERE user_id = $1"
+    },
+    {
+      "phase": "login-old-session-B",
+      "operation": "login",
+      "sql": "SELECT user_id, username, password_hash, display_name, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "login-old-session-B",
+      "operation": "loginTime",
+      "sql": "UPDATE app_user SET last_login_at = CURRENT_TIMESTAMP WHERE user_id = $1"
+    },
+    {
+      "phase": "sessions-before-reset",
+      "operation": "active",
+      "sql": "SELECT user_id, username, display_name, role FROM app_user WHERE user_id = $1 AND is_active = TRUE"
+    },
+    {
+      "phase": "sessions-before-reset",
+      "operation": "active",
+      "sql": "SELECT user_id, username, display_name, role FROM app_user WHERE user_id = $1 AND is_active = TRUE"
+    },
+    {
+      "phase": "reset-existing-admin",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "reset-existing-admin",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "reset-existing-admin",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "reset-existing-admin",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "reset-existing-admin",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "old-password-after-reset",
+      "operation": "login",
+      "sql": "SELECT user_id, username, password_hash, display_name, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "new-password-after-reset",
+      "operation": "login",
+      "sql": "SELECT user_id, username, password_hash, display_name, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "new-password-after-reset",
+      "operation": "loginTime",
+      "sql": "UPDATE app_user SET last_login_at = CURRENT_TIMESTAMP WHERE user_id = $1"
+    },
+    {
+      "phase": "old-sessions-after-reset",
+      "operation": "active",
+      "sql": "SELECT user_id, username, display_name, role FROM app_user WHERE user_id = $1 AND is_active = TRUE"
+    },
+    {
+      "phase": "old-sessions-after-reset",
+      "operation": "active",
+      "sql": "SELECT user_id, username, display_name, role FROM app_user WHERE user_id = $1 AND is_active = TRUE"
+    },
+    {
+      "phase": "inactive-staff-default-role-create",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "inactive-staff-default-role-create",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "inactive-staff-default-role-create",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "inactive-staff-default-role-create",
+      "operation": "existing",
+      "sql": "SELECT user_id, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "inactive-staff-default-role-create",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "inactive-staff-default-role-create",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "inactive-staff-default-role-deactivate",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "inactive-staff-default-role-deactivate",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "inactive-staff-default-role-deactivate",
+      "operation": "target",
+      "sql": "SELECT role, is_active FROM app_user WHERE user_id = $1"
+    },
+    {
+      "phase": "inactive-staff-default-role-deactivate",
+      "operation": "setActive",
+      "sql": "UPDATE app_user SET is_active = $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 RETURNING user_id, username, display_name, role, is_active"
+    },
+    {
+      "phase": "inactive-staff-default-role-deactivate",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "inactive-staff-default-role-reset-existing",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "inactive-staff-default-role-reset-existing",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "inactive-staff-default-role-reset-existing",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "inactive-staff-default-role-reset-existing",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "inactive-staff-default-role-reset-existing",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-create",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-create",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-create",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-create",
+      "operation": "existing",
+      "sql": "SELECT user_id, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-create",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-create",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-deactivate",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-deactivate",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-deactivate",
+      "operation": "target",
+      "sql": "SELECT role, is_active FROM app_user WHERE user_id = $1"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-deactivate",
+      "operation": "setActive",
+      "sql": "UPDATE app_user SET is_active = $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 RETURNING user_id, username, display_name, role, is_active"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-deactivate",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-reset-existing",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-reset-existing",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-reset-existing",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-reset-existing",
+      "operation": "existing",
+      "sql": "SELECT user_id, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-reset-existing",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "inactive-staff-explicit-role-reset-existing",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "active-admin-explicit-staff-create",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "active-admin-explicit-staff-create",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "active-admin-explicit-staff-create",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "active-admin-explicit-staff-create",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "active-admin-explicit-staff-create",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "active-admin-explicit-staff-reset-existing",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "active-admin-explicit-staff-reset-existing",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "active-admin-explicit-staff-reset-existing",
+      "operation": "role",
+      "sql": "SELECT 1 FROM role_master WHERE role_code = $1"
+    },
+    {
+      "phase": "active-admin-explicit-staff-reset-existing",
+      "operation": "existing",
+      "sql": "SELECT user_id, role, is_active FROM app_user WHERE username = $1"
+    },
+    {
+      "phase": "active-admin-explicit-staff-reset-existing",
+      "operation": "otherAdmins",
+      "sql": "SELECT COUNT(*)::int AS count FROM app_user WHERE role = 'admin' AND is_active = TRUE AND user_id != $1"
+    },
+    {
+      "phase": "active-admin-explicit-staff-reset-existing",
+      "operation": "upsert",
+      "sql": "INSERT INTO app_user (username, password_hash, display_name, role) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO UPDATE SET password_hash = EXCLUDED.password_hash, display_name = EXCLUDED.display_name, role = EXCLUDED.role, is_active = TRUE, updated_at = CURRENT_TIMESTAMP RETURNING user_id, username, display_name, role"
+    },
+    {
+      "phase": "active-admin-explicit-staff-reset-existing",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "control-database-unavailable",
+      "operation": "active",
+      "sql": "SELECT user_id, username, display_name, role FROM app_user WHERE user_id = $1 AND is_active = TRUE"
+    },
+    {
+      "phase": "control-deactivate-admin",
+      "operation": "begin",
+      "sql": "BEGIN ISOLATION LEVEL READ COMMITTED"
+    },
+    {
+      "phase": "control-deactivate-admin",
+      "operation": "lock",
+      "sql": "LOCK TABLE app_user IN SHARE ROW EXCLUSIVE MODE"
+    },
+    {
+      "phase": "control-deactivate-admin",
+      "operation": "target",
+      "sql": "SELECT role, is_active FROM app_user WHERE user_id = $1"
+    },
+    {
+      "phase": "control-deactivate-admin",
+      "operation": "otherAdmins",
+      "sql": "SELECT COUNT(*)::int AS count FROM app_user WHERE role = 'admin' AND is_active = TRUE AND user_id != $1"
+    },
+    {
+      "phase": "control-deactivate-admin",
+      "operation": "setActive",
+      "sql": "UPDATE app_user SET is_active = $2, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 RETURNING user_id, username, display_name, role, is_active"
+    },
+    {
+      "phase": "control-deactivate-admin",
+      "operation": "commit",
+      "sql": "COMMIT"
+    },
+    {
+      "phase": "control-old-sessions-after-deactivation",
+      "operation": "active",
+      "sql": "SELECT user_id, username, display_name, role FROM app_user WHERE user_id = $1 AND is_active = TRUE"
+    },
+    {
+      "phase": "control-old-sessions-after-deactivation",
+      "operation": "active",
+      "sql": "SELECT user_id, username, display_name, role FROM app_user WHERE user_id = $1 AND is_active = TRUE"
+    }
+  ],
+  "limitations": [
+    "SQL results and transaction effects are modeled in memory; no real PostgreSQL constraint, locking or session-store behavior is verified.",
+    "Sessions originate from actual verifyAccountLogin results, but Express cookies, HTTP login/logout routes and persistence are not exercised.",
+    "The omitted-role case proves the service default only; it does not prove which role a particular UI interaction submits.",
+    "No browser, network, production data, Guest PIN, environment file, or real account is used."
+  ]
+}

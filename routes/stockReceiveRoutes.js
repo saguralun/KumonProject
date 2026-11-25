@@ -1,5 +1,6 @@
 import express from "express";
 import { createSendError } from "./routeErrorHandler.js";
+import { getStockReceiveRetryScope } from "../services/stockReceiveRetry.js";
 import {
     createDeliveryOrder,
     deleteDeliveryOrder,
@@ -15,11 +16,18 @@ const router = express.Router();
 
 const sendError = createSendError("Unexpected stock receive error");
 
+function retryActor(req) {
+    return req.session?.user?.userId
+        ? `account:${req.session.user.userId}`
+        : req.session?.user && req.sessionID ? `session:${req.sessionID}` : null;
+}
+
 router.get("/masters", async (req, res) => {
     try {
         res.json({
             success: true,
-            masters: await getStockReceiveMasters()
+            masters: await getStockReceiveMasters(),
+            retryScope: await getStockReceiveRetryScope(retryActor(req))
         });
     } catch (error) {
         sendError(res, error);
@@ -57,10 +65,16 @@ router.post("/dos", async (req, res) => {
     try {
         res.json({
             success: true,
-            ...(await createDeliveryOrder(req.body?.type, req.body))
+            ...(await createDeliveryOrder(req.body?.type, req.body, {
+                actor: retryActor(req), operationKey: req.body?.operationKey
+            }))
         });
     } catch (error) {
-        sendError(res, error);
+        if (error.stockReceiveRetrySafe) {
+            res.status(error.statusCode || 500).json({ success: false, error: error.message, retrySafe: true });
+        } else {
+            sendError(res, error);
+        }
     }
 });
 
@@ -99,9 +113,13 @@ router.delete("/dos/:doId/items/:receiveId", async (req, res) => {
 
 router.patch("/dos/:doId/items/:receiveId", async (req, res) => {
     try {
+        if (req.body?.expectedQuantity === undefined) {
+            res.status(409).json({ success: false, error: 'หน้ากรอก DO เป็นข้อมูลรุ่นเก่า กรุณาโหลดหน้าใหม่ก่อนแก้จำนวน' });
+            return;
+        }
         res.json({
             success: true,
-            ...(await updateDeliveryOrderItemQuantity(req.params.doId, req.params.receiveId, req.body?.quantity))
+            ...(await updateDeliveryOrderItemQuantity(req.params.doId, req.params.receiveId, req.body?.quantity, req.body.expectedQuantity))
         });
     } catch (error) {
         sendError(res, error);

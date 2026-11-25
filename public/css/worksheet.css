@@ -473,6 +473,9 @@ html[data-role="staff"] [data-staff-up] {
   display: none;
 }
 
+#stripActionsSlot { flex-direction: column; justify-content: center; align-items: flex-end; }
+#stripActionsSlot .save-hint { max-width: 220px; text-align: right; }
+
 .student-name {
   display: flex;
   gap: 8px;
@@ -1078,11 +1081,13 @@ html[data-role="staff"] [data-staff-up] {
 }
 
 .save-button {
+  transition: box-shadow var(--ease), transform var(--ease);
+  white-space: nowrap;
   min-width: 96px;
   min-height: 36px;
   border-color: #0c8058;
   border-radius: 7px;
-  background: linear-gradient(135deg, #12ab78, var(--green));
+  background: #047857;
   color: #ffffff;
   font-size: 18px;
   font-weight: 700;
@@ -1096,8 +1101,14 @@ html[data-role="staff"] [data-staff-up] {
 
 .save-button:disabled {
   background: var(--surface-soft);
+  color: #52627a;
+  border-color: var(--line);
+  opacity: 1;
   box-shadow: none;
 }
+
+.save-hint { color: #52627a; font-size: 12px; line-height: 1.4; }
+.save-hint[data-ready="true"] { color: #047857; }
 
 .preview-list {
   display: grid;
@@ -1351,6 +1362,15 @@ html[data-role="staff"] [data-staff-up] {
   background: #ffe8e4;
 }
 
+.history-date-draft { max-width: 260px; margin-top: 5px; font-size: 11px; line-height: 1.6; color: #875709; white-space: normal; }
+.history-date-draft[hidden] { display: none; }
+.history-date-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.history-date-actions button { padding: 4px 7px; min-height: 28px; border: 1px solid #c5d4e7; border-radius: 6px; background: #fff; color: #334b65; font: inherit; cursor: pointer; }
+.history-date-actions [data-save-history-date-id] { color: #fff; background: #059669; border-color: #059669; }
+.history-date-input.has-date-draft { border-color: #d99d26; background: #fff9e9; }
+.history-date-actions button:focus-visible { outline: 2px solid #5083ff; outline-offset: 2px; }
+.history-date-actions button:disabled { opacity: .55; cursor: wait; }
+
 .history-date-input {
   width: 124px;
   min-height: 26px;
@@ -1438,6 +1458,52 @@ html[data-role="staff"] [data-staff-up] {
 
 .modal-backdrop.hidden {
   display: none;
+}
+
+dialog.modal-backdrop {
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  color: inherit;
+}
+
+dialog.modal-backdrop::backdrop {
+  background: transparent;
+}
+
+.at-modal-message {
+  padding: 10px 12px;
+  border: 1px solid #f0b4aa;
+  border-radius: 7px;
+  background: #fff4f2;
+  color: var(--red);
+}
+
+.incomplete-student-button {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.incomplete-student-button:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  text-decoration: underline;
+}
+
+.incomplete-student-button:focus-visible {
+  outline: 2px solid var(--blue, #2563eb);
+  outline-offset: 3px;
 }
 
 .at-dialog {

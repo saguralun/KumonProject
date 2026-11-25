@@ -1,4 +1,5 @@
 import pool from "../config/db.js";
+import { receiptSnapshot } from "../public/js/receiptSnapshot.js";
 import { httpError } from "./httpError.js";
 import { formatStudentName } from "./enrollmentHelpers.js";
 import {
@@ -1068,6 +1069,16 @@ export async function receiveReceiptPayment(payload) {
                 409,
                 `น้องคนนี้จ่ายเงินค่าเรียนเดือน ${formatBillingPeriod(receipt)} ครบแล้ว`
             );
+        }
+        // Preview numbers and fees can change while a second cashier saves.
+        // Reject before ANY financial/status write; older clients remain valid.
+        if (payload.expectedReceiptSnapshot !== undefined) {
+            if (typeof payload.expectedReceiptSnapshot !== 'string' || payload.expectedReceiptSnapshot.length > 100000) {
+                throw httpError(400, 'ข้อมูลตรวจใบเสร็จไม่ถูกต้อง');
+            }
+            if (payload.expectedReceiptSnapshot !== receiptSnapshot(receipt)) {
+                throw httpError(409, 'ข้อมูลหรือเลขใบเสร็จเปลี่ยน กรุณาเปิดรายการใหม่เพื่อตรวจยอด หากพิมพ์แล้วให้ยกเลิกใช้กระดาษใบเดิมและพิมพ์ใหม่ ยังไม่ได้รับเงิน');
+            }
         }
         const insertBilling = await client.query(`
             INSERT INTO ${TABLE_SCHEMA}.billing (

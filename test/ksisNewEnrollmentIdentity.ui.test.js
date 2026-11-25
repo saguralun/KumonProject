@@ -46,6 +46,9 @@ for (const embedded of [false, true]) for (const view of ['draft', 'at']) test(`
       assert.doesNotMatch(await container.innerText(), /เด็กอยู่อีกหน้า/);
       assert.match(await page.locator('#ksisDraftSource').innerText(), /นอกหน้า 1 รายการ/);
     } else {
+      const group = container.locator('[data-ksis-group=outside]');
+      assert.equal(await group.getAttribute('open'), null);
+      await group.locator('summary').press('Enter');
       const outside = container.locator('tr').filter({ hasText: 'เด็กอยู่อีกหน้า' });
       assert.equal(await outside.locator('.match-state').innerText(), 'ไม่อยู่ในหน้าปัจจุบัน');
       assert.match(await outside.locator('.match-state').getAttribute('class'), /match-info/);

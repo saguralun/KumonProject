@@ -727,3 +727,14 @@ html[data-role="staff"] [data-staff-up] {
     grid-template-columns: 1fr;
   }
 }
+
+#forecastWarnings {
+  max-height: 220px;
+  overflow: auto;
+  flex-shrink: 0;
+  text-align: left;
+  background: #fffbeb;
+  color: #78350f;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+}

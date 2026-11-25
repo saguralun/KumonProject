@@ -17,6 +17,7 @@ $ErrorActionPreference = "SilentlyContinue"
 # project is cloned into on any given machine.
 $ProjectDir = Split-Path -Parent $PSScriptRoot
 $Marker = "KUMONDB_LAUNCHER_MARKER"
+. (Join-Path $PSScriptRoot 'launch-feedback.ps1')
 
 # Do not replace a running server, browser session, or unsaved KSIS work.
 if (-not $ForceRestart -and (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue)) {
@@ -24,13 +25,13 @@ if (-not $ForceRestart -and (Get-NetTCPConnection -LocalPort 3000 -State Listen 
         $result = Invoke-RestMethod -Uri "http://localhost:3000/api/system/desktop/show" -Method Post -ContentType "application/json" -Body "{}" -TimeoutSec 40 -ErrorAction Stop
         if (-not $result.success) { throw "Desktop not available" }
     } catch {
-        Write-Warning "KumonDB is already running. Finish pending work before using -ForceRestart to activate the integrated desktop."
+        Show-KumonLaunchError -Stage 'reuse' -ProjectDir $ProjectDir -Detail $_.Exception.Message
     }
     return
 }
 
 if (-not (Test-Path -LiteralPath (Join-Path $ProjectDir 'node_modules/electron/dist/electron.exe'))) {
-    Write-Warning "KumonDB desktop dependencies are missing. Install dependencies before opening the application."
+    Show-KumonLaunchError -Stage 'dependencies' -ProjectDir $ProjectDir -Detail 'Desktop dependencies are missing or an update did not finish.'
     return
 }
 
@@ -62,14 +63,23 @@ Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
 
 # --- 2) Start the server, fully hidden ----------------------------------
 
-$serverCommand = "Set-Location -LiteralPath '$ProjectDir'; " +
+$quotedProjectDir = $ProjectDir.Replace("'", "''")
+$serverCommand = "Set-Location -LiteralPath '$quotedProjectDir'; " +
     "`$env:KUMON_DESKTOP_MAIN = '1'; " +
     "`$host.UI.RawUI.WindowTitle = 'KumonDB Server'; " +
     "# $Marker`n" +
     "npm start"
 
-Start-Process powershell -WindowStyle Hidden -ArgumentList @(
-    "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $serverCommand
-)
+try {
+    Start-Process powershell -WindowStyle Hidden -ArgumentList @(
+        "-NoExit", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $serverCommand
+    ) -ErrorAction Stop
+    Wait-KumonDesktop
+} catch {
+    if ((Get-Content -LiteralPath $LockFile -ErrorAction SilentlyContinue) -eq [string]$PID) {
+        Remove-Item -LiteralPath $LockFile -Force -ErrorAction SilentlyContinue
+    }
+    Show-KumonLaunchError -Stage 'start' -ProjectDir $ProjectDir -Detail $_.Exception.Message
+}
 
 # The server owns the integrated desktop. Do not open Chrome or another window.

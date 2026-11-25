@@ -26,6 +26,20 @@ Embedded-app tests use a separate Electron fixture/profile. They do not access
 the real KSIS account, session, application server or student records.
 Serial execution avoids competing browser fixtures on slower workstations.
 
+If cold Chrome/Electron startup on a busy PC exceeds an enclosing UI test
+deadline, run only one browser suite and opt in to an outer deadline allowance:
+
+```powershell
+$env:TEST_UI_TIMEOUT_SCALE = '3'
+node --import ./test/support/uiTimeoutAllowance.mjs --test --test-concurrency=1
+```
+
+The helper is inert without the opt-in and affects only `.ui.test.js` enclosing
+timeouts. It does not change assertions, fixture responses, API operations or
+Playwright action deadlines. Do not combine it with reviewInstrumentation's
+timeout multiplier. Record the allowance with test results; do not classify a
+functional assertion failure as machine slowness.
+
 `isolatedDatabase.integration.test.js` runs on Windows and requires installed
 PostgreSQL binaries (default `C:/Program Files/PostgreSQL/18/bin`; override with
 `TEST_PG_BIN`). It creates its own cluster in a uniquely named temporary folder,
@@ -35,11 +49,32 @@ migrations, payment/status changes, WS, stock cuts and restore tests run only
 inside that disposable cluster. The test shuts down and removes only its own
 cluster when finished.
 
+Windows fixture startup has a separate allowance for cold process launches.
+The disposable cluster uses `initdb --no-sync` and the existing server `-F`;
+these tests check transactions, not recovery after a machine crash. A cleanup
+failure reports its own diagnostic without hiding the original setup failure,
+and data is retained if the test cannot confirm its cluster has stopped.
+
 Do not enable `TEST_WINDOWS_RESTART` for routine checks. It is a separate opt-in
 restart-helper test, not necessary for this suite's application regression check.
 
 ## Coverage
 
+- Remaining UI review: read-only status-action Preview, reviewed snapshots under
+  the existing enrollment lock, date-read races/retries, grouped WS/AT plans,
+  retained shared audit scope, readable Save/hints, offline version timestamps
+  and read-only retries, and mocked Windows launcher failure feedback. See
+  `UI-FOLLOWUP-2026-11-24.md` and its verification index.
+
+- Worksheet AT/Find Incomplete WS use native modal focus containment, Escape
+  and opener restoration. Keyboard name selection, independent paging, stale
+  reads, pending/failed AT retries, nested notices and PC/tablet bounds run in
+  both Chrome and the embedded desktop with synthetic endpoints. See
+  `MODAL-UI-FIXES-2026-11-24.md` and `worksheetModalKeyboard.ui.test.js`.
+
+- Shared cleanup helpers preserve migration parsing (Thai/AD dates, integer
+  validation, level prefixes and issue summaries), local service dates and
+  distinct stock null values. Stock type caches remain separate per service.
 - Payment receipt allocation and duplicate-payment protection under concurrency.
 - Cancellation provenance, legacy receipts, later status edits and later bills.
 - WS connection-pool saturation, rollback, delete/date-edit transactions.
@@ -189,6 +224,74 @@ restart-helper test, not necessary for this suite's application regression check
   native R option. Preview and final confirmation show the return transition;
   identity is rechecked, ST1 changes first, then newly available worksheet
   fields are filled and verified. All other A rows keep their skip behavior.
+
+- `worksheetCdBoundary.ui.test.js` exercises both slots of daily20 at all three
+  TRP 7A/6A CD boundaries, explicit receive/decline/cancel decisions, failed
+  receive retry, ordinary WS save after both decisions, duplicate/reversed
+  packets, single-slot patterns, ME/EFL and context switches. CD master data
+  and receive/stock APIs retain their existing contracts; no CD is handed out
+  automatically by the tests or by changing the worksheet selection.
+- `studentBirthDateSafety.test.js` and the Students UI cases reject changed
+  future birthdays before writes, retain valid corrections and allow unrelated
+  edits to legacy unchanged future dates. No new minimum-age rule is imposed
+  on edits. Student deletion confirms the child, subject and DT scope first;
+  billing/history deletion restrictions remain server-enforced as before.
+- CD return race cases keep success and failure messages with the originating
+  profile request. They do not redirect the return or change stock arithmetic.
+- `stockHeaderDates.test.js` rejects date mismatches before appending quantity
+  under the existing DO lock. Legacy calls that omit receiveDate still append
+  without changing the stored receipt date/period. It does not add a
+  retrospective date-edit API.
+  `stockReadSafety.ui.test.js` verifies out-of-order DO searches, late search
+  errors, physical-cut vs usage counts, zero physical cuts and older responses
+  that omit cutQuantity (unknown is displayed, never inferred from usage).
+  The disposable PostgreSQL suite independently checks birthday validation and
+  date-mismatch rollback alongside the normal payment/stock/WS workflows.
+- The AT advancement UI case waits for its own completion POST before checking
+  the refreshed state. Viewport checks wait for the existing tablet DOM move
+  before measuring Save/CD buttons. This preserves the original value/visibility
+  assertions and avoids observing a prior result or a transient hidden panel.
+
+- `rolePermissionEdits.test.js` and `usersAccountSafety.ui.test.js` reproduce
+  stale whole-role grants in two independent admin contexts. Role-row locking
+  and the required original-grants snapshot prevent silent overwrites. Tests
+  cover deliberate review/retry, legacy-page rejection, Admin guards and cache
+  refresh. Account creation is create-only; per-account password reset has its
+  own endpoint/dialog and preserves name, role and activation. Reset tests cover
+  target-only session revocation, in-flight old sessions, self-reset, rollback,
+  cancel/clear, duplicate submit, retry and normal role/activation controls.
+  The isolated PostgreSQL suite also tests real concurrent permission writers
+  and reset/role actions without changing the schema. See
+  `ACCOUNT-FIXES-2026-11-24.md` for reproduction and verification evidence.
+
+- `updateBackupRecovery.ui.test.js` checks server/database identification,
+  before-Restore archive downloads and restart failure feedback on Login and
+  signed-in pages in browser/desktop fixtures. `backupRecoverySafety.test.js`
+  exercises injected backup/restore steps, target metadata and upload cleanup.
+  `backupImportRoutes.test.js` replaces subprocesses with a fresh function
+  without Node's native custom promisifier, blocks other process entries and
+  verifies the real route's Admin/name guards and structured recovery response.
+  See `UPDATE-BACKUP-FIXES-2026-11-24.md`, including the initial test boundary
+  incident and its production backup/retention side effects.
+
+- `leaveGuard.ui.test.js` exercises unsaved-work protection on WS/AT, Students
+  and Stock Receive: cancel/confirm navigation, pending/failed/successful saves,
+  native browser reload cancellation, actual fixture-window close, logout and
+  update cancellation, modal drafts and unresolved DO messages. No form values
+  are auto-saved or persisted by the guard. Existing DO retry keys are retained.
+  See `LEAVE-GUARD-FIXES-2026-11-24.md` for scope, reproduction and limitations.
+
+- `fourPointClarity.ui.test.js` covers Progress assessment totals/reasons and
+  WS date drafts in browser/desktop fixtures, including Tab/blur, explicit
+  save/cancel, Enter/Esc, retries, processed-row locks, redraws, PC/tablet
+  layouts and deliberate selection changes. Date drafts are memory-only;
+  blur never saves or discards them. `progressChartAssessment.test.js` checks
+  the read-only service payload and preserves the original pace calculation.
+  `studentSearchAndHalfClarity.ui.test.js` covers Student/Enrollment ID labels,
+  truthful exact/prefix matches, and explanations for the existing H/FSH/FRGH
+  date alignment in both enrollment forms. No new date or billing policy is
+  introduced. Verification is recorded in
+  `reviews/2026-11-25/four-point-verification.json`.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

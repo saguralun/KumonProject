@@ -1,0 +1,180 @@
+{
+  "date": "2026-11-24",
+  "kind": "remaining-agent-findings-reproduce-fix-verify",
+  "baseCommit": "6afa0847489b23cfc0b524cf478e15771f4402f5",
+  "uncommittedWorkingTree": true,
+  "productionDataOperations": false,
+  "productionSchemaChanges": false,
+  "actualKsisAuthenticationTested": false,
+  "commitPushOrProductionRestart": false,
+  "devices": {
+    "pcPercent": 99,
+    "tabletPercent": 1,
+    "smartphoneDesign": false
+  },
+  "before": [
+    {
+      "log": "logs/round3-cd-before.log",
+      "sha256": "cbdc4cd833fbb3afa855c164d0e6d8cc56827e855023198afa284cbfc215705f",
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "log": "logs/round3-cd-return-before.log",
+      "sha256": "e66e75ab2c003b58c87dee4d99bceddfa360aaff043d9cabdb687b9575a72299",
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "log": "logs/round3-student-service-before.log",
+      "sha256": "268d463012acee28dd66511210dbbd52a23e5a065086cd13412d18a998f0721e",
+      "tests": 3,
+      "pass": 2,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "log": "logs/round3-student-ui-before.log",
+      "sha256": "d5b1d843b58ae773f78b64002ab5aacbf51e32a5a06c46b4ca10fc5e9760e900",
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "log": "logs/round3-stock-header-before.log",
+      "sha256": "13e55825077cb7b73ba9f2cbf20889b6eedc1685ba25f8f77b8ac13a411c4373",
+      "tests": 2,
+      "pass": 0,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    {
+      "log": "logs/round3-stock-ui-before.log",
+      "sha256": "b1a04de55a9547faaa4bfbbaee40fbb35cc026279212fafcff96cf470a177ebb",
+      "tests": 4,
+      "pass": 0,
+      "fail": 4,
+      "cancelled": 0,
+      "skipped": 0
+    }
+  ],
+  "runs": {
+    "services": {
+      "log": "logs/round3-services-final.log",
+      "sha256": "62877aa8e6a953d271bd5852a8f2536ca272fb1fea6ba50aa9b0b8a020527598",
+      "tests": 339,
+      "pass": 338,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 1
+    },
+    "database": {
+      "log": "logs/round3-database-final.log",
+      "sha256": "6f4bbcfe04207c5a2ba7f2dd3d1a40f7038969ca56198082424ce8cdd17da458",
+      "tests": 43,
+      "pass": 43,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "ui": {
+      "log": "logs/round3-affected-ui.log",
+      "sha256": "39fb5a6be42508b86530a469d2ab06e2b22ecc0cc5adbe6e02c70a7b41d0238f",
+      "tests": 131,
+      "pass": 129,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0
+    }
+  },
+  "totals": {
+    "passed": 512,
+    "skipped": 1,
+    "failed": 0,
+    "cancelled": 0,
+    "uiFiles": 25
+  },
+  "deduplication": "338 service cases, 43 isolated-PG parent/subtests and 131 unique UI cases; two initial UI timing failures were resolved by exact-name matching in the complete 18-case worksheet recheck. Rechecks are not counted again.",
+  "environment": "The first restricted service run failed loopback fetch and junction permissions. An environment probe and the complete unrestricted fixture run passed without application/assertion changes. Existing UI deadline multiplier 3 only.",
+  "code": {
+    "public/js/worksheet/worksheetPreview.js": "9deeb5c6e1d6908fabf695e1a76df3daf15627abaa148f72b90a1d5269d68a99",
+    "public/js/student-manager.js": "2d2fb3c01ae9d33c31b36d16c0f9298d2ded81fe8df6607a6fd93a32a9b6addb",
+    "services/studentService.js": "8cab5e9a19fd986d10fabed688e94feded0204c7998b3fafb48dcde3efa39124",
+    "services/stockReceiveService.js": "29a4c7d334dbbcba6e35d9aed599593fcb5a729aa73299b52786a45f60cb0d9a",
+    "public/js/stock-receive.js": "d2cf3333a3d6f0475dad85c9eae55e288d3e2d42d3597997952e12fd1e111a29",
+    "public/js/stock-cut.js": "8e85a42de4ac13a191352dc05c145b9a33b7ea18cff6af6f7ff126867ab2ee01",
+    "test/worksheetCdBoundary.ui.test.js": "d548e5299c0eb5c690b3ef33e1e11bc73baa016d8fcd199075edddc237c2daa0",
+    "test/studentBirthDateSafety.test.js": "3c189de6ecb8f73e0d8b7ea8dbc83daa7c4838ab8a81f672ac3e39095e53ebd4",
+    "test/stockHeaderDates.test.js": "6b0698787335644d2faabacf614f7311096a77eb3f66ba748ffd669b225984cb",
+    "test/stockReadSafety.ui.test.js": "f91fef2b6400283f38669ee2bea2fc9467f56de4db52ba8a17b7c850f0afb25f",
+    "test/frontendStateRaces.ui.test.js": "adb5d8e2f8635debf5eb6ef5b4cfd8a83c847cce029bfda534dac24fc9b8f623",
+    "test/isolatedDatabase.integration.test.js": "af396887649c68889c13a44e11356888b75f6fac8fe9078eacaf8f3f90e22cbf",
+    "test/worksheetAtScope.ui.test.js": "3bbe9d797c6c6cfbe59829eba84fc78df0521a79636f6bdb4a0b3014d34ac770",
+    "test/README.md": "6af6609986540ab96de6fddbe10fa0f766af8d0218781747a475976c5716bb73",
+    "test/REMAINING-FIXES-2026-11-24.md": "3f59de1698c9926250275d4e8ce9b58c7a98080119c2e3e5fa2ee29f81fe3013"
+  },
+  "preservedPreviousFixes": {
+    "public/js/payment.js": "f1bb2f7574a2868c51d3e9927d91a096fc417701df27b4dfd1238250d5a23831",
+    "public/js/receiptSnapshot.js": "4099efb05a247b639dd0c2158d00f02da2807b5af01b8d5954e67b2f1bd8d807",
+    "services/paymentService.js": "7f757434c61812025671f21e4aad34f4c636a78a02c172f74dee63c795eca5a1",
+    "public/payment.html": "2d224330be268e8c0f73c1f4ed9733b41c7b121c42921c266ccb05949738fb0c",
+    "services/authService.js": "a93c41e367b67846b90f927ba0e6d279bb6b726c3eb4d09838e61c6f2db18199",
+    "services/accountSession.js": "45e91166b9990bd2f384a2501b071e0eba6e55815f96a104665b35fb535c01bc",
+    "middleware/auth.js": "c5b2f6f498b250fd2c5265f9be679f90eeb22eba28792489d3b20e2170dc232e",
+    "routes/authRoutes.js": "5f939d75e0d50505409f00ffd7ac606046d7cdb82c6d1790b22f2503f7b0aee6"
+  },
+  "limitations": [
+    "No actual KSIS expiry/login, real print, production deployment or transactions were tested.",
+    "No automatic CD master creation or retrospective DO date-edit endpoint.",
+    "Other agent findings outside the four authorized priorities remain separate."
+  ],
+  "rechecks": {
+    "legacyStockContract": {
+      "log": "logs/round3-stock-final-contract.log",
+      "sha256": "e25e9d482857c979fbd969e7df7433bce9e7b83465b066aef4e514160240a3e3",
+      "tests": 13,
+      "pass": 13,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "worksheet": {
+      "log": "logs/round3-worksheet-final.log",
+      "sha256": "5532969bbd4e8e91e43cd0e6680ccd535611739dc2b2deedc6c2d34ad6a02a92",
+      "tests": 18,
+      "pass": 18,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    }
+  },
+  "legacyCompatibilityBefore": {
+    "log": "logs/round3-stock-legacy-before.log",
+    "sha256": "8b36cbb86a75ecc22c377a1da9ad0066742fb534a8270d3b7a8d8b6d9ed50189",
+    "tests": 2,
+    "pass": 0,
+    "fail": 2,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "uiValidation": {
+    "uniqueCases": 131,
+    "initialPassed": 129,
+    "initialFailed": 2,
+    "resolvedByRecheck": [
+      "New levels start at WS 1 after passing; failures, historical edits and final levels keep their inputs (desktop)",
+      "Both CDs require explicit receive/decline decisions, cancellation and retry (desktop)"
+    ],
+    "remainingFailures": 0
+  }
+}

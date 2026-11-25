@@ -70,7 +70,7 @@
 
       <section class="filter-panel workspace-toolbar" aria-label="ตัวเลือกรายงาน">
         <label><span>เดือน</span><select id="reportMonth"></select></label>
-        <label><span>ปี</span><input id="reportYear" type="number" min="2000" max="2600" step="1"></label>
+        <label><span>ปี (ค.ศ.)</span><input id="reportYear" type="number" min="2000" max="2600" step="1"></label>
         <button type="button" class="primary-button" id="generateButton">📊 สร้างรายงาน</button>
         <button type="button" class="secondary-button" id="exportButton" data-report-view="report" disabled>⬇️ Export CSV</button>
         <button type="button" class="secondary-button" id="exportEventSummaryButton">📋 Export สรุป N/EO/R/IT/Absent</button>
@@ -97,21 +97,21 @@
           <div class="empty-state">ยังไม่มีรายงาน</div>
         </div>
         <footer class="report-pagination" data-report-view="report" aria-label="เปลี่ยนหน้ารายงาน">
-          <span id="pageRange">0 คน</span>
+          <span id="pageRange">0 รายวิชา</span>
           <div class="page-controls">
             <button type="button" id="previousPage" title="หน้าก่อนหน้า" aria-label="หน้าก่อนหน้า" disabled>‹</button>
             <label for="pageNumber">หน้า</label><input id="pageNumber" type="number" min="1" step="1" value="1" aria-label="หน้ารายงาน" disabled>
             <span id="pageTotal">/ 1</span>
             <button type="button" id="nextPage" title="หน้าถัดไป" aria-label="หน้าถัดไป" disabled>›</button>
           </div>
-          <span>20 คน / หน้า</span>
+          <span>20 รายวิชา / หน้า</span>
         </footer>
       </section>
     </section>
   </main>
 
   <script src="/js/appDialogs.js?v=20261023-all-actions"></script>
-  <script src="/js/authClient.js?v=20261030-code-only-update"></script>
+  <script src="/js/authClient.js?v=20261124-unsaved-work"></script>
   <script src="/js/appMenu.js?v=20261023-dialog-focus"></script>
   <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
   <script src="/js/httpUtil.js?v=20261030-project-audit"></script>

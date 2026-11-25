@@ -112,6 +112,26 @@ test('Read-only AT inspection refreshes clean page 1 through the unchanged filte
     } finally { await browser.close(); }
 });
 
+test('ID-less AT inspection reads the actual KSIS DOM by enrollment identity without treating it as a persisted refresh', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
+    const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
+    try {
+        const page = await browser.newPage(); let posts = 0;
+        const html = fixture().replaceAll('7642650000001', '').replace('<li class="active">1</li>', '<li class="active">2</li>') + '<button id="btnToolbarFilterSort">Filter</button>';
+        await page.route('**/*', route => {
+            if (route.request().method() !== 'GET') { posts++; return route.abort(); }
+            return route.fulfill({ contentType: 'text/html; charset=utf-8', body: html });
+        });
+        await page.goto(KSIS_AT_URL);
+        const source = { ...record, 'รหัสคุมอง': '', TestType1: '', TestType2: '' };
+        const result = await readKsisAtInspection(page, [source], { period, subject: 'ME', enrollmentId: source.ID });
+        assert.equal(result.enrollmentId, source.ID); assert.equal(result.readOnly, true);
+        assert.equal(result.refreshed, false); assert.equal(result.comparisons[0].matches, true);
+        assert.equal(result.comparisons[0].persisted, false); assert.equal(posts, 0);
+        await assert.rejects(readKsisAtInspection(page, [{ ...source, 'วันเกิด': '02/01/2020' }], { period, subject: 'ME', enrollmentId: source.ID }), { statusCode: 409 });
+        assert.equal(posts, 0);
+    } finally { await browser.close(); }
+});
+
 test('Read-only inspection never discards dirty AT input or removes a pending guard', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
     const browser = await chromium.launch({ channel: 'chrome', headless: true, chromiumSandbox: true });
     try {

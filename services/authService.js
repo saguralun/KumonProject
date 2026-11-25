@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
+import { accountCredentialVersion } from './accountSession.js';
 
 const GUEST_PIN = process.env.GUEST_PIN || "";
 
@@ -62,7 +63,7 @@ export async function getActiveSessionAccount(userId) {
 // Handles both "admin" and "staff" DB-backed accounts — the role that
 // decides what a signed-in account may do comes from the row itself, not
 // from which login form was used.
-export async function verifyAccountLogin({ username, password }) {
+export async function verifyAccountSessionLogin({ username, password }) {
     const normalizedUsername = String(username || "").trim();
 
     if (!normalizedUsername || !password) {
@@ -92,7 +93,12 @@ export async function verifyAccountLogin({ username, password }) {
         [row.user_id]
     );
 
-    return sanitizeAccount(row);
+    return { user: sanitizeAccount(row), credentialVersion: accountCredentialVersion(row.password_hash) };
+}
+
+export async function verifyAccountLogin(credentials) {
+    const { user } = await verifyAccountSessionLogin(credentials);
+    return user;
 }
 
 export function verifyGuestLogin({ displayName, pin }) {
@@ -117,6 +123,54 @@ export function verifyGuestLogin({ displayName, pin }) {
     };
 }
 
+async function revokeAccountSessions(client, userId) {
+    // CLI bootstrap may run before the session table exists. All other catalog
+    // and DELETE errors must still roll back a password change.
+    const store = await client.query(`SELECT to_regclass('session') IS NOT NULL AS session_table_exists`);
+    const sessionTableExists = store.rows[0]?.session_table_exists;
+    if (typeof sessionTableExists !== 'boolean') throw new Error('Cannot verify session store availability');
+    if (sessionTableExists) {
+        await client.query(`DELETE FROM "session" WHERE sess->'user'->>'userId' = $1`, [String(userId)]);
+    }
+}
+
+function assertNewPassword(password) {
+    if (typeof password !== 'string' || password.length < 6) throw httpError(400, 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+}
+
+export async function createAccount({ username, password, displayName, role }) {
+    const normalizedUsername = String(username || '').trim();
+    const normalizedRole = String(role || '').trim();
+    if (!normalizedUsername) throw httpError(400, 'กรุณากรอก username');
+    assertNewPassword(password);
+    const passwordHash = await bcrypt.hash(password, 10);
+    return withAccountWrite(async client => {
+        await assertAssignableRole(normalizedRole, client);
+        const result = await client.query(`INSERT INTO app_user (username, password_hash, display_name, role)
+            VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING
+            RETURNING user_id, username, display_name, role, is_active`,
+            [normalizedUsername, passwordHash, String(displayName || normalizedUsername).trim(), normalizedRole]);
+        if (!result.rows[0]) throw httpError(409, 'username นี้มีบัญชีอยู่แล้ว ใช้ปุ่มรีเซ็ตรหัสผ่านหรือเปลี่ยนสิทธิ์ในแถวบัญชีนั้น');
+        return result.rows[0];
+    });
+}
+
+export async function resetAccountPassword(userId, password) {
+    const id = Number(userId);
+    if (!Number.isSafeInteger(id) || id < 1) throw httpError(400, 'รหัสบัญชีไม่ถูกต้อง');
+    assertNewPassword(password);
+    const passwordHash = await bcrypt.hash(password, 10);
+    return withAccountWrite(async client => {
+        const result = await client.query(`UPDATE app_user SET password_hash = $2, updated_at = CURRENT_TIMESTAMP
+            WHERE user_id = $1 RETURNING user_id, username, display_name, role, is_active`, [id, passwordHash]);
+        if (!result.rows[0]) throw httpError(404, 'ไม่พบบัญชีนี้');
+        await revokeAccountSessions(client, id);
+        return result.rows[0];
+    });
+}
+
+// Explicit legacy/CLI upsert retains its role/reactivation semantics. The web
+// create/reset endpoints deliberately do not use this combined operation.
 // role: any role_master code except "guest" — see assertAssignableRole.
 export async function upsertAccount({ username, password, displayName, role = "admin" }) {
     const normalizedUsername = String(username || "").trim();
@@ -159,6 +213,7 @@ export async function upsertAccount({ username, password, displayName, role = "a
             [normalizedUsername, passwordHash, normalizedDisplayName, normalizedRole]
         );
 
+        await revokeAccountSessions(client, result.rows[0].user_id);
         return result.rows[0];
     });
 }

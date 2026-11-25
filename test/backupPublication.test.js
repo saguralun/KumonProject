@@ -55,7 +55,9 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         root, output,
         async run() {
             return execute('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', runner, '-ScriptPath', script], {
-                cwd: root, windowsHide: true, timeout: 15000,
+                // Windows may cold-start two PowerShell processes under load.
+                // Keep every publication assertion, but allow startup to finish.
+                cwd: root, windowsHide: true, timeout: 45000,
                 env: { ...process.env, PGPASSWORD: 'fixture-original-password' }
             });
         },

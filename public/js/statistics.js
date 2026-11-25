@@ -179,7 +179,7 @@ function attachTooltipHandlers(container, monthLabel) {
       els.chartTooltip.innerHTML = `
         <div class="tooltip-title">${escapeHtml(monthLabel)} ${escapeHtml(year)}${currentMonth === "true" ? " · กำลังนับ" : ""}</div>
         <div class="tooltip-line">${escapeHtml(code)} — ${escapeHtml(STATUS_LABELS_TH[code] || code)}</div>
-        <div class="tooltip-line">${escapeHtml(value)} คน</div>
+        <div class="tooltip-line">${escapeHtml(value)} ${code === 'C' ? 'รายวิชาในบิล' : 'รายการสถานะ'}</div>
       `;
       els.chartTooltip.style.left = `${event.clientX + 14}px`;
       els.chartTooltip.style.top = `${event.clientY + 14}px`;

@@ -35,15 +35,24 @@ function restartFixture(service) {
 test('ERROR after READY releases Update only for its own failed attempt', async () => {
     const service = await import('../services/updateService.js?ready-error-retry');
     const first = restartFixture(service);
-    assert.equal((await service.applyUpdate(first.steps)).restartScheduled, true);
+    const result = await service.applyUpdate(first.steps);
+    assert.equal(result.restartScheduled, true);
     await assert.rejects(service.applyUpdate(first.steps), error => error.statusCode === 409);
     // The wscript shim already exited successfully; the actual PowerShell helper
     // reports the failure later, while this original server remains alive.
     await first.report('READY oldPid=fixture\nERROR Original server changed before restart; nothing was stopped');
     await first.done();
+    const failed = service.getRuntimeStatus().update;
+    assert.equal(failed?.attemptId, result.updateAttemptId);
+    assert.equal(failed?.phase, 'failed');
+    assert.match(failed?.message || '', /ลองอัปเดต/);
     const second = restartFixture(service);
-    assert.equal((await service.applyUpdate(second.steps)).restartScheduled, true);
+    const next = await service.applyUpdate(second.steps);
+    assert.equal(next.restartScheduled, true);
+    assert.notEqual(next.updateAttemptId, result.updateAttemptId);
     first.repeatFailure();
+    assert.equal(service.getRuntimeStatus().update.attemptId, next.updateAttemptId);
+    assert.equal(service.getRuntimeStatus().update.phase, 'restarting');
     await assert.rejects(service.applyUpdate(second.steps), error => error.statusCode === 409);
     await second.report('READY\nERROR fixture refused stop');
     await second.done();

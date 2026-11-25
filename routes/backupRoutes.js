@@ -46,6 +46,11 @@ router.post(
                 ...(await importBackup(req.body, { confirmDbName: req.query.confirmDbName }))
             });
         } catch (error) {
+            if (error.preImportBackup) {
+                console.error(error);
+                return res.status(error.statusCode || 500).json({ success: false, error: error.message,
+                    preImportBackup: { filename: error.preImportBackup.filename, sizeBytes: error.preImportBackup.sizeBytes, createdAt: error.preImportBackup.createdAt } });
+            }
             sendError(res, error);
         }
     }

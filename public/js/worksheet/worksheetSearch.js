@@ -30,6 +30,16 @@ export function renderSearchResults() {
             <span class="result-subject" data-subject="${escapeHtml(row.subjectCode)}">${escapeHtml(row.subjectCode)} ${escapeHtml(row.currentLevelCode)}</span>
         </button>
     `).join("");
+    // Mouse selection is handled on mousedown by the page. Native button
+    // activation from the keyboard (or assistive technology) emits a click
+    // with detail 0, so handle that here without selecting twice by mouse.
+    for (const button of els.searchResults.querySelectorAll('[data-index]')) {
+        button.addEventListener('click', (event) => {
+            if (event.detail === 0) {
+                void selectSearchResult(Number(button.dataset.index));
+            }
+        });
+    }
     els.searchResults.classList.remove("hidden");
 }
 

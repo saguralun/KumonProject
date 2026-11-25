@@ -1,5 +1,5 @@
 const path = require('node:path');
-const { app, BrowserWindow, WebContentsView, ipcMain, session } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, dialog } = require('electron');
 const { appOrigin, isKsisUrl, isWorkspaceUrl, isAppUrl, isStudentManagerUrl, clampBounds } = require('./security.cjs');
 
 const origin = appOrigin(process.env.KUMON_APP_ORIGIN);
@@ -11,6 +11,7 @@ app.setAppUserModelId('KumonDB.Desktop');
 let window, ksis, bounds = null, visible = false;
 let activeAccount = null, printing = false, ready = false;
 let studentPreview = null;
+let ownerExited = false;
 const accountViews = new Map();
 const securePreferences = { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true };
 
@@ -104,7 +105,7 @@ else {
       // Do not leave an orphaned single-instance window after an authorized server restart.
       const ownerWatch = setInterval(() => {
         try { process.kill(ownerPid, 0); }
-        catch (error) { if (error.code === 'ESRCH') app.quit(); }
+        catch (error) { if (error.code === 'ESRCH') { ownerExited = true; app.quit(); } }
       }, 150);
       ownerWatch.unref();
     }
@@ -118,6 +119,16 @@ else {
       backgroundColor: '#eef3f8', icon: path.join(__dirname, '../launcher/kumondb.ico'),
       webPreferences: { ...securePreferences, preload: path.join(__dirname, 'preload.cjs') } });
     window.removeMenu();
+    window.webContents.on('will-prevent-unload', event => {
+      if (ownerExited) { event.preventDefault(); return; }
+      const answer = dialog.showMessageBoxSync(window, { type: 'question',
+        title: 'มีงานที่ยังไม่เสร็จ',
+        message: 'ยังมีข้อมูลที่ไม่ได้บันทึกหรือกำลังรอผล ออกจากหน้านี้หรือปิดโปรแกรมใช่ไหม?',
+        detail: 'ค่าที่แก้ค้างจะหาย ส่วนรายการที่ส่งบันทึกไปแล้วอาจยังทำงานต่อ กรุณาตรวจผลก่อนส่งซ้ำ',
+        buttons: ['กลับไปทำงาน', 'ออกจากหน้า / ปิดโปรแกรม'], defaultId: 0, cancelId: 0, noLink: true });
+      // Electron uses preventDefault here to *ignore* renderer prevention.
+      if (answer === 1) event.preventDefault();
+    });
     window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
     window.webContents.on('will-navigate', (event, url) => {
       try {
@@ -144,7 +155,7 @@ else {
     });
     ipcMain.handle('kumon:desktop-info', (event) => {
       if (!trustedSender(event, false)) throw new Error('Untrusted sender');
-      return { embedded: true, unified };
+      return { embedded: true, unified, leaveConfirmation: true };
     });
     ipcMain.handle('kumon:print-html', printHtml);
     ipcMain.on('kumon:ksis-bounds', (event, value) => {

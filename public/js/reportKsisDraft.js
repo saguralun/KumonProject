@@ -1,3 +1,5 @@
+import { renderKsisRowGroups } from './ksisRowGroups.js';
+
 export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChange = () => {} }) {
   const get = (id) => document.getElementById(id);
   const read = get("ksisDraftPreview"), fill = get("ksisDraftFill"), acknowledge = get("ksisDraftAcknowledge");
@@ -25,18 +27,33 @@ export function setupKsisDraft({ shared, open, setStatus, getPeriod, onStateChan
     onStateChange({ busy, pending });
   }
   function render() {
-    const rows = (result?.rows || preview?.rows || []).filter((row) => !row.outsidePage && (row.before || row.requiresIdentityConfirmation) && !row.skipped);
+    const rows = result?.rows || preview?.rows || [];
     if (preview && !result && !busy) {
       const waitingIdentity = preview.rows.filter((row) => row.ready && row.requiresIdentityConfirmation && !confirmedMatches.has(row.key)).length;
-      source.textContent = `${preview.context} • หน้า ${preview.page} • ${subjectLabel(preview.subject)} • WS เท่านั้น • พร้อม ${eligibleRows().length} รายวิชา${waitingIdentity ? ` • รอยืนยันชื่อ ${waitingIdentity} รายวิชา` : ''} • ข้าม A ${preview.rows.filter((row) => row.before && row.skipped).length} รายวิชา • นอกหน้า ${preview.rows.filter((row) => row.outsidePage ?? (!row.before && !row.requiresIdentityConfirmation)).length} รายการ • จะกรอกและบันทึกเฉพาะหน้านี้`;
+      const review = preview.rows.filter(row => !row.outsidePage && !row.skipped && !row.ready).length;
+      source.textContent = `${preview.context} • หน้า ${preview.page} • ${subjectLabel(preview.subject)} • WS เท่านั้น • พร้อม ${eligibleRows().length} รายวิชา${waitingIdentity ? ` • รอยืนยันชื่อ ${waitingIdentity} รายวิชา` : ''}${review ? ` • ต้องตรวจ ${review} รายวิชา` : ''} • ข้าม A ${preview.rows.filter((row) => !row.outsidePage && row.skipped).length} รายวิชา • นอกหน้า ${preview.rows.filter((row) => row.outsidePage).length} รายการ • จะกรอกและบันทึกเฉพาะหน้านี้`;
     }
     const outcomes = { saved: ["กรอกและบันทึกแล้ว", "match-exact"], filled: ["กรอกแล้ว (รอตรวจการบันทึก)", "match-review"], failed: ["ต้องตรวจ", "match-conflict"], not_started: ["ยังไม่ได้กรอก", "match-review"], blocked: ["ไม่ผ่านการตรวจ", "match-conflict"] };
-    container.innerHTML = rows.length ? `${result ? '<h3 class="draft-result-title">สรุปการกรอกหน้านี้</h3>' : ""}<table class="matching-table"><thead><tr><th>นักเรียน / รหัสคุมอง</th><th>ระดับ / หน้า</th><th>WS ที่ใช้</th><th>ST1</th><th>${result ? "ผลการกรอก" : "ผลตรวจ"}</th></tr></thead><tbody>${rows.map((row) => `<tr>
+    const rowBadge = row => {
+      const [label, className] = row.outsidePage ? ['ไม่อยู่ในหน้าปัจจุบัน', 'match-info']
+        : row.skipped ? [row.reason || 'ข้ามสถานะ A', 'match-matched']
+          : result ? outcomes[row.outcome] || ['ยังไม่ได้กรอก', 'match-review']
+            : row.ready ? row.requiresIdentityConfirmation && !confirmedMatches.has(row.key)
+              ? ['รอยืนยันคู่ชื่อและวันเกิด', 'match-info'] : ['พร้อมกรอก', 'match-exact']
+              : [row.reason, 'match-conflict'];
+      return `<span class="match-state ${className}">${text(label)}</span>`;
+    };
+    const table = rows => `<table class="matching-table"><thead><tr><th>นักเรียน / รหัสคุมอง</th><th>ระดับ / หน้า</th><th>WS ที่ใช้</th><th>ST1</th><th>${result ? "ผลการกรอก" : "ผลตรวจ"}</th></tr></thead><tbody>${rows.map((row) => `<tr>
       <td>${text(row.name)}<div class="subtle">${text(row.kumonId || "ยังไม่มีรหัสคุมอง")} • ${text(row.subject)}${row.isKc ? " • KC" : ""}</div>
       ${row.matchMethod === 'name_birth_date' || row.requiresIdentityConfirmation ? `<div class="draft-identity"><div>Report: ${text(row.name)} • ${text(row.birthDate)}</div><div>KSIS: ${text(row.before?.fullName || "ไม่พบคู่")} • ${text(row.before?.birthDate || "—")}</div>${!result && row.ready && row.requiresIdentityConfirmation ? `<label><input type="checkbox" data-confirm-identity="${text(row.key)}" aria-label="ยืนยันคู่ ${text(row.name)} ${text(row.subject)}" ${confirmedMatches.has(row.key) ? "checked" : ""} ${busy || pending ? "disabled" : ""}> ยืนยันว่าเป็นเด็กคนเดียวกัน • ${text(row.subject)}</label>` : row.ready && !row.requiresIdentityConfirmation ? '<div class="subtle">จับคู่ชื่อและวันเกิดตรงกันแล้ว</div>' : ""}</div>` : ""}</td>
       <td>${text(row.before?.level.value || "—")} ${text(row.before?.worksheet.value)} → ${text(row.desired.level || "คงเดิม")} ${text(row.desired.worksheet ?? "")}</td>
       <td>${text(row.before?.used.value ?? "—")} → ${text(row.desired.used)}</td><td>${text(row.before?.status.value || "—")} → ${text(row.desired.status)}${row.returningFromAbsent ? '<div class="subtle">กลับมาเรียน A → R</div>' : ''}</td>
-      <td><span class="match-state ${result ? outcomes[row.outcome]?.[1] || "match-review" : row.ready ? row.requiresIdentityConfirmation && !confirmedMatches.has(row.key) ? "match-info" : "match-exact" : "match-conflict"}">${result ? outcomes[row.outcome]?.[0] || "ยังไม่ได้กรอก" : row.ready ? row.requiresIdentityConfirmation && !confirmedMatches.has(row.key) ? "รอยืนยันคู่ชื่อและวันเกิด" : "พร้อมกรอก" : text(row.reason)}</span>${result && row.resultReason ? `<div class="draft-result-reason${["filled", "saved"].includes(row.outcome) ? " draft-result-notice" : ""}">${text(row.resultReason)}</div>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="empty-state">${preview && !preview.rows.length ? "ไม่มีรายการใน Report ของเดือนและวิชาที่เลือก (รายชื่อมาจากบิลหรือประวัติสถานะของเดือนนั้น)" : preview?.rows.some((row) => row.before && row.skipped) ? "ข้ามรายการสถานะ A ในหน้านี้ ให้จัดการสถานะเองบน KSIS" : "ไม่มีข้อมูลตรงกับหน้า KSIS ปัจจุบัน"}</div>`;
+      <td>${rowBadge(row)}${result && row.resultReason ? `<div class="draft-result-reason${["filled", "saved"].includes(row.outcome) ? " draft-result-notice" : ""}">${text(row.resultReason)}</div>` : ""}</td></tr>`).join("")}</tbody></table>`;
+    const classify = row => row.outsidePage ? 'outside' : row.skipped ? 'skipped'
+      : result ? ['saved', 'filled'].includes(row.outcome) ? 'ready' : 'review'
+        : row.ready && (!row.requiresIdentityConfirmation || confirmedMatches.has(row.key)) ? 'ready' : 'review';
+    container.innerHTML = rows.length ? `${result ? '<h3 class="draft-result-title">สรุปการกรอกหน้านี้</h3>' : ''}${renderKsisRowGroups(rows, classify, table, { completed: Boolean(result) })}`
+      : `<div class="empty-state">${preview ? 'ไม่มีรายการใน Report ของเดือนและวิชาที่เลือก (รายชื่อมาจากบิลหรือประวัติสถานะของเดือนนั้น)' : 'ยังไม่ได้เตรียมข้อมูล'}</div>`;
     if (result && inspection?.previousResultUnverified) {
       container.innerHTML = `<details class="draft-previous-result"><summary>ผลรอบก่อน • บันทึกยืนยันแล้ว ${text(result.savedCount || 0)} รายวิชา • รายการที่เหลือต้องตรวจ WS หลังเข้าสู่ระบบ</summary>${container.innerHTML}</details>`;
     }

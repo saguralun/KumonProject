@@ -1,3 +1,5 @@
+import { renderKsisRowGroups } from './ksisRowGroups.js';
+
 const labels = { ready: 'พร้อมกรอก', existing: 'มีผลสอบตรงกันแล้ว', review: 'ต้องตรวจ', saved: 'บันทึกแล้ว', unconfirmed: 'รอยืนยันคู่', not_started: 'ยังไม่ได้กรอก', outside_page: 'ไม่อยู่ในหน้าปัจจุบัน' };
 const classes = { ready: 'match-exact', existing: 'match-matched', saved: 'match-exact', review: 'match-conflict', unconfirmed: 'match-info', not_started: 'match-review', outside_page: 'match-info' };
 
@@ -24,13 +26,17 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
     const outcome = (row) => row.outcome === 'ready' ? result ? 'not_started' : row.requiresIdentityConfirmation && !confirmed.has(row.id) ? 'unconfirmed' : 'ready' : row.outcome;
     const counts = Object.fromEntries(Object.keys(labels).map((key) => [key, rows.filter((row) => outcome(row) === key).length]));
     get('ksisAtCounts').innerHTML = Object.entries(counts).filter(([, count]) => count).map(([key, count]) => `<span class="audit-total ${classes[key]}">${labels[key]} <strong>${count}</strong></span>`).join('');
-    container.innerHTML = rows.length ? `<table class="matching-table at-table"><thead><tr><th>นักเรียน / วิชา</th><th>วันที่ / ระดับ</th><th>เวลา / คะแนน / Group</th><th>ผลตรวจ</th></tr></thead><tbody>${rows.map((row) => `<tr>
+    const table = rows => `<table class="matching-table at-table"><thead><tr><th>นักเรียน / วิชา</th><th>วันที่ / ระดับ</th><th>เวลา / คะแนน / Group</th><th>ผลตรวจ</th></tr></thead><tbody>${rows.map((row) => `<tr>
       <td>${text(row.name)}<div class="subtle">${text(row.kumonId || 'ยังไม่มีรหัสคุมอง')} • ${text(row.subject)}</div>
       ${row.matchMethod === 'name_birth_date' || row.requiresIdentityConfirmation ? `<div class="draft-identity">Report: ${text(row.name)} • ${text(row.birthDate)}<br>KSIS: ${text(row.targetName || 'ไม่พบคู่')} • ${text(row.targetBirthDate)}${row.outcome === 'ready' && !result && row.requiresIdentityConfirmation ? `<label><input type="checkbox" data-at-identity="${text(row.id)}" aria-label="ยืนยันคู่ ${text(row.name)} ${text(row.desired.level)}" ${confirmed.has(row.id) ? 'checked' : ''} ${busy || pending ? 'disabled' : ''}>ยืนยันเด็กคนเดียวกัน</label>` : ['ready', 'existing'].includes(row.outcome) && !row.requiresIdentityConfirmation ? '<div class="subtle">จับคู่ชื่อและวันเกิดตรงกันแล้ว</div>' : ''}</div>` : ''}</td>
       <td>${text(row.desired.date?.split('-').reverse().join('/'))}<div>${text(row.desired.level)}</div></td>
       <td>${text(row.desired.time)} นาที • ${text(row.desired.score)} คะแนน<div>G${text(row.desired.group)} • ผ่าน</div></td>
-      <td><span class="match-state ${classes[outcome(row)]}">${labels[outcome(row)]}</span>${row.reason ? `<div class="audit-reason">${text(row.reason)}</div>` : ''}${row.key && /^\d{13}$/.test(row.kumonId) ? `<div><button type="button" class="secondary-button" data-at-inspect="${text(row.kumonId)}" ${busy ? 'disabled' : ''}>ตรวจแบบอ่านอย่างเดียว</button></div>` : ''}</td>
-      </tr>`).join('')}</tbody></table>` : `<div class="empty-state">${preview ? 'ไม่มีผลสอบ AT ใน Report ของเดือนและวิชาที่เลือก' : 'ยังไม่มี Preview AT'}</div>`;
+      <td><span class="match-state ${classes[outcome(row)]}">${labels[outcome(row)]}</span>${row.reason ? `<div class="audit-reason">${text(row.reason)}</div>` : ''}${inspectionButton(row)}</td>
+      </tr>`).join('')}</tbody></table>`;
+    const classify = row => outcome(row) === 'outside_page' ? 'outside' : outcome(row) === 'existing' ? 'skipped'
+      : ['ready', 'saved'].includes(outcome(row)) ? 'ready' : 'review';
+    container.innerHTML = rows.length ? renderKsisRowGroups(rows, classify, table, { completed: Boolean(result) })
+      : `<div class="empty-state">${preview ? 'ไม่มีผลสอบ AT ใน Report ของเดือนและวิชาที่เลือก' : 'ยังไม่มี Preview AT'}</div>`;
     renderInspection(); controls();
   }
   function renderInspection() {
@@ -43,17 +49,27 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
       : inspection.refreshed ? all ? 'อ่านข้อมูลที่บันทึกใหม่แล้ว • ตรงกับ Report' : 'อ่านข้อมูลที่บันทึกใหม่แล้ว • ไม่พบผลสอบที่ตรงครบ'
         : 'อ่านค่าปัจจุบันเท่านั้น • ยังไม่ได้ยืนยันกับข้อมูลที่บันทึก';
     target.innerHTML = `<h3>ตรวจ ${text(inspection.name)} • ${text(inspection.subject)}</h3><div role="status">${text(summary)}</div>
-      <div class="subtle">หน้า ${text(inspection.page)} • ${text(inspection.kumonId)} • อ่านอย่างเดียว</div>
+      <div class="subtle">หน้า ${text(inspection.page)} • ${text(/^\d{13}$/.test(inspection.kumonId) ? inspection.kumonId : 'ยังไม่มีรหัสคุมอง')} • อ่านอย่างเดียว</div>
       <table class="matching-table at-inspection-table"><thead><tr><th></th><th>วันที่ / ระดับ</th><th>เวลา / คะแนน / Group</th><th>ผ่าน</th></tr></thead><tbody>${inspection.comparisons.map((item) => `<tr><th>Report</th><td>${text(item.desired.date)} • ${text(item.desired.level)}</td><td>${text(item.desired.time)} นาที • ${text(item.desired.score)} คะแนน • G${text(item.desired.group)}</td><td>ใช่</td></tr><tr><th>KSIS</th><td>${text(item.actual?.date.value || '—')} • ${text(item.actual?.level.value || '—')}</td><td>${text(item.actual?.time.value || '—')} นาที • ${text(item.actual?.score.value || '—')} คะแนน • ${text(item.actual?.group.value || '—')}</td><td>${item.actual?.passed ? 'ใช่' : 'ไม่ใช่'}</td></tr>`).join('')}</tbody></table>
       ${inspection.tests.filter((item) => item.error).map((item) => `<div class="audit-reason match-conflict">KSIS: ${text(item.error)}</div>`).join('')}
       ${inspection.lastSave ? `<div class="subtle">คำตอบบันทึกครั้งก่อน: HTTP ${text(inspection.lastSave.status ?? 'ไม่ทราบ')} ${inspection.lastSave.rows.map((row) => `• saveResult ${text(row.saveResult)} • ${text(row.error || 'ไม่มีข้อความผิดพลาด')}`).join(' ')}</div>` : ''}`;
+  }
+  function inspectionButton(row) {
+    const enrollment = Number.isSafeInteger(Number(row.enrollmentId)) && Number(row.enrollmentId) > 0;
+    const kumon = /^\d{13}$/.test(row.kumonId);
+    if (!row.key || !enrollment && !kumon) return '';
+    // N/EO/IT and other identity matches must not start depending on an old
+    // or temporary ID again just because the inspection is read-only.
+    const useEnrollment = enrollment && (!kumon || row.matchMethod === 'name_birth_date');
+    return `<div><button type="button" class="secondary-button" data-at-inspect="${useEnrollment ? '' : text(row.kumonId)}" data-at-enrollment="${enrollment ? text(row.enrollmentId) : ''}" ${busy ? 'disabled' : ''}>ตรวจแบบอ่านอย่างเดียว</button></div>`;
   }
   container.addEventListener('click', async (event) => {
     const button = event.target.closest('[data-at-inspect]');
     if (!button || busy) return;
     busy = true; render(); setStatus('กำลังตรวจ AT แบบอ่านอย่างเดียว...');
     try {
-      const data = await call('inspect', { ...getPeriod(), subject: subject.value, kumonId: button.dataset.atInspect });
+      const selector = button.dataset.atInspect ? { kumonId: button.dataset.atInspect } : { enrollmentId: Number(button.dataset.atEnrollment) };
+      const data = await call('inspect', { ...getPeriod(), subject: subject.value, ...selector });
       if (data.requiresLogin) { setStatus('กรุณาเข้าสู่ระบบ KSIS ก่อนตรวจ', 'error'); return; }
       inspection = data; setStatus('ตรวจ AT แล้ว • ไม่มีการกรอกหรือบันทึก');
     } catch (error) { source.textContent = error.message; setStatus(error.message, 'error'); }
@@ -109,9 +125,15 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
     } finally { preview = null; busy = false; render(); }
   });
   get('ksisAtAcknowledge').addEventListener('click', async () => {
-    if (busy || !await confirmAction('ยืนยันว่าบันทึกเองหรือยกเลิกข้อมูล AT ค้างบน KSIS แล้วใช่ไหม?')) return;
+    if (busy || !pending || !await confirmAction('ยืนยันว่าบันทึกเองหรือยกเลิกข้อมูล AT ค้างบน KSIS แล้ว หากหลุดระบบ จะโหลดหน้าเข้าสู่ระบบ KSIS ใหม่ ช่องเข้าสู่ระบบที่กรอกไว้จะถูกล้าง ผลบันทึกรอบก่อนยังไม่ยืนยัน ต้องเข้าสู่ระบบและเตรียม AT ใหม่เพื่อตรวจผลเดิมก่อนกรอก ระบบจะไม่บันทึก AT เพิ่ม ยืนยันดำเนินการ?')) return;
+    if (busy || !pending) return;
     busy = true; controls();
-    try { await call('acknowledge'); pending = false; source.textContent = 'จัดการข้อมูลค้างแล้ว กรุณาเตรียม AT ใหม่'; }
+    try {
+      const data = await call('acknowledge');
+      pending = false; preview = inspection = null; confirmed.clear();
+      source.textContent = data.message || 'จัดการข้อมูลค้างแล้ว กรุณาเตรียม AT ใหม่เพื่อตรวจผลเดิมก่อนกรอก ผลบันทึกรอบก่อนยังไม่ยืนยัน';
+      setStatus(source.textContent);
+    }
     catch (error) { source.textContent = error.message; setStatus(error.message, 'error'); }
     finally { busy = false; controls(); }
   });
@@ -128,7 +150,11 @@ export function setupKsisAt({ shared, open, getPeriod, setStatus, onStateChange 
     inspection = state.inspection || null;
     const scopeChanged = dialog.open && confirmation?.scope !== confirmationScope();
     if (dialog.open && (changed || busy || pending || scopeChanged)) dialog.close();
-    source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : state.requiresLogin ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่' : result?.message || (preview ? `${preview.context} • ${preview.subject} • หน้า ${preview.page} • ${preview.rows.length} ผลสอบใน Report` : 'ยังไม่ได้เตรียม AT'));
+    const acknowledged = state.action === 'acknowledge' && !pending;
+    const loginMessage = acknowledged ? 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียม AT ใหม่เพื่อตรวจผลเดิมก่อนกรอก ผลบันทึกรอบก่อนยังไม่ยืนยัน' : 'กรุณาเข้าสู่ระบบ KSIS แล้วเตรียมใหม่';
+    source.textContent = state.error || (busy ? 'กำลังทำงานกับ KSIS...' : state.requiresLogin ? loginMessage
+      : acknowledged ? 'จัดการข้อมูลค้างแล้ว กรุณาเตรียม AT ใหม่เพื่อตรวจผลเดิมก่อนกรอก ผลบันทึกรอบก่อนยังไม่ยืนยัน'
+        : result?.message || (preview ? `${preview.context} • ${preview.subject} • หน้า ${preview.page} • ${preview.rows.length} ผลสอบใน Report` : 'ยังไม่ได้เตรียม AT'));
     if (workspace.active) setStatus(source.textContent, state.error || pending ? 'error' : 'neutral');
     render();
     if (scopeChanged) setStatus('รายการ AT เปลี่ยนระหว่างยืนยัน กรุณาตรวจ Preview และยืนยันใหม่', 'error');

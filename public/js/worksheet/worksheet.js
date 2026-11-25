@@ -24,6 +24,7 @@ import { worksheetApi } from "./worksheetApi.js";
 import {
     focusWorksheetControl,
     receiveCd,
+    readWorksheetNos,
     refreshWorksheetMonthSummary,
     renderPatternButtons,
     renderWorksheetInputs,
@@ -64,8 +65,32 @@ import {
 } from "./worksheetIncomplete.js";
 
 let contextGeneration = 0;
+let worksheetLeaveBaseline = null;
+function worksheetLeaveSnapshot() {
+    return JSON.stringify({ enrollmentId: state.context?.enrollment.enrollmentId,
+        receiveDate: els.receiveDate.value, patternCode: state.patternCode,
+        main: readWorksheetNos('main'), zun: readWorksheetNos('zun') });
+}
+window.kumonLeaveGuard?.register('WS', () => ({
+    dirty: Boolean(state.context && worksheetLeaveBaseline !== null && worksheetLeaveSnapshot() !== worksheetLeaveBaseline)
+        || state.historyDateDrafts.size > 0
+        || [...els.historyTableWrap.querySelectorAll('input[data-edit-history-date-id],input[data-edit-history-number-id]')].some(input => input.value !== input.defaultValue),
+    busy: state.isSaving || state.pendingHistoryEdits.size > 0 || state.isCompletingLevel || state.isCompletingZun
+}));
 export async function loadEnrollmentContext(enrollmentId, { resetMainLevelMasterId = null } = {}) {
     if (state.isSaving) return;
+    const previousContext = state.context;
+    const previousEnrollmentId = Number(previousContext?.enrollment.enrollmentId);
+    const changingEnrollment = previousContext && previousEnrollmentId !== Number(enrollmentId);
+    const discardDates = changingEnrollment && state.historyDateDrafts.has(previousEnrollmentId)
+        && !state.pendingHistoryEdits.has(previousEnrollmentId);
+    if (discardDates && (!await confirmAction('มีวันที่ WS ที่ยังไม่บันทึก ต้องการเปลี่ยนนักเรียน/วิชาและทิ้งวันที่ที่แก้ไว้หรือไม่?') || state.context !== previousContext)) {
+        if (state.context === previousContext) {
+            els.studentSubjectSelect.value = String(previousEnrollmentId);
+            els.studentSearch.value = `#${previousEnrollmentId} ${previousContext.enrollment.studentName}`;
+        }
+        return;
+    }
     const generation = ++contextGeneration;
     state.contextRequestId = generation;
     state.isLoadingContext = true;
@@ -84,6 +109,7 @@ export async function loadEnrollmentContext(enrollmentId, { resetMainLevelMaster
         );
 
         if (generation !== contextGeneration || state.isSaving) return;
+        if (discardDates) state.historyDateDrafts.delete(previousEnrollmentId);
         if (resetMainLevelMasterId != null
             && Number(context.enrollment.currentLevelMasterId) === Number(resetMainLevelMasterId)
             && context.worksheetOptions?.main?.some((option) => Number(option.worksheetNo) === 1)) {
@@ -108,6 +134,7 @@ export async function loadEnrollmentContext(enrollmentId, { resetMainLevelMaster
         renderPatternButtons();
         renderWorksheetProgress();
         renderWorksheetInputs();
+        worksheetLeaveBaseline = worksheetLeaveSnapshot();
         // Paint the new student's history with the header, without waiting on a summary request.
         renderHistoryTable({ scrollToTop: true });
         renderWorksheetPacketSummary(state.worksheetPacketSummary);
@@ -131,6 +158,12 @@ export async function loadEnrollmentContext(enrollmentId, { resetMainLevelMaster
 
 function renderHistoryTable({ scrollToTop = false } = {}) {
     renderHistory(els.historyTableWrap, state.history, state.worksheetMonthSummary);
+    const drafts = state.historyDateDrafts.get(Number(state.context?.enrollment.enrollmentId));
+    for (const input of els.historyTableWrap.querySelectorAll('[data-edit-history-date-id]')) {
+        const draft = drafts?.get(Number(input.dataset.editHistoryDateId));
+        if (draft !== undefined) input.value = draft;
+        syncHistoryDateDraft(input);
+    }
     syncHistoryNumberEditControls();
 
     if (scrollToTop) {
@@ -139,13 +172,39 @@ function renderHistoryTable({ scrollToTop = false } = {}) {
     }
 }
 
+function clearHistoryDateDraft(enrollmentId, recordId) {
+    const drafts = state.historyDateDrafts.get(enrollmentId);
+    drafts?.delete(recordId);
+    if (!drafts?.size) state.historyDateDrafts.delete(enrollmentId);
+    updateHistorySubtitle();
+}
+
+function syncHistoryDateDraft(input, { cancel = false } = {}) {
+    if (!state.context) return;
+    const enrollmentId = Number(state.context.enrollment.enrollmentId);
+    const recordId = Number(input.dataset.editHistoryDateId);
+    const row = state.history.find(item => Number(item.worksheetUsedId) === recordId);
+    if (!row) return;
+    if (cancel) input.value = row.worksheetDate;
+    const dirty = input.value !== row.worksheetDate;
+    if (dirty) {
+        if (!state.historyDateDrafts.has(enrollmentId)) state.historyDateDrafts.set(enrollmentId, new Map());
+        state.historyDateDrafts.get(enrollmentId).set(recordId, input.value);
+    } else clearHistoryDateDraft(enrollmentId, recordId);
+    const notice = input.parentElement.querySelector('[data-history-date-draft-id]');
+    notice.hidden = !dirty;
+    input.classList.toggle('has-date-draft', dirty);
+    updateHistorySubtitle();
+}
+
 function syncHistoryNumberEditControls() {
     if (!state.pendingHistoryEdits.has(Number(state.context?.enrollment.enrollmentId))) return;
     for (const control of els.historyTableWrap.querySelectorAll('input,button')) control.disabled = true;
 }
 
 function updateHistorySubtitle() {
-    els.historySubtitle.textContent = `ล่าสุด ${els.historyLimit.value} รายการ`;
+    const draftCount = [...state.historyDateDrafts.values()].reduce((count, drafts) => count + drafts.size, 0);
+    els.historySubtitle.textContent = `ล่าสุด ${els.historyLimit.value} รายการ${draftCount ? ` • วันที่ยังไม่บันทึก ${draftCount} รายการ` : ''}`;
 }
 
 async function refreshHistory() {
@@ -217,7 +276,7 @@ function setSaving(isSaving) {
         element.disabled = isSaving;
     }
     els.saveButton.disabled = true;
-    els.saveButton.textContent = isSaving ? "⏳ Saving" : "💾 Save";
+    els.saveButton.textContent = isSaving ? "⏳ กำลังบันทึก" : "💾 บันทึก";
     updatePreview();
 }
 
@@ -232,8 +291,8 @@ async function saveEntries() {
         expectedZunLevelMasterId: state.context.enrollment.currentZunLevelMasterId ?? null,
         receiveDate: els.receiveDate.value,
         patternCode: state.patternCode,
-        mainWorksheetNos: readWorksheetNosFromDom("main"),
-        zunWorksheetNos: readWorksheetNosFromDom("zun")
+        mainWorksheetNos: readWorksheetNos("main"),
+        zunWorksheetNos: readWorksheetNos("zun")
     };
     const context = state.context;
     const generation = contextGeneration;
@@ -261,13 +320,14 @@ async function saveEntries() {
         state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
         state.worksheetPacketSummary = state.context.worksheetPacketSummary;
         els.receiveDate.value = result.nextReceiveDate;
+        worksheetLeaveBaseline = worksheetLeaveSnapshot();
         await refreshWorksheetMonthSummary();
 
         renderHistoryTable({ scrollToTop: true });
         renderWorksheetProgress();
         renderWorksheetPacketSummary(state.worksheetPacketSummary);
         updateSecondaryActions();
-        outcome = { message: `บันทึก ${result.records.length} records แล้ว`, kind: 'success' };
+        outcome = { message: `บันทึก ${result.records.length} รายการแล้ว`, kind: 'success' };
         window.setTimeout(() => focusFirstMainInput(), 30);
     } catch (error) {
         outcome = { message: error.message, kind: 'error' };
@@ -275,17 +335,6 @@ async function saveEntries() {
         setSaving(false);
         if (outcome) setStatus(outcome.message, outcome.kind);
     }
-}
-
-// Same field-reading logic as worksheetPreview.js's readWorksheetNos —
-// duplicated as a 3-line function rather than imported, since importing it
-// here would add a 4th module needing to reach back into worksheet.js's
-// exports for no real benefit (this is the only place in this file that
-// needs it).
-function readWorksheetNosFromDom(kind) {
-    return [...els.worksheetInputs.querySelectorAll(`[data-ws-input][data-kind="${kind}"]`)]
-        .sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index))
-        .map((input) => input.value.trim());
 }
 
 async function deleteHistoryRecord(worksheetUsedId) {
@@ -316,6 +365,7 @@ async function deleteHistoryRecord(worksheetUsedId) {
             enrollmentId: context.enrollment.enrollmentId,
             worksheetUsedId: recordId
         });
+        clearHistoryDateDraft(Number(context.enrollment.enrollmentId), recordId);
         if (state.context !== context) return;
 
         state.history = state.history.filter((item) =>
@@ -340,9 +390,11 @@ async function deleteHistoryRecord(worksheetUsedId) {
 }
 
 async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
-    if (!state.context || state.isSaving || state.isLoadingContext || input.disabled || !worksheetUsedId || !worksheetDate) {
+    if (!state.context || state.isSaving || state.isLoadingContext || input.disabled || !worksheetUsedId
+        || state.pendingHistoryEdits.has(Number(state.context.enrollment.enrollmentId))) {
         return;
     }
+    if (!input.checkValidity()) { input.reportValidity(); return; }
 
     const recordId = Number(worksheetUsedId);
     const row = state.history.find((item) =>
@@ -357,10 +409,14 @@ async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
         return;
     }
 
-    input.disabled = true;
     const context = state.context, generation = contextGeneration;
+    const enrollmentId = Number(context.enrollment.enrollmentId);
     const isCurrent = () => state.context === context && generation === contextGeneration;
+    state.pendingHistoryEdits.add(enrollmentId);
+    syncHistoryNumberEditControls();
+    updatePreview();
     setStatus("กำลังแก้วันที่...");
+    let outcome;
 
     try {
         const result = await worksheetApi.updateEntryDate({
@@ -368,24 +424,40 @@ async function updateHistoryRecordDate(worksheetUsedId, worksheetDate, input) {
             worksheetUsedId: recordId,
             worksheetDate
         });
+        clearHistoryDateDraft(enrollmentId, recordId);
         if (!isCurrent()) return;
 
+        // The date has already been saved even if the history request fails.
+        const savedEntry = result.entry || { ...row, worksheetDate };
+        state.history = state.history.map((item) =>
+            Number(item.worksheetUsedId) === recordId ? savedEntry : item
+        );
+        context.history = state.history;
+        renderHistoryTable();
         state.context.completionState = result.completionState || state.context.completionState;
         state.context.worksheetProgress = result.worksheetProgress || state.context.worksheetProgress;
         state.context.gradeSyncStatus = result.gradeSyncStatus;
         state.context.worksheetPacketSummary = result.worksheetPacketSummary || state.context.worksheetPacketSummary;
         state.worksheetPacketSummary = state.context.worksheetPacketSummary;
-        await refreshHistory();
+        const refreshed = await refreshHistory();
         if (!isCurrent()) return;
         renderWorksheetProgress();
         renderWorksheetPacketSummary(state.worksheetPacketSummary);
         updateSecondaryActions();
-        setStatus("แก้วันที่แล้ว", "success");
+        outcome = refreshed
+            ? ["แก้วันที่แล้ว", "success"]
+            : ["แก้วันที่แล้ว แต่โหลดประวัติใหม่ไม่สำเร็จ กรุณาโหลดอีกครั้ง", "neutral"];
     } catch (error) {
         if (!isCurrent()) return;
-        input.value = row.worksheetDate;
+        outcome = [error.message, "error"];
+    } finally {
+        state.pendingHistoryEdits.delete(enrollmentId);
         input.disabled = false;
-        setStatus(error.message, "error");
+        if (isCurrent()) {
+            for (const control of els.historyTableWrap.querySelectorAll('input,button')) control.disabled = false;
+            updatePreview();
+            if (outcome) setStatus(...outcome);
+        }
     }
 }
 
@@ -568,11 +640,24 @@ function bindEvents() {
     els.saveButton.addEventListener("click", saveEntries);
     els.historyLimit.addEventListener("change", refreshHistory);
     els.historyTableWrap.addEventListener("click", (event) => {
+        const dateAction = event.target.closest('[data-save-history-date-id],[data-cancel-history-date-id]');
+        if (dateAction) {
+            const recordId = dateAction.dataset.saveHistoryDateId || dateAction.dataset.cancelHistoryDateId;
+            const input = els.historyTableWrap.querySelector(`[data-edit-history-date-id="${Number(recordId)}"]`);
+            if (!input || input.disabled) return;
+            if (dateAction.hasAttribute('data-save-history-date-id')) void updateHistoryRecordDate(recordId, input.value, input);
+            else { syncHistoryDateDraft(input, { cancel: true }); input.focus(); }
+            return;
+        }
         const button = event.target.closest("[data-delete-history-id]");
 
         if (button) {
             deleteHistoryRecord(button.dataset.deleteHistoryId);
         }
+    });
+    els.historyTableWrap.addEventListener('input', event => {
+        const input = event.target.closest('[data-edit-history-date-id]');
+        if (input && !input.disabled) syncHistoryDateDraft(input);
     });
     els.historyTableWrap.addEventListener("keydown", (event) => {
         const numberInput = event.target.closest('[data-edit-history-number-id]');
@@ -600,11 +685,8 @@ function bindEvents() {
             );
         }
 
-        if (event.key === "Escape") {
-            const row = state.history.find((item) =>
-                Number(item.worksheetUsedId) === Number(input.dataset.editHistoryDateId)
-            );
-            input.value = row?.worksheetDate || input.defaultValue;
+        if (event.key === "Escape" && !input.disabled) {
+            syncHistoryDateDraft(input, { cancel: true });
             input.blur();
         }
     });
@@ -618,10 +700,7 @@ function bindEvents() {
         const input = event.target.closest("[data-edit-history-date-id]");
 
         if (input && !input.disabled) {
-            const row = state.history.find((item) =>
-                Number(item.worksheetUsedId) === Number(input.dataset.editHistoryDateId)
-            );
-            input.value = row?.worksheetDate || input.defaultValue;
+            syncHistoryDateDraft(input);
         }
     }, true);
 
@@ -643,11 +722,6 @@ function bindEvents() {
         openIncompleteWsModal();
     });
     els.incompleteWsClose.addEventListener("click", closeIncompleteWsModal);
-    els.incompleteWsModal.addEventListener("mousedown", (event) => {
-        if (event.target === els.incompleteWsModal) {
-            closeIncompleteWsModal();
-        }
-    });
     els.incompleteWsTableWrap.addEventListener("click", (event) => {
         const pageButton = event.target.closest("[data-incomplete-page]");
 
@@ -663,12 +737,10 @@ function bindEvents() {
         }
     });
     els.atForm.addEventListener("submit", saveAtCompletion);
-    els.atCancel.addEventListener("click", closeAtModal);
-    els.atModal.addEventListener("mousedown", (event) => {
-        if (event.target === els.atModal) {
-            closeAtModal();
-        }
+    els.editLastAtButton.addEventListener('click', () => {
+        if (!els.editLastAtButton.disabled) openAtModal({ editLatest: true });
     });
+    els.atCancel.addEventListener("click", closeAtModal);
     els.atPassControl.addEventListener("click", (event) => {
         const button = event.target.closest("[data-at-pass]");
 

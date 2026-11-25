@@ -1,0 +1,520 @@
+{
+  "schemaVersion": 1,
+  "reviewDate": "2026-11-24",
+  "startedAt": "2026-11-24T01:25:07.725Z",
+  "mode": "synthetic-electron",
+  "options": {
+    "embedded": true,
+    "timeoutMs": 15000,
+    "observationMs": 750
+  },
+  "scope": "Worksheet keyboard entry only; isolated controlFixture, no real account/database/KSIS.",
+  "results": [
+    {
+      "id": "search-result-keyboard",
+      "title": "Tab to result button; Enter/Space vs real mouse-down",
+      "status": "reproduced",
+      "sources": [
+        "test/worksheetUnifiedSearch.ui.test.js",
+        "public/js/worksheet/worksheet.js",
+        "public/js/worksheet/worksheetSearch.js"
+      ],
+      "steps": [
+        "Fresh page: type 512; wait for result; Tab; press Enter only if the result button receives focus.",
+        "Fresh page: type 512; wait for result; Tab; press Space only if the result button receives focus.",
+        "Positive control on a fresh page: move the mouse to the same result; real mouse.down()/up(); wait for Main focus."
+      ],
+      "observations": {
+        "keyboardTrials": [
+          {
+            "key": "Enter",
+            "reachedResultByTab": true,
+            "observationMs": 750,
+            "contextRequests": 0,
+            "ui": {
+              "searchValue": "512",
+              "studentMeta": "เลือกจากช่องค้นหาด้านบน",
+              "subjectValue": "",
+              "mainInputCount": 0,
+              "focused": {
+                "id": null,
+                "class": "result-item is-active",
+                "kind": null,
+                "index": "0"
+              },
+              "status": {
+                "text": "พร้อมใช้งาน",
+                "isSuccess": false,
+                "isError": false
+              }
+            },
+            "selected": false,
+            "outcome": "no_selection_within_observation_window"
+          },
+          {
+            "key": "Space",
+            "reachedResultByTab": true,
+            "observationMs": 750,
+            "contextRequests": 0,
+            "ui": {
+              "searchValue": "512",
+              "studentMeta": "เลือกจากช่องค้นหาด้านบน",
+              "subjectValue": "",
+              "mainInputCount": 0,
+              "focused": {
+                "id": null,
+                "class": "result-item is-active",
+                "kind": null,
+                "index": "0"
+              },
+              "status": {
+                "text": "พร้อมใช้งาน",
+                "isSuccess": false,
+                "isError": false
+              }
+            },
+            "selected": false,
+            "outcome": "no_selection_within_observation_window"
+          }
+        ],
+        "mouseDownControl": {
+          "ui": {
+            "searchValue": "#512 นักเรียน หนึ่ง (น้องหนึ่ง)",
+            "studentMeta": "ID 512 • ME • Current C • No Zun • Continue",
+            "subjectValue": "512",
+            "mainInputCount": 1,
+            "focused": {
+              "id": null,
+              "class": null,
+              "kind": "main",
+              "index": "0"
+            },
+            "status": {
+              "text": "พร้อมบันทึก WS",
+              "isSuccess": true,
+              "isError": false
+            }
+          },
+          "contextRequests": 1,
+          "selected": true
+        }
+      },
+      "blockedRequests": [],
+      "diagnosticState": {
+        "applicationStateEvaluated": false,
+        "note": "Only DOM locator reads and isolated fixture-server data are recorded."
+      },
+      "stubbedFontStylesheets": [
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap",
+        "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap"
+      ],
+      "reason": "At least one native button activation did not select within the recorded window; mouse-down selected the same fixture student.",
+      "fixtureResponses": [
+        {
+          "method": "GET",
+          "path": "/worksheet/search",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/search",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/search",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/512/context",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/512/worksheet-summary",
+          "status": 200
+        }
+      ],
+      "requests": [
+        {
+          "path": "/system/update-check",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/search",
+          "method": "GET"
+        },
+        {
+          "path": "/system/update-check",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/search",
+          "method": "GET"
+        },
+        {
+          "path": "/system/update-check",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/search",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/enrollments/512/context",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/enrollments/512/worksheet-summary",
+          "method": "GET"
+        }
+      ],
+      "writes": [],
+      "fixtureErrors": []
+    },
+    {
+      "id": "date-patch-history-503",
+      "title": "Successful date PATCH followed by history 503",
+      "status": "reproduced",
+      "sources": [
+        "test/worksheetNumberEdit.ui.test.js",
+        "public/js/worksheet/worksheet.js"
+      ],
+      "steps": [
+        "Search 1 and Enter; fill editable history date with 2026-10-21; press Enter.",
+        "Recovery control: change Show to 50 to request history again through the UI."
+      ],
+      "observations": {
+        "before": {
+          "ui": {
+            "searchValue": "#1 นักเรียน ทดสอบ (น้องแพร)",
+            "studentMeta": "ID 1 • ME • Current C • No Zun • Continue",
+            "subjectValue": "1",
+            "mainInputCount": 1,
+            "focused": {
+              "id": null,
+              "class": null,
+              "kind": "main",
+              "index": "0"
+            },
+            "status": {
+              "text": "พร้อมบันทึก WS",
+              "isSuccess": true,
+              "isError": false
+            }
+          },
+          "dateDisabled": false
+        },
+        "after503": {
+          "ui": {
+            "searchValue": "#1 นักเรียน ทดสอบ (น้องแพร)",
+            "studentMeta": "ID 1 • ME • Current C • No Zun • Continue",
+            "subjectValue": "1",
+            "mainInputCount": 1,
+            "focused": null,
+            "status": {
+              "text": "แก้วันที่แล้ว",
+              "isSuccess": true,
+              "isError": false
+            }
+          },
+          "observationMs": 750,
+          "inputPresent": true,
+          "dateDisabled": true,
+          "displayedDate": "2026-10-21",
+          "patchCount": 1,
+          "fixtureStoredRow": {
+            "worksheetUsedId": 10,
+            "enrollmentId": 1,
+            "worksheetMasterId": 101,
+            "actualWorksheetNo": 101,
+            "worksheetDate": "2026-10-21",
+            "levelMasterId": 100,
+            "levelCode": "C",
+            "worksheetType": "WS",
+            "packetWorksheetNo": 101,
+            "worksheetLabel": "C101",
+            "cpws": true,
+            "isStockProcessed": false
+          }
+        },
+        "successMessageWithoutFailureDetail": true,
+        "recoveryControl": {
+          "status": 200,
+          "dateDisabled": false,
+          "displayedDate": "2026-10-21"
+        }
+      },
+      "blockedRequests": [],
+      "diagnosticState": {
+        "applicationStateEvaluated": false,
+        "note": "Only DOM locator reads and isolated fixture-server data are recorded."
+      },
+      "injectedConditions": [
+        "PATCH persists the submitted date in fixture memory and returns 200 + entry.",
+        "First history GET after PATCH returns 503; other history GETs return the stored row. No production service/database is called."
+      ],
+      "reason": "Date input remained disabled after PATCH 200 / history 503.",
+      "limitations": [
+        "The fixture proves frontend handling of these HTTP responses, not production date persistence or transaction behavior."
+      ],
+      "fixtureResponses": [
+        {
+          "method": "GET",
+          "path": "/worksheet/search",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/1/context",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/1/worksheet-summary",
+          "status": 200
+        },
+        {
+          "method": "PATCH",
+          "path": "/worksheet/entries/10/date",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/1/history",
+          "status": 503
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/1/history",
+          "status": 200
+        }
+      ],
+      "requests": [
+        {
+          "path": "/system/update-check",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/search",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/enrollments/1/context",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/enrollments/1/worksheet-summary",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/entries/10/date",
+          "method": "PATCH",
+          "body": {
+            "enrollmentId": 1,
+            "worksheetDate": "2026-10-21"
+          }
+        },
+        {
+          "path": "/worksheet/enrollments/1/history",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/enrollments/1/history",
+          "method": "GET"
+        }
+      ],
+      "writes": [
+        {
+          "path": "/worksheet/entries/10/date",
+          "method": "PATCH",
+          "body": {
+            "enrollmentId": 1,
+            "worksheetDate": "2026-10-21"
+          }
+        }
+      ],
+      "fixtureErrors": []
+    },
+    {
+      "id": "daily20-optional-zun",
+      "title": "20/day from empty optional Zun with valid current level and options",
+      "status": "reproduced",
+      "sources": [
+        "test/worksheetSubjectColors.ui.test.js",
+        "test/worksheetNumberEdit.ui.test.js",
+        "public/js/worksheet/worksheetPreview.js",
+        "services/worksheetService.js: WORKSHEET_PATTERNS"
+      ],
+      "steps": [
+        "Search 1 and Enter; observe optional Zun without touching it; click 20/วัน.",
+        "Blank-Zun control: from Main 1, Enter to Zun 1, Main 2, Zun 2; press 0 to clear; do not save."
+      ],
+      "observations": {
+        "beforePattern": {
+          "main": [
+            "101"
+          ],
+          "zun": [
+            ""
+          ],
+          "previewCount": "1 records",
+          "previewLabels": [
+            "C101"
+          ],
+          "saveEnabled": true,
+          "ui": {
+            "searchValue": "#1 นักเรียน ทดสอบ (น้องแพร)",
+            "studentMeta": "ID 1 • ME • Current C • Zun ZI • Continue",
+            "subjectValue": "1",
+            "mainInputCount": 1,
+            "focused": {
+              "id": null,
+              "class": null,
+              "kind": "main",
+              "index": "0"
+            },
+            "status": {
+              "text": "พร้อมบันทึก WS",
+              "isSuccess": true,
+              "isError": false
+            }
+          }
+        },
+        "afterPattern": {
+          "main": [
+            "101",
+            "111"
+          ],
+          "zun": [
+            "",
+            "1"
+          ],
+          "previewCount": "3 records",
+          "previewLabels": [
+            "C101",
+            "C111",
+            "ZI1"
+          ],
+          "saveEnabled": true,
+          "ui": {
+            "searchValue": "#1 นักเรียน ทดสอบ (น้องแพร)",
+            "studentMeta": "ID 1 • ME • Current C • Zun ZI • Continue",
+            "subjectValue": "1",
+            "mainInputCount": 2,
+            "focused": {
+              "id": null,
+              "class": null,
+              "kind": "main",
+              "index": "0"
+            },
+            "status": {
+              "text": "พร้อมบันทึก WS",
+              "isSuccess": true,
+              "isError": false
+            }
+          }
+        },
+        "halfFilledWithoutZunInput": true,
+        "previewAcceptsOneZun": true,
+        "blankZunControl": {
+          "main": [
+            "101",
+            "111"
+          ],
+          "zun": [
+            "",
+            ""
+          ],
+          "previewCount": "2 records",
+          "previewLabels": [
+            "C101",
+            "C111"
+          ],
+          "saveEnabled": true,
+          "ui": {
+            "searchValue": "#1 นักเรียน ทดสอบ (น้องแพร)",
+            "studentMeta": "ID 1 • ME • Current C • Zun ZI • Continue",
+            "subjectValue": "1",
+            "mainInputCount": 2,
+            "focused": {
+              "id": null,
+              "class": null,
+              "kind": "zun",
+              "index": "1"
+            },
+            "status": {
+              "text": "พร้อมบันทึก WS",
+              "isSuccess": true,
+              "isError": false
+            }
+          }
+        }
+      },
+      "blockedRequests": [],
+      "diagnosticState": {
+        "applicationStateEvaluated": false,
+        "note": "Only DOM locator reads and isolated fixture-server data are recorded."
+      },
+      "fixturePreconditions": {
+        "subject": "ME",
+        "isKumonConnect": false,
+        "currentZunLevelMasterId": 99,
+        "currentZunLevelCode": "ZI",
+        "history": [],
+        "defaultZunWorksheetNo": 1,
+        "zunOptions": "1, 11, ..., 91",
+        "mainOptions": "1, 11, ..., 191",
+        "initialPattern": "daily10"
+      },
+      "reason": "Production UI generated exactly one optional Zun value on switching to 20/day.",
+      "limitations": [
+        "Save was not pressed. No POST rejection was mocked; production service validation is not verified by this case."
+      ],
+      "fixtureResponses": [
+        {
+          "method": "GET",
+          "path": "/worksheet/search",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/1/context",
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/worksheet/enrollments/1/worksheet-summary",
+          "status": 200
+        }
+      ],
+      "requests": [
+        {
+          "path": "/system/update-check",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/search",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/enrollments/1/context",
+          "method": "GET"
+        },
+        {
+          "path": "/worksheet/enrollments/1/worksheet-summary",
+          "method": "GET"
+        }
+      ],
+      "writes": [],
+      "fixtureErrors": []
+    }
+  ],
+  "finishedAt": "2026-11-24T01:25:16.644Z",
+  "counts": {
+    "reproduced": 3,
+    "not_reproduced": 0,
+    "inconclusive": 0
+  }
+}

@@ -13,11 +13,15 @@ import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt
 import { createDeliveryOrder, processDeliveryOrder } from '../services/stockReceiveService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
-import { applyEnrollmentStatusAction, searchStudents, updateEnrollment, createEnrollment, getStudentProfile } from '../services/studentService.js';
+import { applyEnrollmentStatusAction, previewEnrollmentStatusAction, searchStudents, updateEnrollment, createEnrollment, getStudentProfile, updateStudent } from '../services/studentService.js';
 import { paymentDatabaseStatus } from '../services/databaseStatusService.js';
 import { setAccountActive, updateAccountRole } from '../services/authService.js';
 import { ensureFrghStatus } from '../services/specialStatusCatalogService.js';
 import { buildMonthlyReport } from '../services/reportService.js';
+import { receiptSnapshot } from '../public/js/receiptSnapshot.js';
+import { assertPasswordResetDatabaseSafety } from './support/authPasswordResetDatabaseChecks.js';
+import { assertStockReceiveRetryDatabaseSafety } from './support/stockReceiveRetryDatabaseChecks.js';
+import { checkConcurrentPermissions, checkAccountSeparation } from './support/accountSeparationDatabaseChecks.js';
 
 const run = promisify(execFile);
 const enabled = process.platform === 'win32' && process.env.TEST_ISOLATED_PG === '1';
@@ -27,7 +31,7 @@ productionPool.query = () => assert.fail('Production pool.query is poisoned');
 productionPool.connect = () => assert.fail('Production pool.connect is poisoned');
 
 test('Transactions, migrations, concurrent payments/stock/WS and failed restore on a disposable PostgreSQL cluster', {
-    skip: !enabled, timeout: 120000
+    skip: !enabled, timeout: 360000
 }, async (t) => {
     // Never derive any connection or path below from DB_* or the production pool.
     const root = await fs.mkdtemp(path.join(os.tmpdir(), 'kumondb-isolated-pg-'));
@@ -40,11 +44,14 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
     assert.ok(port !== 5432 && port !== 3000);
     const username = 'kumondb_isolated_test';
     const environment = { ...process.env, PGHOST: '127.0.0.1', PGPORT: String(port), PGUSER: username, PGDATABASE: 'postgres', PGPASSWORD: '' };
-    let started = false, database;
+    let startAttempted = false, database, primaryError;
     try {
-        await run(path.join(bin, 'initdb.exe'), ['-D', data, '-U', username, '--auth=trust', '--encoding=UTF8', '--locale=C'], { env: environment, windowsHide: true, timeout: 30000 });
-        await run(pgctl, ['-D', data, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port} -F -c max_connections=30`, '-w', 'start'], { env: environment, windowsHide: true, timeout: 30000 });
-        started = true;
+        // This disposable cluster already uses -F; crash durability is outside
+        // this fixture. Avoid flushing its initial files and allow cold Windows
+        // startup to complete before applying the unchanged transaction checks.
+        await run(path.join(bin, 'initdb.exe'), ['-D', data, '-U', username, '--auth=trust', '--no-sync', '--encoding=UTF8', '--locale=C'], { env: environment, windowsHide: true, timeout: 120000 });
+        startAttempted = true;
+        await run(pgctl, ['-D', data, '-l', path.join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port} -F -c max_connections=30`, '-w', 'start'], { env: environment, windowsHide: true, timeout: 120000 });
         database = new pg.Pool({ host: '127.0.0.1', port, user: username, password: '', database: 'postgres', max: 10,
             connectionTimeoutMillis: 4000, options: '-c search_path=kumon,public -c statement_timeout=15000' });
         const identity = (await database.query(`SELECT current_user AS owner, inet_server_port() AS port, current_setting('data_directory') AS directory`)).rows[0];
@@ -56,6 +63,20 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
         for (const name of ['001_create_master_tables.sql', '002_insert_master_data.sql', '003_create_transaction_tables.sql']) {
             await database.query(await fs.readFile(path.join('database', name), 'utf8'));
         }
+        // Use the session table from the normal schema in this verified
+        // disposable cluster; no additional schema migration is needed.
+        await t.test('Password reset revokes sessions across machines and rejects stale session re-saves', async () => {
+            await assertPasswordResetDatabaseSafety(database);
+        });
+        await t.test('Two real PostgreSQL permission writers reject stale snapshots and preserve deliberate retries', async () => {
+            await checkConcurrentPermissions(database);
+        });
+        await t.test('Create-only accounts and concurrent password/role actions preserve inactive account data and schema', async () => {
+            await checkAccountSeparation(database);
+        });
+        await t.test('WS/CD DO retries persist across restart, preserve intentional append and process only once', async () => {
+            await assertStockReceiveRetryDatabaseSafety(database);
+        });
         const migration = await fs.readFile('database/004_payment_status_provenance.sql', 'utf8');
         await t.test('Payment migration upgrades a legacy schema and is safe to apply twice', async () => {
             await database.query('ALTER TABLE kumon.billing_detail DROP COLUMN inserted_status_history_id, DROP COLUMN payment_status_updated_at');
@@ -100,6 +121,33 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.ok(prepared.every(r=>r.statusId===16));
             assert.equal((await database.query('SELECT status_code FROM kumon.status_master WHERE status_id=15')).rows[0].status_code,'CENTER');
             assert.deepEqual((await database.query(schemaSql)).rows,schemaBefore);
+        });
+        await t.test('Future birthday edits cannot write a student; legacy unchanged dates and valid corrections still save', async () => {
+            const row = (await database.query(`INSERT INTO kumon.student(prefix_id,first_name,last_name,birth_date)
+                VALUES((SELECT MIN(prefix_id) FROM kumon.prefix_master),'Birth safety','Only','2019-01-01') RETURNING student_id,prefix_id`)).rows[0];
+            const payload = { prefixId: row.prefix_id, firstName: 'Birth safety', lastName: 'Only' };
+            const future = `${new Date().getFullYear() + 5}-01-01`;
+            await assert.rejects(updateStudent(row.student_id, { ...payload, firstName: 'Must not write', birthDate: future }), { statusCode: 400 });
+            assert.equal((await database.query('SELECT first_name FROM kumon.student WHERE student_id=$1', [row.student_id])).rows[0].first_name, 'Birth safety');
+            assert.equal((await updateStudent(row.student_id, { ...payload, birthDate: '2019-02-03' })).student.birthDate, '2019-02-03');
+            await database.query('UPDATE kumon.student SET birth_date=$2 WHERE student_id=$1', [row.student_id, future]);
+            assert.equal((await updateStudent(row.student_id, { ...payload, firstName: 'Other field', birthDate: future })).student.firstName, 'Other field');
+        });
+        await t.test('Appending a pending DO cannot silently change dates or add quantities on a date mismatch', async () => {
+            const master = (await database.query('SELECT MIN(worksheet_master_id) AS id FROM kumon.worksheet_master')).rows[0].id;
+            const payload = { doNo: 'isolated-round3-dates', outDate: '2026-11-20', receiveDate: '2026-11-20', items: [{ masterId: master, quantity: 2 }] };
+            const order = await createDeliveryOrder('ws', payload);
+            for (const key of ['outDate', 'receiveDate']) await assert.rejects(createDeliveryOrder('ws', { ...payload, [key]: '2026-11-21' }), { statusCode: 409 });
+            assert.equal((await database.query('SELECT SUM(quantity)::int AS n FROM kumon.stock_receive WHERE stock_do_id=$1', [order.doId])).rows[0].n, 2);
+            await createDeliveryOrder('ws', payload);
+            assert.equal((await database.query('SELECT SUM(quantity)::int AS n FROM kumon.stock_receive WHERE stock_do_id=$1', [order.doId])).rows[0].n, 4);
+            assert.equal((await database.query('SELECT receive_month FROM kumon.stock_do WHERE stock_do_id=$1', [order.doId])).rows[0].receive_month, 11);
+            const legacy = { ...payload, doNo: 'isolated-round3-legacy-dates', receiveDate: '2026-11-21' };
+            const legacyOrder = await createDeliveryOrder('ws', legacy);
+            delete legacy.receiveDate;
+            await createDeliveryOrder('ws', legacy);
+            const header = (await database.query('SELECT receive_date::text,receive_month FROM kumon.stock_do WHERE stock_do_id=$1', [legacyOrder.doId])).rows[0];
+            assert.deepEqual(header, { receive_date: '2026-11-21', receive_month: 12 });
         });
         const statuses = new Map((await database.query('SELECT status_code,status_id FROM kumon.status_master')).rows.map((row) => [row.status_code, row.status_id]));
         const ws = (await database.query(`SELECT wm.worksheet_master_id,wm.worksheet_no,wm.level_master_id FROM kumon.worksheet_master wm JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id WHERE lm.subject_id=1 AND lm.level_type=1 ORDER BY wm.worksheet_master_id LIMIT 1`)).rows[0];
@@ -371,6 +419,28 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.notEqual(first.billingId, second.billingId);
             assert.deepEqual(second.receipt.receiptDetails.map((row) => row.enrollmentId), ids.slice(2));
         });
+        await t.test('Receipt preview changes reject before writes, while an unchanged snapshot pays normally', async () => {
+            const id = await student('Printed draft conflict');
+            const payload = { enrollmentId: id, billingDate: '2026-10-23', billingMonth: 10, billingYear: 2026 };
+            const first = (await previewReceipt(payload)).receipt;
+            // Another till takes the previously previewed receipt number.
+            await payment(await student('Other till'));
+            const state = async () => ({
+                enrollment: (await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows,
+                history: (await database.query('SELECT * FROM kumon.enrollment_status WHERE enrollment_id=$1', [id])).rows,
+                bills: (await database.query('SELECT * FROM kumon.billing WHERE student_id=$1', [first.studentId])).rows
+            });
+            const before = await state();
+            await assert.rejects(receiveReceiptPayment({ ...payload, expectedReceiptSnapshot: receiptSnapshot(first) }), { statusCode: 409 });
+            assert.deepEqual(await state(), before);
+            const fresh = (await previewReceipt(payload)).receipt;
+            await assert.rejects(receiveReceiptPayment({ ...payload, expectedReceiptSnapshot: receiptSnapshot({ ...fresh, netAmount: fresh.netAmount + 1 }) }), { statusCode: 409 });
+            await assert.rejects(receiveReceiptPayment({ ...payload, expectedReceiptSnapshot: {} }), { statusCode: 400 });
+            assert.deepEqual(await state(), before);
+            const paid = await receiveReceiptPayment({ ...payload, expectedReceiptSnapshot: receiptSnapshot(fresh) });
+            assert.equal(paid.receipt.receiptNo, fresh.receiptNo);
+            assert.equal(paid.receipt.netAmount, fresh.netAmount);
+        });
         await t.test('Concurrent receipts get unique numbers, even for the first receipts of a month', async () => {
             const ids = await Promise.all(['One', 'Two', 'Three', 'Four'].map(student));
             const results = await Promise.all(ids.map(payment));
@@ -598,6 +668,25 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             await assert.rejects(saveWorksheetEntries({ enrollmentId: id, receiveDate: '2026-10-23', patternCode: 'daily10', mainWorksheetNos: [ws.worksheet_no] }), /injected summary failure/);
             assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.worksheet_used WHERE enrollment_id=$1', [id])).rows[0].n, 0);
         });
+        await t.test('Status Preview is read-only in PostgreSQL and stale confirmations preserve enrollment data until reviewed again', async () => {
+            const id = await student('Status preview');
+            const before = (await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0];
+            const { preview } = await previewEnrollmentStatusAction(before.student_id, id, { action: 'absent' });
+            assert.equal(preview.statusCode, 'A');
+            assert.deepEqual((await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0], before);
+            assert.equal((await database.query('SELECT COUNT(*)::int AS n FROM kumon.enrollment_status WHERE enrollment_id=$1', [id])).rows[0].n, 0);
+            await database.query("UPDATE kumon.enrollment SET current_status_group2_id=(SELECT status_id FROM kumon.status_master WHERE status_code='H' AND status_group=2) WHERE enrollment_id=$1", [id]);
+            const changed = (await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0];
+            await assert.rejects(applyEnrollmentStatusAction(before.student_id, id, { action: 'absent', expectedPlan: preview.fingerprint }), { statusCode: 409 });
+            assert.deepEqual((await database.query('SELECT * FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0], changed);
+            const fresh = await previewEnrollmentStatusAction(before.student_id, id, { action: 'absent' });
+            assert.equal((await applyEnrollmentStatusAction(before.student_id, id, { action: 'absent', expectedPlan: fresh.preview.fingerprint })).profile.enrollments[0].statusGroup1Code, 'A');
+            const resumed = await previewEnrollmentStatusAction(before.student_id, id, { action: 'resume', resumeDate: '2027-03-15' });
+            assert.equal(resumed.preview.statusCode, 'R'); assert.equal(resumed.preview.halfMonth, true);
+            const result = await applyEnrollmentStatusAction(before.student_id, id, { action: 'resume', resumeDate: '2027-03-15', expectedPlan: resumed.preview.fingerprint });
+            assert.equal(result.profile.enrollments[0].statusGroup1Code, 'R');
+            assert.deepEqual((await database.query('SELECT en_start_date FROM kumon.enrollment WHERE enrollment_id=$1', [id])).rows[0].en_start_date, before.en_start_date);
+        });
         await t.test('Concurrent student status actions return profiles without holding connections while requesting more', async () => {
             const ids = await Promise.all(Array.from({ length: 10 }, (_, index) => student(`Status${index}`)));
             const result = await database.query('SELECT enrollment_id,student_id FROM kumon.enrollment WHERE enrollment_id=ANY($1)', [ids]);
@@ -784,11 +873,28 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             await assert.rejects(restoreBackupFile({ executable: path.join(bin, 'pg_restore.exe'), host: '127.0.0.1', port, user: username, dbName: 'postgres', tempFile: archive, env: environment }));
             assert.deepEqual((await database.query('SELECT id FROM restore_probe.items ORDER BY id')).rows.map((row) => row.id), [1, 2]);
         });
+    } catch (error) {
+        primaryError = error;
+        throw error;
     } finally {
-        await database?.end();
         // Both shutdown and cleanup are restricted to the uniquely generated test directory.
         assert.ok(path.resolve(root).startsWith(`${path.resolve(os.tmpdir())}${path.sep}kumondb-isolated-pg-`));
-        if (started) await run(pgctl, ['-D', data, '-m', 'fast', '-w', 'stop'], { env: environment, windowsHide: true, timeout: 20000 });
-        await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+        const cleanupErrors = [];
+        try { await database?.end(); } catch (error) { cleanupErrors.push(error); }
+        let canRemove = !startAttempted;
+        if (startAttempted) {
+            try {
+                await run(pgctl, ['-D', data, '-m', 'fast', '-w', 'stop'], { env: environment, windowsHide: true, timeout: 60000 });
+                canRemove = true;
+            } catch (error) { cleanupErrors.push(error); }
+        }
+        if (canRemove) {
+            try { await fs.rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); }
+            catch (error) { cleanupErrors.push(error); }
+        }
+        if (cleanupErrors.length) {
+            if (!primaryError) throw new AggregateError(cleanupErrors, 'Disposable PostgreSQL cleanup failed');
+            for (const error of cleanupErrors) t.diagnostic(`Fixture cleanup: ${error.message}`);
+        }
     }
 });

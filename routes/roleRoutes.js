@@ -66,7 +66,11 @@ router.delete("/:roleCode", async (req, res) => {
 
 router.put("/:roleCode/permissions", async (req, res) => {
     try {
-        const permissions = await setRolePermissions(req.params.roleCode, req.body?.permissionKeys);
+        if (!Array.isArray(req.body?.expectedPermissionKeys)) {
+            const error = new Error('หน้าตั้งค่าสิทธิ์รุ่นเก่า กรุณาโหลดหน้าใหม่ก่อนแก้สิทธิ์');
+            error.statusCode = 409; throw error;
+        }
+        const permissions = await setRolePermissions(req.params.roleCode, req.body?.permissionKeys, req.body.expectedPermissionKeys);
 
         res.json({ success: true, permissions });
     } catch (error) {

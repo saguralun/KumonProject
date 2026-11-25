@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-11-24T01:12:25.887Z",
+  "status": "verified_expected_current_behavior",
+  "interpretation": "Passing checks reproduce the stated current behavior, including recovery rejection; they do not mean recovery works.",
+  "endToEnd": false,
+  "browserUsed": false,
+  "networkUsed": false,
+  "databaseUsed": false,
+  "proves": [
+    "Actual exported AT guard decisions against in-memory request/route doubles after handoff.",
+    "Actual exported acknowledgeKsisAt through actual withKsisWorkspacePage/withKsisPage, using a mock desktop, page and session."
+  ],
+  "doesNotProve": [
+    "Actual session expiry, the real KSIS login endpoint, HTTP middleware, renderer controls or user clicks.",
+    "A browser-to-server-to-KSIS end-to-end deadlock, persistence or successful real recovery.",
+    "DOM execution: mockPage.evaluate records calls and supplies explicit fixture values; it never executes callbacks.",
+    "Pending AT is injected through an exported workspace callback, not created by a real fill/save failure."
+  ],
+  "checks": [
+    {
+      "id": "guard-post-login-after-handoff",
+      "passed": true,
+      "layer": "actual exported guard / mock request-route",
+      "loginTarget": "https://kao.ksis.kumon.com/kth/api/login",
+      "loginTargetIsSynthetic": true,
+      "observed": {
+        "action": "abort",
+        "reason": "blockedbyclient",
+        "blocked": 1,
+        "authorizedWrites": 0
+      }
+    },
+    {
+      "id": "guard-positive-read-controls",
+      "passed": true,
+      "layer": "actual exported guard / mock request-route",
+      "observed": "Allowlisted POST read and GET fall back to an in-memory stub; no network request is sent."
+    },
+    {
+      "id": "acknowledge-from-login-rejected",
+      "passed": true,
+      "layer": "actual exported acknowledgeKsisAt + actual workspace/page wrappers / mock desktop-session",
+      "observed": {
+        "statusCode": 409,
+        "message": "หน้า KSIS เปลี่ยนหลัง Preview กรุณาเปิดหน้าที่ต้องการและเตรียมข้อมูลใหม่",
+        "pendingDraft": true,
+        "pendingAt": true,
+        "guardStillInstalled": true,
+        "documentRead": false,
+        "navigationAttempts": 0
+      }
+    },
+    {
+      "id": "acknowledge-dirty-at-remains-pending",
+      "passed": true,
+      "layer": "actual exported acknowledgeKsisAt + actual wrappers / fixture document",
+      "observed": "Dirty AT is rejected and the pending session/guard remain."
+    },
+    {
+      "id": "acknowledge-clean-at-positive-control",
+      "passed": true,
+      "layer": "actual exported acknowledgeKsisAt + actual wrappers / fixture document",
+      "observed": "Clean AT acknowledgement succeeds, releases the installed guard and clears pending flags."
+    }
+  ],
+  "sources": [
+    {
+      "path": "services/ksisAtEntry.js",
+      "sha256": "2e7bfbf44ad47a08631a1068f1926e64e40acd76a25c5188e30f5a5206c7b4bf"
+    },
+    {
+      "path": "services/ksisStudentService.js",
+      "sha256": "98a412deeb0d2d4e09a89aaae751519abf340c69118b972a0b44a2aa3f4aa5c5"
+    },
+    {
+      "path": "services/ksisReportDraft.js",
+      "sha256": "ab11b080eaf4ed3982a87a9e310e6fcd11bd313f5bd2bcaa6b611f422af16ce2"
+    },
+    {
+      "path": "services/ksisReportIdentity.js",
+      "sha256": "108e7490f2d3c0ee191386e4124ad3a865f8b8f0b8185d3ffc231089fc3c5cf0"
+    },
+    {
+      "path": "services/ksisStudentData.js",
+      "sha256": "29bea3bfd576e0f35804c79aa6fe738d5e8287cc2a21a111f5ca995e5977a15a"
+    },
+    {
+      "path": "services/kumonStudentId.js",
+      "sha256": "c60144ad7cb62248acf923880abc8e92a1fcf77ac7f6972d2b4212babecd8972"
+    },
+    {
+      "path": "services/httpError.js",
+      "sha256": "7383f65af707c6a836b2c5ab7cf24ca12c46a8c9caa32dacadcfcc788ba38174"
+    }
+  ],
+  "boundaries": {
+    "moduleIsolation": "Unique per-run module URLs; exact dependency allowlist; unsafe modules replaced before traversal.",
+    "actualModulesLoaded": [
+      "services/httpError.js",
+      "services/ksisAtEntry.js",
+      "services/ksisReportDraft.js",
+      "services/ksisReportIdentity.js",
+      "services/ksisStudentData.js",
+      "services/ksisStudentService.js",
+      "services/kumonStudentId.js"
+    ],
+    "replacedDependencies": [
+      "reportService.js (Report/DB)",
+      "ksisDesktop.js (desktop factory)",
+      "appDesktop.js (current desktop)",
+      "playwright-core"
+    ],
+    "forbiddenDependencies": [
+      "dotenv",
+      "pg",
+      "config/db.js",
+      "unlisted modules and network builtins"
+    ],
+    "domCallbacksExecuted": 0,
+    "mockedEvaluationCalls": [
+      "handoff callback recorded without DOM execution",
+      "dirty AT document",
+      "clean AT document",
+      "guard release callback recorded without DOM execution"
+    ],
+    "authorizedGuardWrites": 0
+  }
+}

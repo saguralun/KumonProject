@@ -59,7 +59,16 @@ for (const failed of ['recover', 'pull', 'install', 'head', 'restart']) {
     test(`An update stops at ${failed} failure and preserves retry after a successful pull`, async t => {
         const { performUpdate, checkForUpdate } = await import(`../services/updateService.js?code-only-${failed}`);
         const f = fixture(failed);
-        await assert.rejects(performUpdate({}, f.steps), new RegExp(`fixture ${failed} failed`));
+        await assert.rejects(performUpdate({}, f.steps), error => {
+            assert.match(error.message, new RegExp(`fixture ${failed} failed`));
+            if (failed === 'install') {
+                assert.match(error.message, /เครื่องแม่.*ยังไม่ครบ/);
+                assert.match(error.message, /ยังไม่ได้รีสตาร์ต/);
+                assert.match(error.message, /กดอัปเดตอีกครั้ง/);
+                assert.doesNotMatch(error.message, /ลองรัน/);
+            }
+            return true;
+        });
         const order = ['branch', 'recover', 'pull', 'install', 'head', 'restart'];
         assert.deepEqual(f.calls, order.slice(0, order.indexOf(failed) + 1));
         const { stdout: head } = await promisify(execFile)('git', ['rev-parse', 'HEAD'], { windowsHide: true });

@@ -39,11 +39,14 @@ async function loadLanInfo() {
 
 loadLanInfo();
 
-import('./updateMonitor.js?v=20261023-update-anytime').then(({ startUpdateMonitor }) => {
-  startUpdateMonitor((data) => {
+Promise.all([import('./updateMonitor.js?v=20261124-ui-clarity'), import('./updateStatusView.js')]).then(([{ startUpdateMonitor }, { createUpdateStatusView }]) => {
+  const feedback = createUpdateStatusView(els.updateBanner.parentElement);
+  els.updateBanner.after(document.getElementById('updateCheckStatus'));
+  const monitor = startUpdateMonitor((data) => {
     els.updateBannerMessage.textContent = data.retryRequired ? 'การอัปเดตก่อนหน้ายังไม่เสร็จ กรุณาลองใหม่' : data.remoteMessage || `commit ${data.remoteCommit}`;
     els.updateBanner.classList.toggle('hidden', data.upToDate);
-  }, { isBusy: () => updating });
+  }, { isBusy: () => updating, onCheckState: feedback.update });
+  feedback.onRetry(monitor.check);
 }).catch(() => {});
 
 function setMessage(text) {
@@ -76,23 +79,25 @@ els.updateButton.addEventListener('click', async () => {
 });
 
 async function updateProgram() {
-  if (!await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะสำรองไฟล์ที่โปรแกรมสร้างก่อนจัดการไฟล์ค้าง กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
+  const { readUpdateRuntime, waitForUpdatedServer, updateConfirmationText } = await import('./updateRestart.js?v=20261124-restart-feedback');
+  const runtime = await readUpdateRuntime();
+  if (updating || !await confirmAction(updateConfirmationText(runtime?.serverName))) return;
   updating = true;
   els.updateButton.disabled = els.adminSubmit.disabled = els.guestSubmit.disabled = true;
   try {
     setMessage('กำลังอัปเดตโปรแกรม กรุณารอ...');
-    const { getRuntimeInstanceId, waitForUpdatedServer } = await import('./updateRestart.js?v=20261030-code-only-update');
-    let previousInstanceId = await getRuntimeInstanceId();
+    let previousInstanceId = runtime?.instanceId || null, updateAttemptId;
     let recoveredFiles = 0;
     try {
       const data = await requestJson('/api/system/update-apply', { method: 'POST', body: JSON.stringify({ confirm: true }) });
       previousInstanceId = data.previousInstanceId || previousInstanceId;
+      updateAttemptId = data.updateAttemptId;
       recoveredFiles = Array.isArray(data.fileRecovery?.files) ? data.fileRecovery.files.length : 0;
     } catch (error) {
       if (!(error instanceof TypeError)) throw error;
     }
     setMessage(`${recoveredFiles ? `สำรองไฟล์สร้างอัตโนมัติแล้ว ${recoveredFiles} ไฟล์ • ` : ''}กำลังรอโปรแกรมเปิดใหม่...`);
-    await waitForUpdatedServer(previousInstanceId);
+    await waitForUpdatedServer(previousInstanceId, { updateAttemptId });
     window.location.reload();
   } finally {
     updating = false;

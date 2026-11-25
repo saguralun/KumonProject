@@ -46,7 +46,7 @@ for (const embedded of [false, true]) test(`WS history keeps new entries visible
     assert.equal(await page.locator('#worksheetProgressValue').innerText(), '30');
     await page.locator('[data-progress-kind="main"]').click();
     await page.locator('#saveButton').click();
-    await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('บันทึก 1 records แล้ว'));
+    await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('บันทึก 1 รายการแล้ว'));
     assert.equal(await page.locator('.history-table [data-delete-history-id]').first().getAttribute('data-delete-history-id'), '7');
     assert.equal(await page.locator('[data-edit-history-date-id="7"]').inputValue(), '0092-03-20');
     assert.equal(await page.locator('#worksheetProgressValue').innerText(), '130');

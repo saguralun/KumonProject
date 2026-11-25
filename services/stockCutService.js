@@ -1,3 +1,5 @@
+import { createStockTypeResolver } from "./stockTypeResolver.js";
+import { normalizeNullableDate as normalizeDate } from "./dateHelpers.js";
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 
@@ -45,55 +47,7 @@ const ITEM_TYPE_CONFIG = {
     }
 };
 
-let stockTypeIdCache = null;
-
-async function loadStockTypeIds() {
-    if (stockTypeIdCache) {
-        return stockTypeIdCache;
-    }
-
-    const result = await pool.query(`SELECT stock_type_code, stock_type_id FROM ${TABLE_SCHEMA}.stock_type_master`);
-    const byCode = new Map(result.rows.map((row) => [row.stock_type_code, row.stock_type_id]));
-
-    stockTypeIdCache = {};
-
-    for (const [type, config] of Object.entries(ITEM_TYPE_CONFIG)) {
-        const stockTypeId = byCode.get(config.stockTypeCode);
-
-        if (!stockTypeId) {
-            throw httpError(500, `ไม่พบ stock_type_master สำหรับ ${config.stockTypeCode}`);
-        }
-
-        stockTypeIdCache[type] = stockTypeId;
-    }
-
-    return stockTypeIdCache;
-}
-
-async function resolveType(type) {
-    const normalized = String(type || "").trim().toLowerCase();
-    const config = ITEM_TYPE_CONFIG[normalized];
-
-    if (!config) {
-        throw httpError(400, "ประเภทสต็อกไม่ถูกต้อง (ต้องเป็น ws หรือ cd)");
-    }
-
-    const stockTypeIds = await loadStockTypeIds();
-
-    return { type: normalized, stockTypeId: stockTypeIds[normalized], ...config };
-}
-
-function normalizeDate(value) {
-    if (value instanceof Date) {
-        const year = value.getFullYear();
-        const month = String(value.getMonth() + 1).padStart(2, "0");
-        const day = String(value.getDate()).padStart(2, "0");
-
-        return `${year}-${month}-${day}`;
-    }
-
-    return value ? String(value).slice(0, 10) : null;
-}
+const resolveType = createStockTypeResolver({ pool, schema: TABLE_SCHEMA, itemTypes: ITEM_TYPE_CONFIG });
 
 // One row per date that still has pending (unprocessed) usage — the main
 // list view. Dates disappear from here as soon as everything on them has

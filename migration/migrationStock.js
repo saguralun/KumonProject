@@ -8,6 +8,14 @@ import {
     readSourceRecords,
     summaryValue
 } from "./migrationImportCommon.js";
+import {
+    nullable,
+    lookupKey,
+    masterKey,
+    parsePositiveInteger,
+    issueList,
+    issueCount
+} from "./migrationValueHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,20 +52,6 @@ function clean(value) {
         .trim();
 }
 
-function nullable(value) {
-    const text = clean(value);
-
-    return text || null;
-}
-
-function lookupKey(value) {
-    return clean(value).toLowerCase();
-}
-
-function masterKey(...parts) {
-    return parts.map((part) => lookupKey(part)).join("|");
-}
-
 // QtyTotal is meant to be the current stock count, but a handful of source
 // rows (so far only seen on CD) have negative values from the legacy
 // system's own deficit tracking. Per the decision made when adding CD
@@ -88,26 +82,6 @@ function parseQuantityClamped(value, label) {
     };
 }
 
-function parsePositiveInteger(value, label) {
-    const text = clean(value);
-
-    if (!text) {
-        return { value: null, error: `${label} is required.` };
-    }
-
-    if (!/^\d+$/.test(text)) {
-        return { value: null, error: `${label} must be a positive integer: ${text}` };
-    }
-
-    const numberValue = Number(text);
-
-    if (!Number.isSafeInteger(numberValue) || numberValue < 1) {
-        return { value: null, error: `${label} must be a positive integer: ${text}` };
-    }
-
-    return { value: numberValue, error: null };
-}
-
 function addIssue(issueMap, value, row, message) {
     const issueValue = clean(value) || "(blank)";
     let issue = issueMap.get(issueValue);
@@ -128,14 +102,6 @@ function addIssue(issueMap, value, row, message) {
             message
         });
     }
-}
-
-function issueList(issueMap) {
-    return [...issueMap.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-}
-
-function issueCount(issueMap) {
-    return [...issueMap.values()].reduce((sum, issue) => sum + issue.count, 0);
 }
 
 function addError(row, issues, category, value, message) {

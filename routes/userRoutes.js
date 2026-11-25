@@ -4,7 +4,8 @@ import {
     listAccounts,
     setAccountActive,
     updateAccountRole,
-    upsertAccount
+    createAccount,
+    resetAccountPassword
 } from "../services/authService.js";
 
 const router = express.Router();
@@ -24,7 +25,7 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
     try {
-        const user = await upsertAccount({
+        const user = await createAccount({
             username: req.body?.username,
             password: req.body?.password,
             displayName: req.body?.displayName,
@@ -35,6 +36,13 @@ router.post("/", async (req, res) => {
     } catch (error) {
         sendError(res, error);
     }
+});
+
+router.post("/:userId/password", async (req, res) => {
+    try {
+        const user = await resetAccountPassword(req.params.userId, req.body?.password);
+        res.json({ success: true, user });
+    } catch (error) { sendError(res, error); }
 });
 
 router.post("/:userId/role", async (req, res) => {

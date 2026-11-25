@@ -40,8 +40,11 @@ const state = {
   quantities: new Map(),
   selectedDoId: null,
   detailRequest: 0,
+  listRequest: 0,
   detailBusy: false,
+  inputSwitchBusy: false,
   savingDo: false,
+  retryScope: null,
   searchTimer: null,
   // Row count for the item grid, derived per-type from that type's own
   // largest level (e.g. 20 worksheets = 10 rows for WS; far fewer for CD)
@@ -49,6 +52,16 @@ const state = {
   // (e.g. Zun's 10 worksheets) just leaves the second column blank.
   gridRowCount: 10
 };
+let doHeaderBaseline = null;
+function doHeaderSnapshot() {
+  return JSON.stringify(['doNo', 'outDate', 'receiveDate'].map(name => els.doForm.elements[name].value));
+}
+window.kumonLeaveGuard?.register('รับของเข้าคลัง', () => ({
+  dirty: state.quantities.size > 0 || (doHeaderBaseline !== null && doHeaderSnapshot() !== doHeaderBaseline)
+    || [...els.doDetailBody.querySelectorAll('.do-item-qty-input')].some(input => input.value !== input.dataset.originalQuantity),
+  busy: state.savingDo || state.detailBusy,
+  uncertain: readPendingDo()?.actor === state.retryScope?.actor && Boolean(state.retryScope)
+}));
 
 function selectInputText(input) {
   if (!input) {
@@ -273,6 +286,7 @@ function selectItemType(type) {
 }
 
 function selectSubject(subjectId) {
+  if (Number(subjectId) === Number(state.selectedSubjectId)) return;
   state.selectedSubjectId = subjectId;
   state.selectedLevelMasterId = null;
   state.quantities.clear();
@@ -282,6 +296,7 @@ function selectSubject(subjectId) {
 }
 
 function selectLevel(levelMasterId) {
+  if (Number(levelMasterId || 0) === Number(state.selectedLevelMasterId || 0)) return;
   state.selectedLevelMasterId = levelMasterId || null;
   state.quantities.clear();
   renderItemsGrid();
@@ -340,24 +355,37 @@ function updateTotals() {
   els.saveDoButton.disabled = state.savingDo || entries.length === 0;
 }
 
+async function changeInputContext(change, restore = () => {}) {
+  restore();
+  if (state.savingDo || state.inputSwitchBusy) return;
+  state.inputSwitchBusy = true;
+  try {
+    if (state.quantities.size && !await confirmAction('ยังมีจำนวนที่ไม่ได้บันทึก เปลี่ยนวิชา/Level/ประเภทและล้างจำนวนที่กรอกไว้ใช่ไหม?')) return;
+    change();
+  } finally { state.inputSwitchBusy = false; }
+}
+
 els.typeButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-item-type]");
 
-  if (button) {
-    selectItemType(button.dataset.itemType);
+  if (button && button.dataset.itemType !== state.selectedItemType) {
+    void changeInputContext(() => selectItemType(button.dataset.itemType));
   }
 });
 
 els.subjectButtons.addEventListener("click", (event) => {
   const button = event.target.closest("[data-subject-id]");
 
-  if (button) {
-    selectSubject(Number(button.dataset.subjectId));
+  if (button && Number(button.dataset.subjectId) !== Number(state.selectedSubjectId)) {
+    void changeInputContext(() => selectSubject(Number(button.dataset.subjectId)));
   }
 });
 
 els.levelSelect.addEventListener("change", () => {
-  selectLevel(els.levelSelect.value ? Number(els.levelSelect.value) : null);
+  const next = Number(els.levelSelect.value) || null;
+  if (Number(next || 0) === Number(state.selectedLevelMasterId || 0)) return;
+  void changeInputContext(() => { selectLevel(next); els.levelSelect.value = String(next || ''); },
+    () => { els.levelSelect.value = String(state.selectedLevelMasterId || ''); });
 });
 
 els.doItemsGrid.addEventListener("input", (event) => {
@@ -381,6 +409,55 @@ els.doItemsGrid.addEventListener("input", (event) => {
 
 // ---- DO form submit ----
 
+// Persist BEFORE sending: a lost response or page reload must not mint another
+// additive operation. One unresolved save per browser also survives a new tab.
+const PENDING_DO_KEY = "kumondb.stock-receive.pending.v1";
+
+function readPendingDo() {
+  const text = localStorage.getItem(PENDING_DO_KEY);
+  if (!text) return null;
+  const pending = JSON.parse(text);
+  if (!pending?.operationKey || !pending?.payload || !pending?.actor) {
+    throw new Error("ข้อมูลคำขอ DO ที่ค้างไม่สมบูรณ์ กรุณาตรวจ DO ก่อนล้างข้อมูลเบราว์เซอร์");
+  }
+  return pending;
+}
+
+function clearPendingDo(operationKey) {
+  if (readPendingDo()?.operationKey === operationKey) localStorage.removeItem(PENDING_DO_KEY);
+}
+
+async function submitDeliveryOrder(payload) {
+  if (!state.retryScope) throw new Error("กรุณาโหลดหน้าใหม่ก่อนบันทึก DO");
+  let pending = readPendingDo();
+  if (pending && (pending.actor !== state.retryScope.actor ||
+      JSON.stringify(pending.payload) !== JSON.stringify(payload))) {
+    throw new Error("มีคำขอ DO ที่ยังไม่ทราบผล กรุณาส่งข้อมูลเดิมซ้ำ หรือตรวจ DO ก่อนกดเริ่ม DO ใหม่");
+  }
+  if (!pending) {
+    // getRandomValues also works on the centre's plain HTTP LAN addresses.
+    const nonce = [...crypto.getRandomValues(new Uint8Array(16))]
+      .map(value => value.toString(16).padStart(2, "0")).join("");
+    pending = {
+      operationKey: `${state.retryScope.epoch}:${nonce}`,
+      actor: state.retryScope.actor, payload,
+      subjectId: state.selectedSubjectId, levelId: state.selectedLevelMasterId
+    };
+    localStorage.setItem(PENDING_DO_KEY, JSON.stringify(pending));
+  }
+  const response = await fetch("/api/stock-receive/dos", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...pending.payload, operationKey: pending.operationKey })
+  });
+  const data = await response.json();
+  if (!response.ok || data.success !== true) {
+    if (data.retrySafe === true) clearPendingDo(pending.operationKey);
+    throw new Error(data.error || "ยังยืนยันผลบันทึก DO ไม่ได้ กรุณาลองส่งรายการเดิมซ้ำ");
+  }
+  clearPendingDo(pending.operationKey);
+  return data;
+}
+
 els.doForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (state.savingDo) return;
@@ -400,15 +477,12 @@ els.doForm.addEventListener("submit", async (event) => {
   setStatus("กำลังบันทึก...");
 
   try {
-    const data = await requestJson("/api/stock-receive/dos", {
-      method: "POST",
-      body: JSON.stringify({
+    const data = await submitDeliveryOrder({
         type: state.selectedItemType,
         doNo: formData.get("doNo"),
         outDate: formData.get("outDate"),
         receiveDate: formData.get("receiveDate"),
         items
-      })
     });
 
     setStatus(
@@ -423,6 +497,7 @@ els.doForm.addEventListener("submit", async (event) => {
     // submitted get cleared. "เริ่ม DO ใหม่" is there for when they're
     // actually moving on to a different delivery note.
     clearQuantities();
+    doHeaderBaseline = doHeaderSnapshot();
     await loadDeliveryOrders();
   } catch (error) {
     setStatus(error.message, "error");
@@ -445,6 +520,7 @@ function clearQuantities() {
 function resetForm() {
   els.doForm.reset();
   setDefaultDates();
+  doHeaderBaseline = doHeaderSnapshot();
   state.selectedLevelMasterId = null;
   state.quantities.clear();
   els.levelSelect.value = "";
@@ -460,7 +536,16 @@ function setDefaultDates() {
 
 els.newDoButton.addEventListener("click", async () => {
   if (state.savingDo) return;
-  if (state.quantities.size > 0 && !await confirmAction("ยังไม่ได้บันทึกรายการที่กรอกไว้ เริ่ม DO ใหม่เลยไหม?")) {
+  try {
+    const pending = readPendingDo();
+    if (pending) {
+      if (!await confirmAction("คำขอ DO เดิมยังไม่ทราบผล ตรวจรายการ DO แล้วว่าบันทึกสำเร็จหรือยังใช่ไหม? เริ่มใหม่จะเลิกใช้รหัสเดิม หากเพิ่มจำนวนเดิมอีกอาจเพิ่มซ้ำ")) return;
+      clearPendingDo(pending.operationKey);
+    } else if (state.quantities.size > 0 && !await confirmAction("ยังไม่ได้บันทึกรายการที่กรอกไว้ เริ่ม DO ใหม่เลยไหม?")) {
+      return;
+    }
+  } catch (error) {
+    setStatus(error.message, "error");
     return;
   }
 
@@ -529,21 +614,27 @@ function renderDoTable(rows) {
 }
 
 async function loadDeliveryOrders() {
+  const requestId = ++state.listRequest;
   const params = new URLSearchParams({
     type: els.typeFilter.value,
     status: els.statusFilter.value,
     query: els.doSearch.value.trim(),
     limit: "300"
   });
+  const isCurrent = () => requestId === state.listRequest
+    && params.get('type') === els.typeFilter.value
+    && params.get('status') === els.statusFilter.value
+    && params.get('query') === els.doSearch.value.trim();
 
   els.doListSubtitle.textContent = "กำลังโหลด...";
 
   try {
     const data = await requestJson(`/api/stock-receive/dos?${params.toString()}`);
-
+    if (!isCurrent()) return;
     renderDoTable(data.rows);
     els.doListSubtitle.textContent = `แสดง ${data.rows.length} รายการ`;
   } catch (error) {
+    if (!isCurrent()) return;
     els.doTableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.doListSubtitle.textContent = "โหลดไม่สำเร็จ";
   }
@@ -575,6 +666,7 @@ async function quickFillDo(button) {
   }
 
   setStatus(`เตรียม DO '${doNo}' ไว้ในฟอร์มแล้ว เลือกวิชา/level แล้วกรอกจำนวนเพิ่มได้เลย`, "success");
+  doHeaderBaseline = doHeaderSnapshot();
   els.doFormPanel.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
@@ -758,7 +850,7 @@ els.doDetailBody.addEventListener("change", async (event) => {
   try {
     await requestJson(`/api/stock-receive/dos/${doId}/items/${input.dataset.receiveId}`, {
       method: "PATCH",
-      body: JSON.stringify({ quantity: newQuantity })
+      body: JSON.stringify({ quantity: newQuantity, expectedQuantity: originalQuantity })
     });
     setStatus("แก้จำนวนแล้ว", "success");
     if (state.selectedDoId === doId) await openDoDetail(doId);
@@ -767,6 +859,10 @@ els.doDetailBody.addEventListener("change", async (event) => {
     setStatus(error.message, "error");
     input.value = originalQuantity;
     input.disabled = false;
+    if (error.statusCode === 409 && state.selectedDoId === doId) {
+      await openDoDetail(doId);
+      setStatus(`${error.message} • ค่าที่ต้องการแก้คือ ${newQuantity} กรุณาตรวจแล้วกรอกใหม่`, 'error');
+    }
   } finally {
     setDetailBusy(false);
   }
@@ -829,11 +925,13 @@ async function init() {
   bindSelectAllInput(els.doSearch);
   bindSelectAllInput(els.doForm.elements.doNo);
   setDefaultDates();
+  doHeaderBaseline = doHeaderSnapshot();
 
   try {
     const data = await requestJson("/api/stock-receive/masters");
 
     state.masters = data.masters;
+    state.retryScope = data.retryScope;
     state.gridRowCount = computeMaxGridRowCount(state.selectedItemType);
 
     const subjects = subjectsForType(state.selectedItemType);
@@ -843,6 +941,24 @@ async function init() {
     renderSubjectButtons();
     renderLevelOptions();
     renderItemsGrid();
+    const pending = readPendingDo();
+    if (pending) {
+      if (pending.actor !== state.retryScope?.actor) {
+        setStatus("มีคำขอ DO ของผู้ใช้เดิมที่ยังไม่ทราบผล กรุณาเข้าสู่ระบบด้วยผู้ใช้เดิมเพื่อตรวจสอบ", "error");
+      } else {
+        state.selectedItemType = pending.payload.type;
+        state.selectedSubjectId = pending.subjectId;
+        state.selectedLevelMasterId = pending.levelId;
+        state.quantities = new Map(pending.payload.items.map(item => [item.masterId, String(item.quantity)]));
+        for (const name of ["doNo", "outDate", "receiveDate"]) els.doForm.elements[name].value = pending.payload[name];
+        state.gridRowCount = computeMaxGridRowCount(state.selectedItemType);
+        renderTypeButtons(); renderSubjectButtons(); renderLevelOptions();
+        els.subjectLevelRow.classList.toggle("level-hidden", state.selectedItemType === "cd");
+        els.levelSelect.value = String(pending.levelId);
+        renderItemsGrid();
+        setStatus("พบคำขอ DO ที่ยังไม่ทราบผล กดบันทึกเพื่อส่งรายการเดิมซ้ำอย่างปลอดภัย หรือตรวจ DO ก่อนเริ่มใหม่", "error");
+      }
+    }
   } catch (error) {
     setStatus(error.message, "error");
   }

@@ -1,0 +1,5226 @@
+{
+  "generatedAt": "2026-11-24T01:23:19.318Z",
+  "scope": "Synthetic workflow click observations; not proof of every postcondition or every possible record/state.",
+  "limitations": [
+    "A missing click does not prove a button is broken; disabled-state assertions and indirect calls may not emit a click.",
+    "Unique-label matches are weaker than exact per-page ID matches.",
+    "Dynamic controls and navigation links have no complete static denominator.",
+    "A click in a passing workflow does not establish all data, permission, printer or network scenarios."
+  ],
+  "summary": {
+    "declaredPages": 17,
+    "declaredButtons": 218,
+    "observedById": 102,
+    "observedByUniqueLabel": 27,
+    "notObserved": 89,
+    "ambiguous": 0,
+    "observedClickEvents": 1010,
+    "observedDynamicSignatures": 117,
+    "observedLinkSignatures": 7,
+    "malformedTraceLines": 0
+  },
+  "runs": [
+    {
+      "file": "all-ui.log",
+      "completed": true,
+      "tests": 196,
+      "pass": 192,
+      "fail": 2,
+      "cancelled": 2,
+      "skipped": 0,
+      "passedNames": [
+        "Opening schedule create, toggle, refresh and delete recover errors and require confirmation (browser)",
+        "Role permission controls serialize a role's changes and restore failed toggles (browser)",
+        "Backup and restore controls validate the database name, cancel safely, block duplicate restore and recover rejection (browser)",
+        "Opening schedule create, toggle, refresh and delete recover errors and require confirmation (desktop)",
+        "Role permission controls serialize a role's changes and restore failed toggles (desktop)",
+        "Backup and restore controls validate the database name, cancel safely, block duplicate restore and recover rejection (desktop)",
+        "One main window supports login, regular pages, the controlled KSIS view, isolated accounts and printing without popups",
+        "Shared confirmations require an explicit choice, escape text, reject duplicate requests and restore focus (browser)",
+        "Shared confirmations require an explicit choice, escape text, reject duplicate requests and restore focus (desktop)",
+        "Every application page loads shared dialogs and no production action uses native confirm, prompt or alert",
+        "Every workspace starts with the new layout before JavaScript, without flashing the retired sidebar",
+        "Every workspace has one header menu, no edge handle, full-width content and accessible close controls on desktop and mobile",
+        "Confirmation opened from navigation owns Tab and Escape until dismissed, then returns focus to the menu",
+        "Flyouts support pointer gap crossing, one open group, keyboard return and viewport resizing",
+        "Page tools remain visible, readable and operable without opening navigation",
+        "Backup download keeps the page open, reports permission/file errors, and saves exact bytes (browser)",
+        "Backup download keeps the page open, reports permission/file errors, and saves exact bytes (desktop)",
+        "All page button declarations have a code reference or an explicit form/inline action; shared scripts resolve locally",
+        "Migration setup cancellation and preview selection never run a destructive import (browser)",
+        "Migration setup cancellation and preview selection never run a destructive import (desktop)",
+        "Student student save locks selection, rejects duplicate submit, and preserves failed input for retry",
+        "Student enrollment save locks selection, rejects duplicate submit, and preserves failed input for retry",
+        "Student history and profile ignore late responses and remove old billing actions while loading",
+        "Add Student displays duplicate preflight failure, blocks overlapping submits, and restores controls",
+        "Student failed profile selection keeps edits locked until a profile loads successfully",
+        "Student history failure leaves the successfully selected profile editable",
+        "Student unlocking preserves status, no-enrollment, deletion and three-subject restrictions",
+        "Users delayed refresh preserves a permission saved during the refresh and the next toggle retains it",
+        "Users ignores an older successful list load after a newer load",
+        "Users ignores an older failed list load after a newer load",
+        "WS date edit ignores a late success after selection changes",
+        "WS date edit ignores a late error after selection changes",
+        "WS save sends the captured main and explicit nullable Zun context and preserves input after a 409",
+        "Deleting a enrollment captures its target, locks selection, and restores restrictions after rejection",
+        "Deleting a student aborts if its selection changes during confirmation",
+        "Deleting a enrollment aborts if its selection changes during confirmation",
+        "Pending CD return stays locked through student-list and history rerenders and recovers after failure",
+        "Status action verifies its confirmed target and blocks selection while its response is pending",
+        "New enrollment save captures its student and prevents navigation or duplicate submission while pending",
+        "AT fills multiple inline results, saves one verified new result at a time, preserves existing results, then detects duplicates",
+        "AT guard blocks unintended writes and partial autosaves; conflicts stop without retrying later results",
+        "Read-only AT inspection refreshes clean page 1 through the unchanged filter and proves persisted values without a save",
+        "Read-only inspection never discards dirty AT input or removes a pending guard",
+        "AT subject selection uses the native filter and read endpoint only, and refuses existing unsaved edits",
+        "AT workspace UI requires explicit save confirmation, confirms no-ID pupils, clears consumed previews and fits narrow panels",
+        "AT audit reads saved pages through the native unchanged filter, preserves login and returns to current page without writes",
+        "AT audit refuses dirty, modal, wrong period/subject and blocks a timer save during its refresh",
+        "AT audit tab filters results, highlights differing values, invalidates periods and fits desktop, embedded and mobile",
+        "Shared draft identity changes invalidate the exact confirmation scope before any fill",
+        "Shared at identity changes invalidate the exact confirmation scope before any fill",
+        "Embedded Chromium keeps KSIS alive across tool tabs and local reload, with isolated remote content and clamped layout",
+        "A browser K-sis page is only a launcher for the existing app, never a second editable workspace",
+        "The integrated workspace can retry a failed attachment without leaving a stale launcher or opening another page",
+        "WS reads exactly six filtered rows, including rows below the scroll, and preserves hidden-edit protection",
+        "AT reads exactly six filtered rows, including rows below the scroll, and preserves hidden-edit protection",
+        "Filtered WS preview and shared header both report six ready rows instead of an empty-state message",
+        "Unique ID-less matches need no per-row checkbox, retain both identities and require one final save confirmation",
+        "KSIS roster reader visits all pages without editing form values or saving",
+        "Matching view requires review and explicit confirmation before any save request",
+        "ID-less matching previews every new child, uses name+DOB, and never submits their empty IDs (browser)",
+        "ID-less matching previews every new child, uses name+DOB, and never submits their empty IDs (desktop)",
+        "KSIS draft previews N/EO/IT by identity and distinguishes off-page children (browser)",
+        "KSIS at previews N/EO/IT by identity and distinguishes off-page children (browser)",
+        "KSIS draft previews N/EO/IT by identity and distinguishes off-page children (desktop)",
+        "KSIS at previews N/EO/IT by identity and distinguishes off-page children (desktop)",
+        "WS fills the editable Kendo input when the readonly display stays visible, without clicking or filling the display",
+        "Visible fixed R/IT/N/EO statuses override hidden selects and allow unique identity WS fills, retaining recognized old warnings",
+        "Automatically matched ID-less students fill the exact row and still stop if identity changes after Preview",
+        "WS batches save every ten students including all subjects, and retain saved progress on a later failure",
+        "A rejected WS save response is not reported as saved even with HTTP 200",
+        "Basic fill only changes main fields even if old rows contain Zun and AT, without opening their toolbars",
+        "Zun opens through its observed read-only POST, while main save and Zun write requests stay blocked",
+        "Draft commits focus-swapping Kendo numeric inputs for WS, Zun and AT before proceeding",
+        "Draft stops on a new KSIS validation error before adding Zun or AT",
+        "Draft identifies the Z toolbar step when the button cannot be reached instead of hiding the timeout",
+        "Draft fills main fields plus two Z dialogs, never saves main or touches AT/DT, and permits later human save",
+        "All-subject fill continues past intentional unfilled-row filter errors without crossing data or saving main",
+        "A rows are never edited and mismatch reports preserve verified rows and identify the failing field",
+        "Draft adds three ATs with dates, levels, time, zero score, group and passed checked, without saving main",
+        "Draft stops before AT confirmation for the wrong child or a clamped time",
+        "Draft guard blocks a field's unexpected automatic POST and never silently persists it",
+        "Stopped WS releases its interception so manual corrections and a new login work without an automatic save",
+        "WS recovery waits for a manual save response even when the dirty marker is already hidden",
+        "WS reset discards only unsaved fields on the current grid, never saves and refuses an outstanding save",
+        "Draft UI previews before fill, requires confirmation, and locks reads until manual review acknowledgement",
+        "Report R changes native KSIS A to R, unlocks fields, then batches normally; other A stays skipped (normal)",
+        "Report R changes native KSIS A to R, unlocks fields, then batches normally; other A stays skipped (fixed-r)",
+        "A to R refuses unavailable or rejected changes and never sends an unintended save (locked)",
+        "A to R refuses unavailable or rejected changes and never sends an unintended save (no-r)",
+        "A to R refuses unavailable or rejected changes and never sends an unintended save (revert)",
+        "A to R refuses unavailable or rejected changes and never sends an unintended save (autosave)",
+        "A to R refuses unavailable or rejected changes and never sends an unintended save (wrong-child)",
+        "WS preview and final confirmation disclose the A to R return without filling (browser)",
+        "WS preview and final confirmation disclose the A to R return without filling (desktop)",
+        "Add Student KSIS Preview requires apply and never saves automatically",
+        "KSIS connector extracts the observed form structure through a real browser",
+        "One Preview opens KSIS beside the existing form, waits for manual fixture login, resumes and never applies or saves automatically",
+        "A new empty server workspace clears old browser WS errors without ignoring a still-pending KSIS connection",
+        "Clear stopped WS needs confirmation, removes stale error across reloads and retains prior save history",
+        "Opening KSIS automatically recovers a logged-out WS job and collapses its old unverified result without filling or saving",
+        "WS recovery remains usable after manual fixes or logout, keeps prior save counts and synchronizes connection-only changes",
+        "Pending WS automatically unlocks after manual correction on the same KSIS page without another click or save",
+        "Pending AT inspection is available without acknowledgement and displays saved evidence without enabling another fill",
+        "WS issues show both R-versus-A subjects instead of hiding them in skipped rows",
+        "Audit uses native Refresh, preserves login and document, returns to the selected page and traverses read-only",
+        "Audit refuses dirty data and a wrong period without navigating, and blocks writes during native Refresh",
+        "K-sis audit UI filters differences, invalidates periods, remains read-only, and fits desktop/mobile",
+        "Local staff can update in-app without an admin session",
+        "Login update requires confirmation but no credentials, recovers errors and waits for the new runtime",
+        "Migration uses one engine, previews every module, cancels imports and ignores obsolete pagination (browser)",
+        "Migration uses one engine, previews every module, cancels imports and ignores obsolete pagination (desktop)",
+        "Every Migration import button recovers a failed import, honors Student dependency and completes only its fixture (browser)",
+        "Every Migration import button recovers a failed import, honors Student dependency and completes only its fixture (desktop)",
+        "Background receipt printing permits payment and isolates late success (browser)",
+        "Background receipt printing permits payment and isolates late failure (browser)",
+        "Background receipt printing permits payment and isolates late success (desktop)",
+        "Background receipt printing permits payment and isolates late failure (desktop)",
+        "Partial payment switches between the saved receipt and only newly checked subjects (browser)",
+        "A late saved-receipt response cannot replace newly selected extra billing (browser)",
+        "No saved receipt leaves printing blocked and allows returning to extra billing (browser)",
+        "A wholly unpaid empty selection never invents a reprint or prints zero (browser)",
+        "Closing a pending reprint keeps its response out of the next receipt (browser)",
+        "Fully paid receipts retain their original reprint and cancellation controls (browser)",
+        "Partial payment switches between the saved receipt and only newly checked subjects (desktop)",
+        "A late saved-receipt response cannot replace newly selected extra billing (desktop)",
+        "No saved receipt leaves printing blocked and allows returning to extra billing (desktop)",
+        "A wholly unpaid empty selection never invents a reprint or prints zero (desktop)",
+        "Closing a pending reprint keeps its response out of the next receipt (desktop)",
+        "Fully paid receipts retain their original reprint and cancellation controls (desktop)",
+        "Choosing two of three subjects, cancellation and visible payment errors (browser)",
+        "Choosing two of three subjects, cancellation and visible payment errors (integrated app)",
+        "Unpaid status pill navigates the same tab to the exact student and subject without automatic status changes",
+        "Inactive subject links do not focus another subject's Absent button",
+        "Guest cannot see the Payment Absent link or receive an Absent focus",
+        "Invalid or mismatched deep links never target an unrelated student's status",
+        "Progress dots stay inside their color bands with descending reference thresholds and clamped upper levels",
+        "Table paging and Progress subject/filter buttons ignore delayed responses (browser)",
+        "Stock, Forecast and Report buttons produce current results and valid exports without writing records (browser)",
+        "Table paging and Progress subject/filter buttons ignore delayed responses (desktop)",
+        "Stock, Forecast and Report buttons produce current results and valid exports without writing records (desktop)",
+        "Report B subject tabs, 20-person pages and period invalidation work on desktop and mobile",
+        "Student billing action visibility and confirmation for admin",
+        "Student billing action visibility and confirmation for instructor",
+        "Student billing action visibility and confirmation for staff",
+        "Student billing action visibility and confirmation for guest",
+        "Used N/EO date and special-status corrections survive save/reload without unlocking other initial fields (browser)",
+        "Used N/EO date and special-status corrections survive save/reload without unlocking other initial fields (desktop)",
+        "Unused enrollments can be corrected, date status follows Start Date, using the existing schema through Add/Save/reload (browser)",
+        "Unused enrollments can be corrected, date status follows Start Date, using the existing schema through Add/Save/reload (desktop)",
+        "Resume and Absent work without native dialogs, cancel safely, retry visible errors and submit once (browser)",
+        "Resume and Absent work without native dialogs, cancel safely, retry visible errors and submit once (desktop app)",
+        "Student directory status and subject panels remain read-only while switching filters/subjects (browser)",
+        "Student directory status and subject panels remain read-only while switching filters/subjects (desktop)",
+        "New updates appear while login and workspace stay open (browser)",
+        "New updates appear while login and workspace stay open (Electron)",
+        "DO detail, quantity, item delete, Process and whole-DO delete stay on the visible delivery note (browser)",
+        "Stock cut buttons cancel, recover a rejected cut, serialize clicks and keep WS/CD responses separate (browser)",
+        "Receive stock preserves failed input, cancels discard and blocks duplicate DO submissions (browser)",
+        "DO detail, quantity, item delete, Process and whole-DO delete stay on the visible delivery note (desktop)",
+        "Stock cut buttons cancel, recover a rejected cut, serialize clicks and keep WS/CD responses separate (desktop)",
+        "Receive stock preserves failed input, cancels discard and blocks duplicate DO submissions (desktop)",
+        "New levels start at WS 1 after passing; failures, historical edits and final levels keep their inputs (browser)",
+        "New levels start at WS 1 after passing; failures, historical edits and final levels keep their inputs (desktop)",
+        "AT ignores a late success after another student loads",
+        "AT ignores a late failure after another student loads",
+        "ZUN ignores a late success after another student loads",
+        "ZUN ignores a late failure after another student loads",
+        "AT respects a newer navigation request even before that student finishes loading",
+        "ZUN respects a newer navigation request even before that student finishes loading",
+        "AT failure preserves its form for retry, then closes and refreshes only its own context on success",
+        "AT refresh cannot overwrite a newer selection or its status while refresh is pending",
+        "WS delete focuses Confirm, Escape/cancel preserve the record and Enter deletes once (browser)",
+        "WS delete focuses Confirm, Escape/cancel preserve the record and Enter deletes once (desktop)",
+        "CD confirmations and history controls cannot duplicate a request or mix another student's response (browser)",
+        "CD confirmations and history controls cannot duplicate a request or mix another student's response (desktop)",
+        "WS history keeps new entries visible while Main/Zun progress follows Receive Date (browser)",
+        "WS history keeps new entries visible while Main/Zun progress follows Receive Date (desktop)",
+        "WS number editing supports Enter, cancel, validation, retry and reload with processed rows locked (browser)",
+        "WS number editing supports Enter, cancel, validation, retry and reload with processed rows locked (desktop)",
+        "A late WS number success cannot overwrite another student (browser)",
+        "A late WS number failure cannot overwrite another student (browser)",
+        "A late WS number success cannot overwrite another student (desktop)",
+        "A late WS number failure cannot overwrite another student (desktop)",
+        "A saved WS correction stays visible if history reload fails and does not invite a duplicate save",
+        "WS locks student selection during a save and cannot mix its result into a different enrollment",
+        "Out-of-order enrollment responses cannot replace the latest student, and saving waits for context loading",
+        "A rejected WS save keeps the error visible, unlocks selection and does not add history",
+        "WS progress and packet bars follow ME/EFL/TRP on subject and Main/Zun switches without changing status colors or data",
+        "Unified WS search uses one field for ID, name and nickname, retains subject filters and supports immediate Enter (browser)",
+        "Unified WS search uses one field for ID, name and nickname, retains subject filters and supports immediate Enter (desktop)",
+        "An obsolete unified-search result cannot replace a newer query",
+        "An obsolete unified-search failure cannot replace a newer query"
+      ],
+      "failedNames": [
+        "Menu permissions are unchanged and an open menu never follows navigation to the next workspace",
+        "WS date edit failure retains its original date and can be retried successfully in the same context",
+        "Deleting a student captures its target, locks selection, and restores restrictions after rejection",
+        "Two isolated browser windows share AT preview, identity checks, busy locks and pending results; reads never fill or save"
+      ]
+    },
+    {
+      "file": "rechecks.log",
+      "completed": true,
+      "tests": 4,
+      "pass": 4,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "passedNames": [
+        "Menu permissions are unchanged and an open menu never follows navigation to the next workspace",
+        "WS date edit failure retains its original date and can be retried successfully in the same context",
+        "Deleting a student captures its target, locks selection, and restores restrictions after rejection",
+        "Two isolated browser windows share AT preview, identity checks, busy locks and pending results; reads never fill or save"
+      ],
+      "failedNames": []
+    }
+  ],
+  "unresolvedInitialFailures": [],
+  "pages": [
+    {
+      "page": "backup.html",
+      "declaredButtons": 7,
+      "observed": 4,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "runBackupButton",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "📤 Backup เดี๋ยวนี้",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "adminControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "importSubmit",
+          "classes": [
+            "danger-button"
+          ],
+          "label": "🗑️ Restore ทับข้อมูลปัจจุบัน",
+          "inline": false,
+          "form": "importForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 6,
+          "trustedEvents": 6,
+          "testFiles": [
+            "adminControls.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "forecast.html",
+      "declaredButtons": 13,
+      "observed": 10,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "recalculateForecastButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "🔄 คำนวณ average ใหม่",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "forecastButton",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "🔮 Forecast",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "orderButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "กด Forecast ก่อน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "expectedStockButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "กด Forecast ก่อน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "exportForecastButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "📥 Export Excel",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "exportOrderButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "📥 Export Excel",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "exportExpectedStockButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "📥 Export Excel",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "forecastDetailClose",
+          "classes": [
+            "icon-button"
+          ],
+          "label": "Close",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "index.html",
+      "declaredButtons": 5,
+      "observed": 2,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "ksis.html",
+      "declaredButtons": 34,
+      "observed": 27,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 7,
+          "trustedEvents": 7,
+          "testFiles": [
+            "appDesktop.ui.test.js",
+            "appMenu.ui.test.js",
+            "ksisDesktop.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDesktopOpen",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "เปิด K-sis ในแอป",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "ksisDesktop.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDraftButton",
+          "classes": [],
+          "label": "กรอก WS",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "ksisDesktop.ui.test.js",
+            "ksisReportDraft.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAuditButton",
+          "classes": [],
+          "label": "ตรวจ WS",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "ksisDesktop.ui.test.js",
+            "ksisWsAudit.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtButton",
+          "classes": [],
+          "label": "กรอก AT",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 5,
+          "trustedEvents": 5,
+          "testFiles": [
+            "ksisAt.ui.test.js",
+            "ksisNewEnrollmentIdentity.ui.test.js",
+            "ksisWorkspace.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtAuditButton",
+          "classes": [],
+          "label": "ตรวจ AT",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "ksisAtAudit.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisMatchingButton",
+          "classes": [],
+          "label": "จับคู่รหัสคุมอง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "ksisMatching.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDraftPreview",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "เตรียมข้อมูล / อ่านหน้า KSIS ปัจจุบัน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 12,
+          "trustedEvents": 12,
+          "testFiles": [
+            "ksisDesktop.ui.test.js",
+            "ksisFilteredPage.ui.test.js",
+            "ksisIdentity.ui.test.js",
+            "ksisNewEnrollmentIdentity.ui.test.js",
+            "ksisReportDraft.ui.test.js",
+            "ksisReturnFromAbsent.ui.test.js",
+            "ksisWorkspace.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDraftFill",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "กรอกและบันทึกหน้านี้",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 12,
+          "trustedEvents": 12,
+          "testFiles": [
+            "ksisConfirmationScope.ui.test.js",
+            "ksisDesktop.ui.test.js",
+            "ksisIdentity.ui.test.js",
+            "ksisNewEnrollmentIdentity.ui.test.js",
+            "ksisReportDraft.ui.test.js",
+            "ksisReturnFromAbsent.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDraftInspect",
+          "classes": [
+            "secondary-button",
+            "hidden"
+          ],
+          "label": "ตรวจสถานะหลังแก้ไข",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "ksisWorkspace.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDraftAcknowledge",
+          "classes": [
+            "secondary-button",
+            "hidden"
+          ],
+          "label": "ตรวจและจัดการข้อมูลบน KSIS แล้ว",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "ksisDraftReset",
+          "classes": [
+            "secondary-button",
+            "hidden"
+          ],
+          "label": "ล้างรอบค้าง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "ksisWorkspace.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDraftCancel",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ยกเลิก",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 7,
+          "trustedEvents": 7,
+          "testFiles": [
+            "ksisConfirmationScope.ui.test.js",
+            "ksisDesktop.ui.test.js",
+            "ksisIdentity.ui.test.js",
+            "ksisNewEnrollmentIdentity.ui.test.js",
+            "ksisReturnFromAbsent.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisDraftConfirm",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "ยืนยันกรอก",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "ksisConfirmationScope.ui.test.js",
+            "ksisIdentity.ui.test.js",
+            "ksisReportDraft.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtOpen",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "เปิดหน้า AT",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "ksisAtPreview",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "เตรียม AT หน้าปัจจุบัน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "ksisAt.ui.test.js",
+            "ksisNewEnrollmentIdentity.ui.test.js",
+            "ksisWorkspace.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtFill",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "กรอกและบันทึก AT หน้านี้",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 8,
+          "trustedEvents": 8,
+          "testFiles": [
+            "ksisAt.ui.test.js",
+            "ksisConfirmationScope.ui.test.js",
+            "ksisNewEnrollmentIdentity.ui.test.js",
+            "ksisWorkspace.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtAcknowledge",
+          "classes": [
+            "secondary-button",
+            "hidden"
+          ],
+          "label": "จัดการข้อมูล AT ค้างแล้ว",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "ksisAtCancel",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ยกเลิก",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "ksisAt.ui.test.js",
+            "ksisConfirmationScope.ui.test.js",
+            "ksisNewEnrollmentIdentity.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtConfirm",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "ยืนยันกรอกและบันทึก AT",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "ksisAt.ui.test.js",
+            "ksisConfirmationScope.ui.test.js",
+            "ksisWorkspace.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtAuditCurrent",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ตรวจ AT หน้าปัจจุบัน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "ksisAtAudit.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAtAuditAll",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ตรวจ AT ทุกหน้า",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "ksisAtAudit.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisReadRoster",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "อ่านรายชื่อ KSIS ทุกหน้า",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "ksisMatching.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisSelectExact",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "เลือกคู่ที่ตรงแน่นอน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "ksisMatching.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisConfirmMatches",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "ยืนยันรหัสที่เลือก",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "ksisMatching.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisCancelConfirm",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ยกเลิก",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "ksisMatching.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisSaveConfirm",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "ยืนยันบันทึก",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "ksisMatching.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAuditCurrent",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ตรวจ WS หน้าปัจจุบัน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "ksisWsAudit.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisAuditAll",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ตรวจ WS ทุกหน้า",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "ksisWsAudit.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisOpenReportB",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "Report B",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        }
+      ]
+    },
+    {
+      "page": "login.html",
+      "declaredButtons": 5,
+      "observed": 2,
+      "controls": [
+        {
+          "id": "loginUpdateButton",
+          "classes": [
+            "update-banner-button"
+          ],
+          "label": "อัปเดตโปรแกรม",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 5,
+          "trustedEvents": 5,
+          "testFiles": [
+            "loginUpdate.ui.test.js",
+            "updateAvailability.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "login-tab",
+            "active"
+          ],
+          "label": "เข้าสู่ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "login-tab"
+          ],
+          "label": "Guest",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "adminSubmit",
+          "classes": [
+            "login-submit"
+          ],
+          "label": "เข้าสู่ระบบ",
+          "inline": false,
+          "form": "adminForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "appDesktop.ui.test.js"
+          ]
+        },
+        {
+          "id": "guestSubmit",
+          "classes": [
+            "login-submit"
+          ],
+          "label": "เข้าสู่ระบบแบบ Guest",
+          "inline": false,
+          "form": "guestForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        }
+      ]
+    },
+    {
+      "page": "opening-schedule.html",
+      "declaredButtons": 7,
+      "observed": 4,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 6,
+          "trustedEvents": 6,
+          "testFiles": [
+            "appMenu.ui.test.js",
+            "updateAvailability.ui.test.js"
+          ]
+        },
+        {
+          "id": "addScheduleButton",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "➕ เพิ่มเวลา",
+          "inline": false,
+          "form": "scheduleForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "adminControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "refreshButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "🔄 Refresh",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "adminControls.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "payment.html",
+      "declaredButtons": 21,
+      "observed": 8,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 10,
+          "trustedEvents": 10,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "printerStatusBadge",
+          "classes": [
+            "printer-status-badge"
+          ],
+          "label": "กดเพื่อเช็คใหม่",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "printTestButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "กำลังเช็คเครื่องพิมพ์...",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "summary-card",
+            "is-total"
+          ],
+          "label": "ทั้งหมด\n              0",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "summary-card",
+            "is-paid"
+          ],
+          "label": "จ่ายแล้ว\n              0",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "summary-card",
+            "is-partial"
+          ],
+          "label": "จ่ายบางส่วน\n              0",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "summary-card",
+            "is-unpaid"
+          ],
+          "label": "ยังไม่จ่าย\n              0",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "moneyVisibilityToggle",
+          "classes": [
+            "money-visibility-toggle"
+          ],
+          "label": "👁️ แสดงยอด",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "printUnpaidButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "🖨️ Print unpaid",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "exportUnpaidButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "⬇️ Export CSV",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "refreshButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "🔄 Refresh",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "receiptClose",
+          "classes": [
+            "icon-button"
+          ],
+          "label": "Close",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "paymentPartialReprint.ui.test.js"
+          ]
+        },
+        {
+          "id": "receiptCancelPayment",
+          "classes": [
+            "danger-button",
+            "hidden"
+          ],
+          "label": "↩️ Cancel Receipt",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "paymentPartialReprint.ui.test.js"
+          ]
+        },
+        {
+          "id": "receiptPrint",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "กำลังเช็คเครื่องพิมพ์...",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 14,
+          "trustedEvents": 10,
+          "testFiles": [
+            "paymentBackgroundPrint.ui.test.js",
+            "paymentPartialReprint.ui.test.js"
+          ]
+        },
+        {
+          "id": "receiptReceivePayment",
+          "classes": [
+            "save-button"
+          ],
+          "label": "💵 รับเงิน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 20,
+          "trustedEvents": 20,
+          "testFiles": [
+            "paymentBackgroundPrint.ui.test.js",
+            "paymentPartialReprint.ui.test.js",
+            "paymentReceipt.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ยกเลิก",
+          "inline": false,
+          "form": "",
+          "dialogForm": true,
+          "submit": true,
+          "match": "observed_unique_label",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "paymentBackgroundPrint.ui.test.js"
+          ]
+        },
+        {
+          "id": "receiptConfirmAccept",
+          "classes": [
+            "save-button"
+          ],
+          "label": "ยืนยัน",
+          "inline": false,
+          "form": "",
+          "dialogForm": true,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 14,
+          "trustedEvents": 14,
+          "testFiles": [
+            "paymentBackgroundPrint.ui.test.js",
+            "paymentPartialReprint.ui.test.js",
+            "paymentReceipt.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "progress-chart.html",
+      "declaredButtons": 8,
+      "observed": 5,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "gradeFilterAll",
+          "classes": [
+            "grade-filter-action"
+          ],
+          "label": "ทั้งหมด",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "progressChart.ui.test.js",
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "gradeFilterNone",
+          "classes": [
+            "grade-filter-action"
+          ],
+          "label": "ไม่เลือก",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "progressChart.ui.test.js",
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "refreshButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "🔄 Refresh",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "report.html",
+      "declaredButtons": 12,
+      "observed": 8,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 8,
+          "trustedEvents": 8,
+          "testFiles": [
+            "appDesktop.ui.test.js",
+            "appMenu.ui.test.js",
+            "ksisDesktop.ui.test.js"
+          ]
+        },
+        {
+          "id": "generateButton",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "📊 สร้างรายงาน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 7,
+          "trustedEvents": 7,
+          "testFiles": [
+            "appMenu.ui.test.js",
+            "readOnlyControls.ui.test.js",
+            "reportLayout.ui.test.js"
+          ]
+        },
+        {
+          "id": "exportButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "⬇️ Export CSV",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "exportEventSummaryButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "📋 Export สรุป N/EO/R/IT/Absent",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "levelSummaryButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "สรุปนักเรียนตามเลเวล",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "readOnlyControls.ui.test.js",
+            "reportLayout.ui.test.js"
+          ]
+        },
+        {
+          "id": "exportLevelSummaryButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "Export Excel",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "previousPage",
+          "classes": [],
+          "label": "หน้าก่อนหน้า",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "nextPage",
+          "classes": [],
+          "label": "หน้าถัดไป",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "reportLayout.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "statistics.html",
+      "declaredButtons": 5,
+      "observed": 2,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "stock-cut.html",
+      "declaredButtons": 8,
+      "observed": 5,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "cutAllButton",
+          "classes": [
+            "danger-button"
+          ],
+          "label": "🔪 ตัดทั้งหมด",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 6,
+          "trustedEvents": 4,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "detailClose",
+          "classes": [
+            "modal-close"
+          ],
+          "label": "Close",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "cutDayButton",
+          "classes": [
+            "danger-button"
+          ],
+          "label": "🔪 ตัด Stock วันนี้",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "stock-receive.html",
+      "declaredButtons": 10,
+      "observed": 7,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "newDoButton",
+          "classes": [
+            "ghost-button"
+          ],
+          "label": "↺ เริ่ม DO ใหม่",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "saveDoButton",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "💾 บันทึก DO",
+          "inline": false,
+          "form": "doForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "doDetailClose",
+          "classes": [
+            "modal-close"
+          ],
+          "label": "Close",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "doDeleteButton",
+          "classes": [
+            "danger-button",
+            "hidden"
+          ],
+          "label": "🗑️ ลบ DO",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "doProcessButton",
+          "classes": [
+            "primary-button",
+            "hidden"
+          ],
+          "label": "✅ Process เข้า Stock",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 8,
+          "trustedEvents": 6,
+          "testFiles": [
+            "warehouseControls.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "stock.html",
+      "declaredButtons": 6,
+      "observed": 3,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "refreshStockButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "🔄 Refresh",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "readOnlyControls.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "student-manager.html",
+      "declaredButtons": 40,
+      "observed": 20,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "newStudentButton",
+          "classes": [
+            "secondary-button",
+            "compact"
+          ],
+          "label": "+ Student",
+          "inline": false,
+          "form": "studentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        },
+        {
+          "id": "deleteStudentButton",
+          "classes": [
+            "danger-button",
+            "hidden"
+          ],
+          "label": "🗑️ Delete",
+          "inline": false,
+          "form": "studentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 3,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        },
+        {
+          "id": "saveStudentButton",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "💾 Save Student",
+          "inline": false,
+          "form": "studentForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 7,
+          "trustedEvents": 7,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        },
+        {
+          "id": "newEnrollmentButton",
+          "classes": [
+            "secondary-button",
+            "compact"
+          ],
+          "label": "+ Subject",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "studentEnrollmentEdit.ui.test.js"
+          ]
+        },
+        {
+          "id": "deleteEnrollmentButton",
+          "classes": [
+            "danger-button",
+            "hidden"
+          ],
+          "label": "🗑️ Delete",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 3,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        },
+        {
+          "id": "saveEnrollmentButton",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "💾 Save Enrollment",
+          "inline": false,
+          "form": "enrollmentForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 16,
+          "trustedEvents": 16,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "studentEnrollmentEdit.ui.test.js"
+          ]
+        },
+        {
+          "id": "enrollmentAbsentButton",
+          "classes": [
+            "danger-button",
+            "compact"
+          ],
+          "label": "Absent",
+          "inline": false,
+          "form": "enrollmentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 7,
+          "trustedEvents": 7,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "paymentStudentLink.ui.test.js",
+            "studentResume.ui.test.js"
+          ]
+        },
+        {
+          "id": "enrollmentOtButton",
+          "classes": [
+            "danger-button",
+            "compact"
+          ],
+          "label": "OT",
+          "inline": false,
+          "form": "enrollmentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "enrollmentResumeButton",
+          "classes": [
+            "secondary-button",
+            "compact"
+          ],
+          "label": "Resume",
+          "inline": false,
+          "form": "enrollmentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 6,
+          "trustedEvents": 6,
+          "testFiles": [
+            "studentResume.ui.test.js"
+          ]
+        },
+        {
+          "id": "enrollmentCompleterButton",
+          "classes": [
+            "complete-button",
+            "compact",
+            "hidden"
+          ],
+          "label": "🏁 Complete",
+          "inline": false,
+          "form": "enrollmentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "wsGraphButton",
+          "classes": [
+            "secondary-button",
+            "compact"
+          ],
+          "label": "📈 WS Graph",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab",
+            "active"
+          ],
+          "label": "WS",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "CD",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "AT",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "DT",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "Billing",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 5,
+          "trustedEvents": 5,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "studentBillingPermission.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "Status",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "studentBillingPermission.ui.test.js"
+          ]
+        },
+        {
+          "id": "addStudentCancel",
+          "classes": [
+            "modal-close"
+          ],
+          "label": "Close",
+          "inline": false,
+          "form": "addStudentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "ksisPreviewButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "Preview",
+          "inline": false,
+          "form": "addStudentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "ksisStudent.ui.test.js",
+            "ksisStudentAutoPreview.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisApplyButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "นำลงฟอร์ม",
+          "inline": false,
+          "form": "addStudentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "ksisStudent.ui.test.js"
+          ]
+        },
+        {
+          "id": "copyAddressSearchButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "🔎 ค้นหา",
+          "inline": false,
+          "form": "addStudentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "copyAddressApplyButton",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "📋 คัดลอกที่อยู่",
+          "inline": false,
+          "form": "addStudentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "addStudentClose",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "Cancel",
+          "inline": false,
+          "form": "addStudentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "addStudentSave",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "💾 Add Student",
+          "inline": false,
+          "form": "addStudentForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        },
+        {
+          "id": "ksisStudentStop",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ยกเลิก Preview",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "ksisStudentAutoPreview.ui.test.js"
+          ]
+        },
+        {
+          "id": "addEnrollmentCancel",
+          "classes": [
+            "modal-close"
+          ],
+          "label": "Close",
+          "inline": false,
+          "form": "addEnrollmentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "addEnrollmentClose",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "Cancel",
+          "inline": false,
+          "form": "addEnrollmentForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "addEnrollmentSave",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "💾 Add Subject",
+          "inline": false,
+          "form": "addEnrollmentForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "studentEnrollmentEdit.ui.test.js"
+          ]
+        },
+        {
+          "id": "wsGraphClose",
+          "classes": [
+            "modal-close"
+          ],
+          "label": "Close",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab",
+            "active"
+          ],
+          "label": "3 เดือน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "6 เดือน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "12 เดือน",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "history-tab"
+          ],
+          "label": "ทั้งหมด",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "enrollmentResumeCancel",
+          "classes": [
+            "secondary-button"
+          ],
+          "label": "ยกเลิก",
+          "inline": false,
+          "form": "enrollmentResumeForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 6,
+          "trustedEvents": 6,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "paymentStudentLink.ui.test.js",
+            "studentResume.ui.test.js"
+          ]
+        },
+        {
+          "id": "enrollmentResumeSave",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "บันทึกกลับมาเรียน",
+          "inline": false,
+          "form": "enrollmentResumeForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 12,
+          "trustedEvents": 12,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "studentResume.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "users.html",
+      "declaredButtons": 7,
+      "observed": 4,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "createSubmit",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "💾 บันทึก",
+          "inline": false,
+          "form": "createForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        },
+        {
+          "id": "createRoleSubmit",
+          "classes": [
+            "primary-button"
+          ],
+          "label": "+ เพิ่ม Role",
+          "inline": false,
+          "form": "createRoleForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js"
+          ]
+        }
+      ]
+    },
+    {
+      "page": "worksheet.html",
+      "declaredButtons": 24,
+      "observed": 15,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 6,
+          "trustedEvents": 6,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 8,
+          "trustedEvents": 8,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "subject-button",
+            "active"
+          ],
+          "label": "ALL",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js",
+            "worksheetSubjectColors.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "subject-button"
+          ],
+          "label": "ME",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "worksheetSubjectColors.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "subject-button"
+          ],
+          "label": "EFL",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "worksheetSubjectColors.ui.test.js",
+            "worksheetUnifiedSearch.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "subject-button"
+          ],
+          "label": "TRP",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "worksheetSubjectColors.ui.test.js"
+          ]
+        },
+        {
+          "id": "findIncompleteWs",
+          "classes": [
+            "find-incomplete-ws-button"
+          ],
+          "label": "🔎หา WS ค้าง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 1,
+          "trustedEvents": 1,
+          "testFiles": [
+            "worksheetSubjectColors.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "worksheet-progress-tab",
+            "active"
+          ],
+          "label": "Main",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "worksheetLatestDate.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "worksheet-progress-tab"
+          ],
+          "label": "Zun",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 10,
+          "trustedEvents": 10,
+          "testFiles": [
+            "worksheetLatestDate.ui.test.js",
+            "worksheetSubjectColors.ui.test.js"
+          ]
+        },
+        {
+          "id": "completeWsLevel",
+          "classes": [
+            "progress-at-button",
+            "hidden"
+          ],
+          "label": "📝สอบ AT",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 11,
+          "trustedEvents": 11,
+          "testFiles": [
+            "worksheetAtScope.ui.test.js"
+          ]
+        },
+        {
+          "id": "completeZunLevel",
+          "classes": [
+            "progress-at-button",
+            "hidden"
+          ],
+          "label": "🎯จบ Zun",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 3,
+          "trustedEvents": 3,
+          "testFiles": [
+            "worksheetAtScope.ui.test.js"
+          ]
+        },
+        {
+          "id": "datePrev",
+          "classes": [
+            "icon-button"
+          ],
+          "label": "Previous day",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "dateNext",
+          "classes": [
+            "icon-button"
+          ],
+          "label": "Next day",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "receiveCd",
+          "classes": [
+            "receive-cd-button",
+            "hidden"
+          ],
+          "label": "💿รับ CD",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 8,
+          "trustedEvents": 6,
+          "testFiles": [
+            "worksheetAuxControls.ui.test.js"
+          ]
+        },
+        {
+          "id": "saveButton",
+          "classes": [
+            "save-button"
+          ],
+          "label": "💾 Save",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 6,
+          "trustedEvents": 6,
+          "testFiles": [
+            "frontendStateRaces.ui.test.js",
+            "worksheetLatestDate.ui.test.js",
+            "worksheetRequestSafety.ui.test.js"
+          ]
+        },
+        {
+          "id": "atCancel",
+          "classes": [
+            "icon-button",
+            "at-close-button"
+          ],
+          "label": "Close",
+          "inline": false,
+          "form": "atForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "at-result-button"
+          ],
+          "label": "ไม่ผ่าน",
+          "inline": false,
+          "form": "atForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "worksheetAtScope.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "at-result-button",
+            "active"
+          ],
+          "label": "ผ่าน",
+          "inline": false,
+          "form": "atForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "atEditLatest",
+          "classes": [
+            "secondary-button",
+            "hidden"
+          ],
+          "label": "แก้รอบล่าสุด",
+          "inline": false,
+          "form": "atForm",
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "atSaveButton",
+          "classes": [
+            "save-button"
+          ],
+          "label": "💾 บันทึก AT",
+          "inline": false,
+          "form": "atForm",
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 14,
+          "trustedEvents": 14,
+          "testFiles": [
+            "worksheetAtScope.ui.test.js"
+          ]
+        },
+        {
+          "id": "incompleteWsClose",
+          "classes": [
+            "icon-button",
+            "at-close-button"
+          ],
+          "label": "Close",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        }
+      ]
+    },
+    {
+      "page": "migration.html",
+      "declaredButtons": 6,
+      "observed": 3,
+      "controls": [
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "งานประจำ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "จัดการ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_unique_label",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "คลัง",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "",
+          "classes": [
+            "home-link",
+            "nav-flyout-trigger"
+          ],
+          "label": "ระบบ",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "not_observed",
+          "clickEvents": 0,
+          "trustedEvents": 0,
+          "testFiles": []
+        },
+        {
+          "id": "appMenuButton",
+          "classes": [
+            "app-menu-icon-button",
+            "app-menu-toggle"
+          ],
+          "label": "เปิดเมนู",
+          "inline": false,
+          "dialogForm": false,
+          "submit": false,
+          "match": "observed_id",
+          "clickEvents": 4,
+          "trustedEvents": 4,
+          "testFiles": [
+            "appMenu.ui.test.js"
+          ]
+        },
+        {
+          "id": "databaseSetupButton",
+          "classes": [
+            "danger"
+          ],
+          "label": "🗄️ Reinstall Database (001 → 002 → 003)",
+          "inline": true,
+          "dialogForm": false,
+          "submit": true,
+          "match": "observed_id",
+          "clickEvents": 2,
+          "trustedEvents": 2,
+          "testFiles": [
+            "buttonInventory.ui.test.js"
+          ]
+        }
+      ]
+    }
+  ],
+  "dynamic": [
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "Student 1 ยังไม่มีวิชา",
+      "dataKeys": [
+        "data-directory-tone",
+        "data-preferred-enrollment-id",
+        "data-student-id"
+      ],
+      "events": 10,
+      "testFiles": [
+        "frontendStateRaces.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 11,
+      "testFiles": [
+        "frontendStateRaces.ui.test.js",
+        "ksisStudent.ui.test.js",
+        "studentBillingPermission.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "Student 2 ยังไม่มีวิชา",
+      "dataKeys": [
+        "data-directory-tone",
+        "data-preferred-enrollment-id",
+        "data-student-id"
+      ],
+      "events": 17,
+      "testFiles": [
+        "frontendStateRaces.ui.test.js"
+      ]
+    },
+    {
+      "page": "/report.html",
+      "id": "",
+      "label": "EFL1",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 3,
+      "testFiles": [
+        "readOnlyControls.ui.test.js",
+        "reportLayout.ui.test.js"
+      ]
+    },
+    {
+      "page": "/report.html",
+      "id": "",
+      "label": "TRP0",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 1,
+      "testFiles": [
+        "reportLayout.ui.test.js"
+      ]
+    },
+    {
+      "page": "/report.html",
+      "id": "",
+      "label": "ME45",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 1,
+      "testFiles": [
+        "reportLayout.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "ยกเลิกบิล",
+      "dataKeys": [
+        "data-cancel-billing-id"
+      ],
+      "events": 4,
+      "testFiles": [
+        "studentBillingPermission.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "studentBillingPermission.ui.test.js"
+      ]
+    },
+    {
+      "page": "/fixture",
+      "id": "authUpdateButton",
+      "label": "commit undefined",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "localUpdate.ui.test.js"
+      ]
+    },
+    {
+      "page": "/fixture",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 3,
+      "testFiles": [
+        "appDialogs.ui.test.js",
+        "localUpdate.ui.test.js"
+      ]
+    },
+    {
+      "page": "/fixture",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 3,
+      "testFiles": [
+        "appDialogs.ui.test.js",
+        "localUpdate.ui.test.js"
+      ]
+    },
+    {
+      "page": "/payment.html",
+      "id": "",
+      "label": "💵 รับเงิน",
+      "dataKeys": [
+        "data-receipt-row-index"
+      ],
+      "events": 12,
+      "testFiles": [
+        "paymentBackgroundPrint.ui.test.js",
+        "paymentPartialReprint.ui.test.js",
+        "paymentReceipt.ui.test.js"
+      ]
+    },
+    {
+      "page": "/payment.html",
+      "id": "",
+      "label": "💵 รับเงินเพิ่ม",
+      "dataKeys": [
+        "data-receipt-row-index"
+      ],
+      "events": 12,
+      "testFiles": [
+        "paymentPartialReprint.ui.test.js",
+        "paymentReceipt.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "studentPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "studentImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 6,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 20,
+      "testFiles": [
+        "buttonInventory.ui.test.js",
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "enrollmentPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "historyPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "historyImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "billingPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "billingImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "atPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "atImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "dtPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "dtImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "wsPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "wsImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "worksheet-receivePreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "worksheet-receiveImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "cdPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "cdImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "stockPreviewButton",
+      "label": "Preview",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "stockImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "wsPreviewButton",
+      "label": "Preview Again",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "",
+      "label": "Student",
+      "dataKeys": [
+        "data-module"
+      ],
+      "events": 2,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "",
+      "label": "WS",
+      "dataKeys": [
+        "data-module"
+      ],
+      "events": 2,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "",
+      "label": "Next",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 22,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "studentPreviewButton",
+      "label": "Preview Again",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "enrollmentPreviewButton",
+      "label": "Preview Again",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "enrollmentImportButton",
+      "label": "Import",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "migrationWorkflow.ui.test.js"
+      ]
+    },
+    {
+      "page": "/ksis.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "ksisDesktop.ui.test.js",
+        "ksisWorkspace.ui.test.js"
+      ]
+    },
+    {
+      "page": "/ksis.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 3,
+      "testFiles": [
+        "appMenu.ui.test.js",
+        "ksisDesktop.ui.test.js"
+      ]
+    },
+    {
+      "page": "/index.html",
+      "id": "",
+      "label": "alpha",
+      "dataKeys": [
+        "data-table-name"
+      ],
+      "events": 2,
+      "testFiles": [
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/index.html",
+      "id": "",
+      "label": "beta",
+      "dataKeys": [
+        "data-table-name"
+      ],
+      "events": 2,
+      "testFiles": [
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/index.html",
+      "id": "",
+      "label": "2",
+      "dataKeys": [
+        "data-page"
+      ],
+      "events": 2,
+      "testFiles": [
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/progress-chart.html",
+      "id": "",
+      "label": "EFL",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 3,
+      "testFiles": [
+        "progressChart.ui.test.js",
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/progress-chart.html",
+      "id": "",
+      "label": "TRP",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 3,
+      "testFiles": [
+        "progressChart.ui.test.js",
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock.html",
+      "id": "",
+      "label": "EFL",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 2,
+      "testFiles": [
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock.html",
+      "id": "",
+      "label": "TRP",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 2,
+      "testFiles": [
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/report.html",
+      "id": "",
+      "label": "ME1",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 2,
+      "testFiles": [
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/report.html",
+      "id": "",
+      "label": "TRP1",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 2,
+      "testFiles": [
+        "readOnlyControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/index.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/payment.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/report.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/progress-chart.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/statistics.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-receive.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-cut.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/forecast.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/opening-schedule.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/users.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/backup.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/migration.html",
+      "id": "appMenuBackdrop",
+      "label": "ปิดเมนู",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "นักเรียน ตัวอย่างทดสอบนามสกุลยาว 24",
+      "dataKeys": [
+        "data-student-id"
+      ],
+      "events": 6,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "นักเรียน ตัวอย่างทดสอบนามสกุลยาว 0",
+      "dataKeys": [
+        "data-student-id"
+      ],
+      "events": 6,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock.html",
+      "id": "",
+      "label": "ME",
+      "dataKeys": [],
+      "events": 3,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-cut.html",
+      "id": "",
+      "label": "ME",
+      "dataKeys": [],
+      "events": 3,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/progress-chart.html",
+      "id": "",
+      "label": "ME",
+      "dataKeys": [],
+      "events": 3,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/ksis.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 1,
+      "testFiles": [
+        "ksisWorkspace.ui.test.js"
+      ]
+    },
+    {
+      "page": "/ksis.html",
+      "id": "",
+      "label": "ตรวจแบบอ่านอย่างเดียว",
+      "dataKeys": [
+        "data-at-inspect"
+      ],
+      "events": 1,
+      "testFiles": [
+        "ksisWorkspace.ui.test.js"
+      ]
+    },
+    {
+      "page": "/ksis.html",
+      "id": "authLogoutButton",
+      "label": "ออกจากระบบ",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appDesktop.ui.test.js"
+      ]
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "",
+      "label": "ถัดไป →",
+      "dataKeys": [
+        "data-incomplete-page",
+        "data-incomplete-section"
+      ],
+      "events": 1,
+      "testFiles": [
+        "worksheetSubjectColors.ui.test.js"
+      ]
+    },
+    {
+      "page": "/payment.html",
+      "id": "",
+      "label": "ปิดเมนู",
+      "dataKeys": [
+        "data-tooltip"
+      ],
+      "events": 1,
+      "testFiles": [
+        "appMenu.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "เอา CD คืน",
+      "dataKeys": [
+        "data-cpcd",
+        "data-return-cd-id",
+        "data-stock-processed"
+      ],
+      "events": 3,
+      "testFiles": [
+        "frontendStateRaces.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "นักเรียน ตัวอย่าง (น้องทดสอบ) ME · C EFL · A · 1 ปี 2 เดือน TRP · C",
+      "dataKeys": [
+        "data-directory-tone",
+        "data-preferred-enrollment-id",
+        "data-student-id"
+      ],
+      "events": 2,
+      "testFiles": [
+        "studentSubjectCues.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "ME #10 • Continue",
+      "dataKeys": [
+        "data-enrollment-id",
+        "data-status",
+        "data-subject"
+      ],
+      "events": 6,
+      "testFiles": [
+        "studentSubjectCues.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "EFL #20 • Absent",
+      "dataKeys": [
+        "data-enrollment-id",
+        "data-status",
+        "data-subject"
+      ],
+      "events": 6,
+      "testFiles": [
+        "studentSubjectCues.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "TRP #30 • Continue",
+      "dataKeys": [
+        "data-enrollment-id",
+        "data-status",
+        "data-subject"
+      ],
+      "events": 8,
+      "testFiles": [
+        "studentEnrollmentEdit.ui.test.js",
+        "studentSubjectCues.ui.test.js"
+      ]
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "worksheetAtScope.ui.test.js",
+        "worksheetAuxControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/login.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 3,
+      "testFiles": [
+        "loginUpdate.ui.test.js",
+        "updateAvailability.ui.test.js"
+      ]
+    },
+    {
+      "page": "/opening-schedule.html",
+      "id": "authUpdateButton",
+      "label": "Fixture new version",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "updateAvailability.ui.test.js"
+      ]
+    },
+    {
+      "page": "/opening-schedule.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "adminControls.ui.test.js",
+        "updateAvailability.ui.test.js"
+      ]
+    },
+    {
+      "page": "/opening-schedule.html",
+      "id": "",
+      "label": "ปิดเมนู",
+      "dataKeys": [
+        "data-tooltip"
+      ],
+      "events": 2,
+      "testFiles": [
+        "updateAvailability.ui.test.js"
+      ]
+    },
+    {
+      "page": "/payment.html",
+      "id": "",
+      "label": "ทั้งหมด 3",
+      "dataKeys": [
+        "data-status-filter"
+      ],
+      "events": 1,
+      "testFiles": [
+        "paymentStudentLink.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "ME #101 • Continue",
+      "dataKeys": [
+        "data-enrollment-id",
+        "data-status",
+        "data-subject"
+      ],
+      "events": 1,
+      "testFiles": [
+        "paymentStudentLink.ui.test.js"
+      ]
+    },
+    {
+      "page": "/login.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "loginUpdate.ui.test.js"
+      ]
+    },
+    {
+      "page": "/payment.html",
+      "id": "",
+      "label": "🖨️ พิมพ์ซ้ำ",
+      "dataKeys": [
+        "data-receipt-row-index"
+      ],
+      "events": 2,
+      "testFiles": [
+        "paymentPartialReprint.ui.test.js"
+      ]
+    },
+    {
+      "page": "/fixture",
+      "id": "action",
+      "label": "Action",
+      "dataKeys": [],
+      "events": 6,
+      "testFiles": [
+        "appDialogs.ui.test.js"
+      ]
+    },
+    {
+      "page": "/fixture",
+      "id": "appDialogConfirm",
+      "label": "ปิด",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "appDialogs.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-receive.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 8,
+      "testFiles": [
+        "warehouseControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-receive.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 8,
+      "testFiles": [
+        "warehouseControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-receive.html",
+      "id": "",
+      "label": "ลบรายการนี้",
+      "dataKeys": [
+        "data-delete-receive-id"
+      ],
+      "events": 4,
+      "testFiles": [
+        "warehouseControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-cut.html",
+      "id": "",
+      "label": "CD",
+      "dataKeys": [
+        "data-item-type"
+      ],
+      "events": 2,
+      "testFiles": [
+        "warehouseControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-cut.html",
+      "id": "",
+      "label": "WS",
+      "dataKeys": [
+        "data-item-type"
+      ],
+      "events": 2,
+      "testFiles": [
+        "warehouseControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-cut.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "warehouseControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/stock-cut.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "warehouseControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "",
+      "label": "Delete worksheet record",
+      "dataKeys": [
+        "data-delete-history-id"
+      ],
+      "events": 6,
+      "testFiles": [
+        "worksheetAuxControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "worksheetAuxControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "appDialogCancel",
+      "label": "ไม่รับ CD",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "worksheetAuxControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "appDialogConfirm",
+      "label": "รับ CD",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "worksheetAuxControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/opening-schedule.html",
+      "id": "",
+      "label": "ลบเวลาเปิดนี้",
+      "dataKeys": [
+        "data-delete-id"
+      ],
+      "events": 4,
+      "testFiles": [
+        "adminControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/opening-schedule.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "adminControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/users.html",
+      "id": "",
+      "label": "ลบ role นี้",
+      "dataKeys": [
+        "data-role-code"
+      ],
+      "events": 4,
+      "testFiles": [
+        "adminControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/users.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "adminControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/users.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "adminControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/backup.html",
+      "id": "appDialogCancel",
+      "label": "ยกเลิก",
+      "dataKeys": [],
+      "events": 2,
+      "testFiles": [
+        "adminControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/backup.html",
+      "id": "appDialogConfirm",
+      "label": "ยืนยัน",
+      "dataKeys": [],
+      "events": 4,
+      "testFiles": [
+        "adminControls.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "แก้วันเริ่ม ทดสอบ ยังไม่มีวิชา",
+      "dataKeys": [
+        "data-directory-tone",
+        "data-preferred-enrollment-id",
+        "data-student-id"
+      ],
+      "events": 8,
+      "testFiles": [
+        "studentEnrollmentEdit.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "ME #10 • New",
+      "dataKeys": [
+        "data-enrollment-id",
+        "data-status",
+        "data-subject"
+      ],
+      "events": 6,
+      "testFiles": [
+        "studentEnrollmentEdit.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "EFL #20 • Enrolling Other",
+      "dataKeys": [
+        "data-enrollment-id",
+        "data-status",
+        "data-subject"
+      ],
+      "events": 4,
+      "testFiles": [
+        "studentEnrollmentEdit.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "นักเรียน ทดสอบแก้ข้อมูล ยังไม่มีวิชา",
+      "dataKeys": [
+        "data-directory-tone",
+        "data-preferred-enrollment-id",
+        "data-student-id"
+      ],
+      "events": 6,
+      "testFiles": [
+        "studentEnrollmentEdit.ui.test.js"
+      ]
+    },
+    {
+      "page": "/student-manager.html",
+      "id": "",
+      "label": "EFL #20 • Active",
+      "dataKeys": [
+        "data-enrollment-id",
+        "data-status",
+        "data-subject"
+      ],
+      "events": 2,
+      "testFiles": [
+        "studentEnrollmentEdit.ui.test.js"
+      ]
+    },
+    {
+      "page": "/progress-chart.html",
+      "id": "",
+      "label": "ME",
+      "dataKeys": [
+        "data-subject"
+      ],
+      "events": 1,
+      "testFiles": [
+        "progressChart.ui.test.js"
+      ]
+    }
+  ],
+  "links": [
+    {
+      "page": "/report.html",
+      "id": "",
+      "label": "🌐 K-sis",
+      "events": 2
+    },
+    {
+      "page": "/forecast.html",
+      "id": "",
+      "label": "",
+      "events": 6
+    },
+    {
+      "page": "/report.html",
+      "id": "",
+      "label": "",
+      "events": 6
+    },
+    {
+      "page": "/worksheet.html",
+      "id": "",
+      "label": "💰 Payment",
+      "events": 2
+    },
+    {
+      "page": "/backup.html",
+      "id": "",
+      "label": "⬇️ ดาวน์โหลด",
+      "events": 10
+    },
+    {
+      "page": "/backup.html",
+      "id": "",
+      "label": "",
+      "events": 6
+    },
+    {
+      "page": "/payment.html",
+      "id": "",
+      "label": "เปิด Student ของ เด็กยังไม่จ่าย ทดสอบ เพื่อไปยังปุ่ม Absent โดยยังไม่เปลี่ยนสถานะ",
+      "events": 1
+    }
+  ],
+  "malformed": []
+}

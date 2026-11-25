@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/users.css?v=20260904-list-panel-min-height">
+  <link rel="stylesheet" href="/css/users.css?v=20261124-account-separation">
   <link rel="stylesheet" href="/css/app-scale.css?v=20261030-project-audit">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-update-anytime">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
@@ -70,7 +70,7 @@
 
       <section class="panel create-panel">
         <div class="panel-header">
-          <div class="panel-title">สร้าง / รีเซ็ตรหัสผ่าน</div>
+          <div class="panel-title">สร้างบัญชีใหม่</div>
         </div>
         <form id="createForm" class="create-form">
           <label>
@@ -89,9 +89,9 @@
             <span>Role</span>
             <select name="role" id="createRoleSelect"></select>
           </label>
-          <button type="submit" class="primary-button" id="createSubmit">💾 บันทึก</button>
+          <button type="submit" class="primary-button" id="createSubmit">สร้างบัญชี</button>
         </form>
-        <div class="form-hint">ใช้ username เดิมเพื่อรีเซ็ตรหัสผ่าน/เปลี่ยนชื่อ/role ของบัญชีนั้นได้เลย</div>
+        <div class="form-hint">สร้างเฉพาะ username ใหม่ บัญชีเดิมให้ใช้ปุ่มรีเซ็ตรหัสผ่าน เปลี่ยน Role หรือเปิด/ปิดใช้งานในแถวบัญชีนั้น</div>
         <div class="form-message hidden" id="createMessage"></div>
       </section>
 
@@ -133,11 +133,23 @@
     </section>
   </main>
 
+  <dialog id="resetPasswordDialog" class="account-password-dialog" aria-labelledby="resetPasswordTitle">
+    <form id="resetPasswordForm">
+      <h2 id="resetPasswordTitle">รีเซ็ตรหัสผ่าน</h2>
+      <label>Username<input id="resetPasswordUsername" type="text" readonly></label>
+      <label>รหัสผ่านใหม่<input id="resetPasswordValue" type="password" autocomplete="new-password" minlength="6" required></label>
+      <p class="form-hint">บัญชีนี้ต้องเข้าสู่ระบบใหม่ทุกเครื่อง รวมถึงหน้าปัจจุบันถ้าเป็นบัญชีของคุณเอง การรีเซ็ตไม่เปลี่ยน Role ชื่อ หรือสถานะเปิด/ปิดบัญชี</p>
+      <div id="resetPasswordMessage" class="form-message hidden" role="alert"></div>
+      <div class="account-password-actions"><button type="button" id="resetPasswordCancel">ยกเลิก</button><button type="submit" id="resetPasswordSubmit" class="primary-button">รีเซ็ตรหัสผ่าน</button></div>
+    </form>
+  </dialog>
   <script src="/js/appDialogs.js?v=20261023-all-actions"></script>
-  <script src="/js/authClient.js?v=20261030-code-only-update"></script>
+  <script src="/js/authClient.js?v=20261124-unsaved-work"></script>
   <script src="/js/appMenu.js?v=20261023-dialog-focus"></script>
   <script src="/js/navFlyout.js?v=20261023-static-menu"></script>
   <script src="/js/htmlUtil.js?v=20260901-shared-utils"></script>
-  <script src="/js/users.js?v=20261030-project-audit"></script>
+  <script src="/js/httpUtil.js?v=20261123-shared-helpers"></script>
+  <script src="/js/statusUtil.js?v=20260901-shared-utils"></script>
+  <script src="/js/users.js?v=20261124-account-separation"></script>
 </body>
 </html>

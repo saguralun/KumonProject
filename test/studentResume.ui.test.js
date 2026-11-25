@@ -24,6 +24,9 @@ for (const embedded of [false, true]) test(`Resume and Absent work without nativ
     app.get('/api/students/masters', (_req, res) => res.json({ success: true, masters }));
     app.get('/api/students/search', (_req, res) => res.json({ success: true, rows: [student] }));
     app.get('/api/students/999', (_req, res) => res.json({ success: true, ...profile() }));
+    app.get('/api/students/999/enrollments/202/status-preview', (req, res) => res.json({ preview: { fingerprint: 'fixture-status',
+        period: { month: 11, year: 2026 }, periodSource: 'resume_date', resumeDate: req.query.resumeDate,
+        statusCode: req.query.action === 'resume' ? 'R' : 'A', startDate: '2026-01-01', changesStartDate: false, halfMonth: false, missedMonths: 0 } }));
     app.post('/api/students/999/enrollments/202/status-action', async (req, res) => {
         requests.push(req.body);
         if (fail) return res.status(503).json({ success: false, error: 'Fixture resume unavailable' });
@@ -63,7 +66,9 @@ for (const embedded of [false, true]) test(`Resume and Absent work without nativ
         await page.locator('#enrollmentResumeCancel').click(); assert.equal(requests.length, 0);
         await page.locator('#enrollmentResumeButton').click(); await page.keyboard.press('Escape'); assert.equal(requests.length, 0);
         await page.locator('#enrollmentResumeButton').click(); await date.fill('');
-        await page.locator('#enrollmentResumeSave').click(); assert.equal(requests.length, 0);
+        assert.equal(await page.locator('#enrollmentResumeSave').isDisabled(), true);
+        await page.locator('#enrollmentResumeForm').evaluate(form => form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+        assert.equal(requests.length, 0);
         await date.fill('2026-10-23'); await page.locator('#enrollmentResumeSave').click();
         await page.waitForFunction(() => document.getElementById('enrollmentResumeError').textContent.includes('unavailable'));
         assert.equal(await dialog.isVisible(), true); assert.equal(await date.inputValue(), '2026-10-23');
@@ -84,7 +89,7 @@ for (const embedded of [false, true]) test(`Resume and Absent work without nativ
         releaseSave();
         await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('Resume แล้ว'));
         assert.equal(await dialog.isVisible(), false); assert.equal(await page.locator('#enrollmentResumeButton').isVisible(), false);
-        assert.deepEqual(requests, [{ action: 'resume', resumeDate: '2026-10-23' }, { action: 'resume', resumeDate: '2026-10-23' }]);
+        assert.deepEqual(requests, [{ action: 'resume', resumeDate: '2026-10-23', expectedPlan: 'fixture-status' }, { action: 'resume', resumeDate: '2026-10-23', expectedPlan: 'fixture-status' }]);
         holdSave = false; fail = true; status = 'C';
         await page.reload();
         await page.evaluate(() => { window.confirm = () => false; });
@@ -100,7 +105,7 @@ for (const embedded of [false, true]) test(`Resume and Absent work without nativ
         fail = false; await page.locator('#enrollmentResumeSave').click();
         await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('Absent แล้ว'));
         assert.equal(await dialog.isVisible(), false); assert.equal(await page.locator('#enrollmentAbsentButton').isVisible(), false);
-        assert.deepEqual(requests.slice(2), [{ action: 'absent' }, { action: 'absent' }]);
+        assert.deepEqual(requests.slice(2), [{ action: 'absent', expectedPlan: 'fixture-status' }, { action: 'absent', expectedPlan: 'fixture-status' }]);
         assert.deepEqual(errors, []);
     } finally {
         releaseSave?.(); await desktop?.application.close(); await browser?.close(); await new Promise((resolve) => server.close(resolve));

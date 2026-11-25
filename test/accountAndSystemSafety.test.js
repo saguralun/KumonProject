@@ -14,7 +14,8 @@ test('Existing sessions immediately lose access after account deactivation or ro
     t.mock.method(pool, 'query', async (sql) => {
         if (unavailable) throw new Error('database unavailable');
         assert.match(sql, /is_active = TRUE/);
-        return { rows: active ? [{ user_id: 22, username: 'test', display_name: 'Test', role }] : [] };
+        return { rows: active ? [{ user_id: 22, username: 'test', display_name: 'Test', role,
+            password_hash: 'isolated-unchanged-password-hash', stored_session_exists: true }] : [] };
     });
     const app = express(); app.use(session({ secret: 'isolated-test-secret', resave: false, saveUninitialized: false }));
     app.post('/test-login', (req, res) => { req.session.user = { userId: 22, role: 'admin' }; res.json({ success: true }); });

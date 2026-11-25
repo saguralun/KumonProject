@@ -1,0 +1,181 @@
+{
+  "review": "stock-retry-service-additivity",
+  "status": "passed",
+  "service": "services/stockReceiveService.js#createDeliveryOrder",
+  "scope": "Actual service invoked twice with the identical synthetic WS quantity-10 request; first creates a pending DO, second appends to that same pending DO.",
+  "conclusion": "The identical service request is additive: quantity after the first call is 10 and after the second is 20. The DO remains pending; stock processing is not invoked.",
+  "limitation": "This proves repeated-service-call additivity using an in-memory SQL mock. It does NOT prove an end-to-end lost-response UI scenario, browser behavior, or real PostgreSQL execution.",
+  "isolation": {
+    "databaseModuleReplacedBeforeEvaluation": true,
+    "dbImportsIntercepted": 1,
+    "productionPoolCreated": false,
+    "realDatabaseConnections": 0,
+    "envFilesRead": false,
+    "unknownPoolSqlRejected": true,
+    "unknownClientSqlRejected": true
+  },
+  "request": {
+    "type": "ws",
+    "doNo": "SYNTHETIC-STOCK-RETRY-REVIEW",
+    "outDate": "2026-11-24",
+    "receiveDate": "2026-11-24",
+    "items": [
+      {
+        "masterId": 901,
+        "quantity": 10
+      }
+    ]
+  },
+  "invocations": [
+    {
+      "attempt": 1,
+      "quantityBefore": 0,
+      "quantityAfter": 10,
+      "isStockProcessed": false,
+      "returned": {
+        "type": "ws",
+        "doId": 701,
+        "doNo": "SYNTHETIC-STOCK-RETRY-REVIEW",
+        "appended": false
+      }
+    },
+    {
+      "attempt": 2,
+      "quantityBefore": 10,
+      "quantityAfter": 20,
+      "isStockProcessed": false,
+      "returned": {
+        "type": "ws",
+        "doId": 701,
+        "doNo": "SYNTHETIC-STOCK-RETRY-REVIEW",
+        "appended": true
+      }
+    }
+  ],
+  "quantities": [
+    10,
+    20
+  ],
+  "transactions": {
+    "commits": 2,
+    "connections": 2,
+    "releases": 2
+  },
+  "issuedSql": [
+    {
+      "invocation": 1,
+      "target": "pool.query",
+      "sql": "SELECT stock_type_code, stock_type_id FROM kumon.stock_type_master",
+      "parameters": []
+    },
+    {
+      "invocation": 1,
+      "target": "client.query",
+      "sql": "BEGIN",
+      "parameters": []
+    },
+    {
+      "invocation": 1,
+      "target": "client.query",
+      "sql": "SELECT stock_do_id, is_stock_processed FROM kumon.stock_do WHERE do_no = $1 FOR UPDATE",
+      "parameters": [
+        "SYNTHETIC-STOCK-RETRY-REVIEW"
+      ]
+    },
+    {
+      "invocation": 1,
+      "target": "client.query",
+      "sql": "\n                INSERT INTO kumon.stock_do (\n                    do_no, out_date, receive_date, receive_month, receive_year, is_stock_processed\n                )\n                VALUES ($1, $2, $3, $4, $5, FALSE)\n                RETURNING stock_do_id\n            ",
+      "parameters": [
+        "SYNTHETIC-STOCK-RETRY-REVIEW",
+        "2026-11-24",
+        "2026-11-24",
+        12,
+        2026
+      ]
+    },
+    {
+      "invocation": 1,
+      "target": "client.query",
+      "sql": "SELECT 1 FROM kumon.worksheet_master WHERE worksheet_master_id = $1",
+      "parameters": [
+        901
+      ]
+    },
+    {
+      "invocation": 1,
+      "target": "client.query",
+      "sql": "\n                UPDATE kumon.stock_receive\n                SET quantity = quantity + $1\n                WHERE stock_do_id = $2 AND stock_type_id = $3 AND master_id = $4\n            ",
+      "parameters": [
+        10,
+        701,
+        1,
+        901
+      ]
+    },
+    {
+      "invocation": 1,
+      "target": "client.query",
+      "sql": "\n                    INSERT INTO kumon.stock_receive (stock_do_id, stock_type_id, master_id, quantity)\n                    VALUES ($1, $2, $3, $4)\n                ",
+      "parameters": [
+        701,
+        1,
+        901,
+        10
+      ]
+    },
+    {
+      "invocation": 1,
+      "target": "client.query",
+      "sql": "COMMIT",
+      "parameters": []
+    },
+    {
+      "invocation": 2,
+      "target": "client.query",
+      "sql": "BEGIN",
+      "parameters": []
+    },
+    {
+      "invocation": 2,
+      "target": "client.query",
+      "sql": "SELECT stock_do_id, is_stock_processed FROM kumon.stock_do WHERE do_no = $1 FOR UPDATE",
+      "parameters": [
+        "SYNTHETIC-STOCK-RETRY-REVIEW"
+      ]
+    },
+    {
+      "invocation": 2,
+      "target": "client.query",
+      "sql": "SELECT MIN(stm.stock_type_code) AS stock_type_code\n                 FROM kumon.stock_receive r\n                 JOIN kumon.stock_type_master stm ON stm.stock_type_id = r.stock_type_id\n                 WHERE r.stock_do_id = $1",
+      "parameters": [
+        701
+      ]
+    },
+    {
+      "invocation": 2,
+      "target": "client.query",
+      "sql": "SELECT 1 FROM kumon.worksheet_master WHERE worksheet_master_id = $1",
+      "parameters": [
+        901
+      ]
+    },
+    {
+      "invocation": 2,
+      "target": "client.query",
+      "sql": "\n                UPDATE kumon.stock_receive\n                SET quantity = quantity + $1\n                WHERE stock_do_id = $2 AND stock_type_id = $3 AND master_id = $4\n            ",
+      "parameters": [
+        10,
+        701,
+        1,
+        901
+      ]
+    },
+    {
+      "invocation": 2,
+      "target": "client.query",
+      "sql": "COMMIT",
+      "parameters": []
+    }
+  ]
+}

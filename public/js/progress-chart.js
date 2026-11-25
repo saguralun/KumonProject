@@ -7,6 +7,8 @@ const els = {
   combinedLegend: document.getElementById("combinedLegend"),
   statusLine: document.getElementById("statusLine"),
   summaryCards: document.getElementById("summaryCards"),
+  assessmentSummary: document.getElementById("assessmentSummary"),
+  unassessedStudents: document.getElementById("unassessedStudents"),
   chartScroll: document.getElementById("chartScroll"),
   chartTooltip: document.getElementById("chartTooltip")
 };
@@ -144,6 +146,7 @@ function filterDataByGrades(data) {
     ...data,
     grades,
     students: data.students.filter((student) => selectedGrades.has(student.gradeClass)),
+    unplottedStudents: (data.unplottedStudents || []).filter((student) => selectedGrades.has(student.gradeClass)),
     referenceLines: data.referenceLines.map((line) => ({
       ...line,
       points: line.points.filter((_, index) => gradeIndexSet.has(index))
@@ -178,16 +181,27 @@ function renderLegends() {
   `).join("");
 }
 
+function assessmentIssue(student, data) {
+  const issues = [];
+  if (!student.gradeClass) issues.push("ยังไม่มีชั้นเรียน");
+  else if (!data.grades.includes(student.gradeClass)) issues.push(`ไม่มีเกณฑ์เทียบชั้นเรียน ${student.gradeClass} ในวิชานี้`);
+  if (!data.levels.includes(student.levelCode) || !Number.isFinite(student.levelPosition)) issues.push(`ไม่มีเลเวลนี้ในกราฟ (${student.levelCode || "ยังไม่ระบุ"})`);
+  return issues.join(" • ");
+}
+
 function renderSummary(data) {
+  const all = [...data.students, ...(data.unplottedStudents || [])];
+  const assessed = all.filter(student => !assessmentIssue(student, data));
+  const unknown = all.filter(student => assessmentIssue(student, data));
   const dist = {};
 
-  data.students.forEach((student) => {
+  assessed.forEach((student) => {
     const code = student.gradeSyncStatus?.code || "none";
 
     dist[code] = (dist[code] || 0) + 1;
   });
 
-  const onPaceOrAhead = data.students.length - (dist.none || 0);
+  const onPaceOrAhead = assessed.length - (dist.none || 0);
 
   els.summaryCards.innerHTML = `
     <div class="summary-card">
@@ -195,18 +209,23 @@ function renderSummary(data) {
       <strong>${escapeHtml(data.subjectCode)}</strong>
     </div>
     <div class="summary-card">
-      <span>เด็ก active ทั้งหมด</span>
-      <strong>${data.students.length.toLocaleString("th-TH")}</strong>
+      <span>เด็ก active ${selectedGrades?.size === dataCache[activeSubject]?.grades.length ? "ทั้งหมด" : "ตามตัวกรอง"}</span>
+      <strong>${all.length.toLocaleString("th-TH")}</strong>
     </div>
     <div class="summary-card">
       <span>ทันชั้นเรียนขึ้นไป</span>
       <strong>${onPaceOrAhead.toLocaleString("th-TH")}</strong>
+      <small>จาก ${assessed.length.toLocaleString("th-TH")} คนที่ประเมินได้</small>
     </div>
     <div class="summary-card">
       <span>เกิน 2 ปีขึ้นไป</span>
       <strong>${((dist["2Y"] || 0) + (dist["3Y"] || 0) + (dist["5Y"] || 0) + (dist["7Y"] || 0)).toLocaleString("th-TH")}</strong>
     </div>
   `;
+  els.assessmentSummary.textContent = `ประเมินได้ ${assessed.length.toLocaleString("th-TH")} จาก ${all.length.toLocaleString("th-TH")} คนที่แสดง • ยังไม่ทันชั้นเรียน ${(dist.none || 0).toLocaleString("th-TH")} คน • ข้อมูลไม่พอประเมิน ${unknown.length.toLocaleString("th-TH")} คน`;
+  els.unassessedStudents.hidden = unknown.length === 0;
+  els.unassessedStudents.innerHTML = `<summary>ข้อมูลไม่พอประเมิน ${unknown.length.toLocaleString("th-TH")} คน</summary><ul>${unknown.map(student => `<li><strong>${escapeHtml(student.name)}${student.nickname ? ` (${escapeHtml(student.nickname)})` : ""}</strong> • ${escapeHtml(data.subjectCode)} #${escapeHtml(student.enrollmentId)}<div>${escapeHtml(assessmentIssue(student, data))}</div></li>`).join("")}</ul>`;
+  return { ...data, students: assessed };
 }
 
 function buildSvg(data) {
@@ -468,9 +487,7 @@ async function renderChart({ skipFetch = false } = {}) {
 
     renderGradeFilter(data);
 
-    const filtered = filterDataByGrades(data);
-
-    renderSummary(filtered);
+    const filtered = renderSummary(filterDataByGrades(data));
 
     if (!filtered.grades.length) {
       els.chartScroll.innerHTML = `<div class="empty-state">ยังไม่ได้เลือกชั้นเรียน</div>`;
@@ -479,8 +496,8 @@ async function renderChart({ skipFetch = false } = {}) {
     }
 
     if (!filtered.students.length) {
-      els.chartScroll.innerHTML = `<div class="empty-state">ไม่มีเด็ก active ในชั้นเรียน/วิชานี้</div>`;
-      setStatus("โหลดแล้ว — ไม่มีข้อมูล");
+      els.chartScroll.innerHTML = `<div class="empty-state">${els.unassessedStudents.hidden ? "ไม่มีเด็ก active ในชั้นเรียน/วิชานี้" : "ยังไม่มีข้อมูลที่ประเมินได้ ดูเหตุผลในรายการข้อมูลไม่พอประเมิน"}</div>`;
+      setStatus("โหลดแล้ว — ไม่มีจุดที่ประเมินได้");
       return;
     }
 
@@ -491,6 +508,8 @@ async function renderChart({ skipFetch = false } = {}) {
     if (requestId !== chartRequest || cache !== dataCache || subject !== activeSubject) return;
     els.chartScroll.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.summaryCards.innerHTML = "";
+    els.assessmentSummary.textContent = "";
+    els.unassessedStudents.hidden = true;
     setStatus(error.message, "error");
   }
 }

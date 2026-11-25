@@ -1,6 +1,6 @@
 import express from "express";
 import { createSendError } from "./routeErrorHandler.js";
-import { verifyAccountLogin, verifyGuestLogin } from "../services/authService.js";
+import { verifyAccountSessionLogin, verifyGuestLogin } from "../services/authService.js";
 import { grantedPermissionsFor } from "../services/roleService.js";
 
 const router = express.Router();
@@ -9,7 +9,7 @@ const sendError = createSendError("Unexpected auth error");
 
 router.post("/login/admin", async (req, res) => {
     try {
-        const user = await verifyAccountLogin({
+        const { user, credentialVersion } = await verifyAccountSessionLogin({
             username: req.body?.username,
             password: req.body?.password
         });
@@ -20,6 +20,7 @@ router.post("/login/admin", async (req, res) => {
             }
 
             req.session.user = user;
+            req.session.accountCredentialVersion = credentialVersion;
             res.json({ success: true, user });
         });
     } catch (error) {

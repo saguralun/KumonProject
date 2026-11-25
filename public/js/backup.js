@@ -9,7 +9,9 @@ const els = {
   importConfirmText: document.getElementById("importConfirmText"),
   importSubmit: document.getElementById("importSubmit"),
   importMessage: document.getElementById("importMessage"),
-  dbNameHint: document.getElementById("dbNameHint")
+  dbNameHint: document.getElementById("dbNameHint"),
+  target: document.getElementById('backupTarget'),
+  recovery: document.getElementById('preImportRecovery')
 };
 
 const setStatus = createStatusSetter(els.statusLine);
@@ -17,6 +19,7 @@ const setStatus = createStatusSetter(els.statusLine);
 // Set once the first /api/backup/list response comes back — the import
 // confirm field is checked against this on every keystroke.
 let expectedDbName = null;
+let targetDescription = '';
 let restoring = false, backingUp = false;
 const downloading = new Set();
 
@@ -88,7 +91,7 @@ function renderBackupList(backups) {
 
 function finishDownload(filename) {
   downloading.delete(filename);
-  for (const link of els.listWrap.querySelectorAll('[data-download-filename]')) {
+  for (const link of document.querySelectorAll('[data-download-filename]')) {
     if (link.dataset.downloadFilename === filename) link.removeAttribute('aria-disabled');
   }
 }
@@ -105,7 +108,7 @@ window.addEventListener('kumon:download-state', event => {
   }
 });
 
-els.listWrap.addEventListener('click', async event => {
+async function handleDownload(event) {
   const link = event.target.closest('[data-download-filename]');
   if (!link) return;
   event.preventDefault();
@@ -134,18 +137,35 @@ els.listWrap.addEventListener('click', async event => {
   } finally {
     if (!waitingForDesktop) finishDownload(filename);
   }
-});
+}
+els.listWrap.addEventListener('click', handleDownload);
+els.recovery.addEventListener('click', handleDownload);
+
+function showRecovery(backup) {
+  els.recovery.classList.toggle('hidden', !backup?.filename);
+  if (!backup?.filename) { els.recovery.replaceChildren(); return; }
+  els.recovery.innerHTML = `<strong>ข้อมูลก่อน Restore</strong><div>${escapeHtml(backup.filename)}</div>
+    <p>ดาวน์โหลดไฟล์นี้เก็บไว้ หากต้องการกลับไปใช้ข้อมูลก่อน Restore ให้เลือกไฟล์ที่ดาวน์โหลดในช่องไฟล์ .backup ด้านบน แล้วพิมพ์ชื่อฐานข้อมูลและยืนยัน Restore ตามปกติ</p>
+    <a class="download-button" download="${escapeHtml(backup.filename)}" data-download-filename="${escapeHtml(backup.filename)}" href="/api/backup/download/${encodeURIComponent(backup.filename)}">⬇️ ดาวน์โหลดข้อมูลก่อน Restore</a>`;
+}
 
 async function loadBackups() {
   try {
     const data = await requestJson("/api/backup/list");
 
     expectedDbName = data.dbName;
+    const target = data.target;
+    targetDescription = `เครื่องแม่ ${target?.serverName || 'ที่ให้บริการหน้านี้'} • ฐานข้อมูล "${data.dbName}"`;
+    if (target?.databaseHost) targetDescription += ` ที่ ${target.databaseHost}:${target.databasePort || 5432}`;
+    els.target.textContent = targetDescription;
     els.dbNameHint.textContent = data.dbName;
     els.destinationSubtitle.textContent = `ปลายทาง: ${data.backupDir} • เก็บย้อนหลัง ${backupRetentionHint(data.backups.length)}`;
     renderBackupList(data.backups);
     validateImportForm();
   } catch (error) {
+    expectedDbName = null;
+    els.target.textContent = 'ตรวจเครื่องแม่และฐานข้อมูลปลายทางไม่สำเร็จ กรุณาโหลดหน้าใหม่ก่อน Restore';
+    validateImportForm();
     els.listWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.destinationSubtitle.textContent = "โหลดข้อมูลไม่สำเร็จ";
   }
@@ -202,12 +222,13 @@ els.importForm.addEventListener("submit", async (event) => {
   }
 
   const dbName = expectedDbName;
+  const target = targetDescription;
   const confirmed = await confirmAction(
-    `ยืนยัน restore ทับข้อมูลปัจจุบันในฐาน "${expectedDbName}" ด้วยไฟล์ "${file.name}" ใช่ไหม?\n\n` +
+    `ยืนยัน Restore บน${target} ด้วยไฟล์ "${file.name}" ใช่ไหม?\nมีผลต่อทุกเครื่องที่เชื่อมเครื่องแม่นี้\n\n` +
     `ระบบจะสำรองข้อมูลปัจจุบันไว้ก่อนเสมอ แต่หลังจากนี้ข้อมูลที่เห็นอยู่ตอนนี้จะถูกแทนที่ทันที`
   );
 
-  if (!confirmed || restoring || backingUp || expectedDbName !== dbName) {
+  if (!confirmed || restoring || backingUp || expectedDbName !== dbName || targetDescription !== target) {
     return;
   }
 
@@ -216,6 +237,7 @@ els.importForm.addEventListener("submit", async (event) => {
   els.importFile.disabled = els.importConfirmText.disabled = els.runBackupButton.disabled = true;
   els.importSubmit.textContent = "⏳ กำลัง restore...";
   setImportMessage("");
+  showRecovery(null);
 
   try {
     const response = await fetch(
@@ -229,7 +251,9 @@ els.importForm.addEventListener("submit", async (event) => {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok || data.success === false) {
-      throw new Error(data.error || "Restore ไม่สำเร็จ");
+      const error = new Error(data.error || 'Restore ไม่สำเร็จ');
+      error.preImportBackup = data.preImportBackup;
+      throw error;
     }
 
     setImportMessage(
@@ -237,11 +261,14 @@ els.importForm.addEventListener("submit", async (event) => {
       true
     );
     setStatus("Restore สำเร็จ");
+    showRecovery(data.preImportBackup);
     els.importForm.reset();
     await loadBackups();
   } catch (error) {
     setImportMessage(error.message);
     setStatus(error.message, "error");
+    showRecovery(error.preImportBackup);
+    await loadBackups();
   } finally {
     restoring = false;
     els.importFile.disabled = els.importConfirmText.disabled = els.runBackupButton.disabled = false;

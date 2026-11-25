@@ -21,6 +21,9 @@
   const actions = document.querySelector(".preview-actions");
   const desktopParent = actions ? actions.parentElement : null;
   const tabletSlot = document.getElementById("stripActionsSlot");
+  const hint = document.getElementById('saveHint');
+  const hintAnchor = hint ? document.createComment('save-hint-desktop') : null;
+  if (hint) hint.before(hintAnchor);
 
   if (!actions || !desktopParent || !tabletSlot) {
     return;
@@ -33,6 +36,10 @@
 
     if (actions.parentElement !== target) {
       target.appendChild(actions);
+    }
+    if (hint) {
+      if (mql.matches) tabletSlot.appendChild(hint);
+      else hintAnchor.after(hint);
     }
   }
 

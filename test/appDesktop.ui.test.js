@@ -53,7 +53,7 @@ test('One main window supports login, regular pages, the controlled KSIS view, i
             await main.locator('#authLogoutButton').click(); await main.waitForURL('**/login.html');
         };
         await main.locator('#adminForm').waitFor();
-        assert.deepEqual(await main.evaluate(() => window.kumonDesktop.info()), { embedded: true, unified: true });
+        assert.deepEqual(await main.evaluate(() => window.kumonDesktop.info()), { embedded: true, unified: true, leaveConfirmation: true });
         await login('first'); assert.equal(await windowCount(), 1); assert.equal(context.pages().length, 1);
         assert.equal(remoteLoads, 0);
         await main.goto(`${origin}/report.html`); await main.locator('#authLogoutButton').waitFor({ state: 'attached' });

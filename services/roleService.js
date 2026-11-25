@@ -178,7 +178,7 @@ export async function deleteRole(roleCode) {
     invalidateCache();
 }
 
-export async function setRolePermissions(roleCode, permissionKeys) {
+export async function setRolePermissions(roleCode, permissionKeys, expectedPermissionKeys) {
     if (roleCode === "admin") {
         throw httpError(400, "Admin เข้าถึงได้ทุกอย่างเสมอ ไม่ต้องตั้งค่า permission");
     }
@@ -187,17 +187,25 @@ export async function setRolePermissions(roleCode, permissionKeys) {
         throw httpError(400, "Guest จำกัดสิทธิ์ไว้ตายตัว (งานประจำเท่านั้น) ให้สิทธิ์เพิ่มไม่ได้");
     }
 
-    const role = await pool.query(`SELECT role_code FROM role_master WHERE role_code = $1`, [roleCode]);
-
-    if (!role.rows[0]) {
-        throw httpError(404, "ไม่พบ role นี้");
+    const validKeys = value => Array.isArray(value) && value.every(key => typeof key === 'string' && key.length > 0);
+    if (!validKeys(permissionKeys) || (expectedPermissionKeys !== undefined && !validKeys(expectedPermissionKeys))) {
+        throw httpError(400, 'รายการสิทธิ์ไม่ถูกต้อง');
     }
-
-    const keys = Array.isArray(permissionKeys) ? [...new Set(permissionKeys.map(String))] : [];
+    const keys = [...new Set(permissionKeys)];
     const client = await pool.connect();
-
+    let releaseError;
     try {
         await client.query("BEGIN");
+        const role = await client.query(`SELECT role_code FROM role_master WHERE role_code = $1 FOR UPDATE`, [roleCode]);
+        if (!role.rows[0]) throw httpError(404, "ไม่พบ role นี้");
+        if (expectedPermissionKeys !== undefined) {
+            const current = await client.query(`SELECT permission_key FROM role_permission WHERE role_code = $1`, [roleCode]);
+            const actual = current.rows.map(row => row.permission_key).sort();
+            const expected = [...new Set(expectedPermissionKeys)].sort();
+            if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                throw httpError(409, 'สิทธิ์ถูกเปลี่ยนจากอีกเครื่องแล้ว กรุณาตรวจค่าล่าสุดก่อนบันทึกใหม่');
+            }
+        }
         await client.query(`DELETE FROM role_permission WHERE role_code = $1`, [roleCode]);
 
         if (keys.length) {
@@ -209,9 +217,14 @@ export async function setRolePermissions(roleCode, permissionKeys) {
             );
         }
 
+        const updated = await client.query(`SELECT permission_key FROM role_permission WHERE role_code = $1`, [roleCode]);
         await client.query("COMMIT");
+        invalidateCache();
+        return updated.rows.map(row => row.permission_key);
     } catch (error) {
-        await client.query("ROLLBACK");
+        try { await client.query("ROLLBACK"); } catch (rollbackError) { releaseError = rollbackError; }
+        // A lost COMMIT reply must never leave old authorization cached.
+        invalidateCache();
 
         if (error.code === "23503") {
             throw httpError(400, "มี permission key ที่ไม่รู้จักอยู่ในรายการที่ส่งมา");
@@ -219,15 +232,6 @@ export async function setRolePermissions(roleCode, permissionKeys) {
 
         throw error;
     } finally {
-        client.release();
+        client.release(releaseError);
     }
-
-    invalidateCache();
-
-    const updated = await pool.query(
-        `SELECT permission_key FROM role_permission WHERE role_code = $1`,
-        [roleCode]
-    );
-
-    return updated.rows.map((row) => row.permission_key);
 }

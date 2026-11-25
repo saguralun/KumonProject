@@ -68,6 +68,13 @@ els.typeButtons.addEventListener("click", (event) => {
 
 // ---- Pending dates list ----
 
+function physicalCutLabel(rows) {
+  if (!rows.every(row => Number.isSafeInteger(row.cutQuantity) && row.cutQuantity >= 0)) {
+    return 'ไม่ทราบจำนวนตัดจริง กรุณาตรวจรายละเอียด';
+  }
+  return `ตัดคลังจริง ${rows.reduce((sum, row) => sum + row.cutQuantity, 0)} แผ่น/ชุด`;
+}
+
 async function loadPendingDates() {
   const requestId = ++state.pendingRequest, type = state.selectedItemType;
   state.pendingLoaded = false;
@@ -88,10 +95,9 @@ async function loadPendingDates() {
       return;
     }
 
-    const totalItems = state.pendingDates.reduce((sum, row) => sum + row.itemCount, 0);
     const totalQuantity = state.pendingDates.reduce((sum, row) => sum + row.totalQuantity, 0);
 
-    els.pendingSubtitle.textContent = `${state.pendingDates.length} วัน • ${totalItems} รายการ • ${totalQuantity} แผ่น/ชุด`;
+    els.pendingSubtitle.textContent = `${state.pendingDates.length} วัน • ${totalQuantity} รายการบันทึก • ${physicalCutLabel(state.pendingDates)}`;
     els.cutAllButton.disabled = false;
   } catch (error) {
     if (requestId !== state.pendingRequest || type !== state.selectedItemType) return;
@@ -112,7 +118,8 @@ function renderPendingTable() {
         <tr>
           <th>วันที่</th>
           <th>รายการ</th>
-          <th>จำนวนที่ใช้</th>
+          <th>รายการบันทึก</th>
+          <th>ตัดคลังจริง</th>
         </tr>
       </thead>
       <tbody>
@@ -121,6 +128,7 @@ function renderPendingTable() {
             <td><strong>${escapeHtml(formatDateDisplay(row.date))}</strong></td>
             <td>${row.itemCount}</td>
             <td>${row.totalQuantity}</td>
+            <td>${Number.isSafeInteger(row.cutQuantity) && row.cutQuantity >= 0 ? row.cutQuantity : '—'}</td>
           </tr>
         `).join("")}
       </tbody>
@@ -245,7 +253,7 @@ els.cutAllButton.addEventListener("click", async () => {
   }
 
   const dates = state.pendingDates.map(row => row.date), type = state.selectedItemType;
-  if (!await confirmAction(`ตัด stock ทั้งหมด ${dates.length} วันใช่ไหม? รวม ${state.pendingDates.reduce((sum, row) => sum + row.totalQuantity, 0)} แผ่น/ชุด`)) {
+  if (!await confirmAction(`ตัด stock ทั้งหมด ${dates.length} วันใช่ไหม? รวม ${state.pendingDates.reduce((sum, row) => sum + row.totalQuantity, 0)} รายการบันทึก • ${physicalCutLabel(state.pendingDates)}`)) {
     return;
   }
 

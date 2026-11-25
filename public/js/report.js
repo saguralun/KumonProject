@@ -133,8 +133,8 @@ function renderTable() {
   els.pageTotal.textContent = `/ ${page.pages}`;
   els.previousPage.disabled = page.page <= 1 || !page.total;
   els.nextPage.disabled = page.page >= page.pages || !page.total;
-  els.pageRange.textContent = page.total ? `${page.start + 1}–${page.start + page.rows.length} จาก ${page.total} คน` : "0 คน";
-  els.resultSubtitle.textContent = state.period ? `${monthName(state.period.month)} ${state.period.year} • ${state.subject} • ${page.total} คน` : "ยังไม่มีรายงาน";
+  els.pageRange.textContent = page.total ? `${page.start + 1}–${page.start + page.rows.length} จาก ${page.total} รายวิชา` : "0 รายวิชา";
+  els.resultSubtitle.textContent = state.period ? `${monthName(state.period.month)} ${state.period.year} • ${state.subject} • ${page.total} รายวิชา` : "ยังไม่มีรายงาน";
   els.reportTableWrap.scrollTop = 0;
   renderStatus1Summary();
   fitReportRows();
@@ -200,7 +200,7 @@ function renderStatus1Summary() {
   });
 
   els.status1Summary.innerHTML = `
-    <span class="status1-summary-label">${state.subject} (${rows.length} คน):</span>
+    <span class="status1-summary-label">${state.subject} (${rows.length} รายวิชา):</span>
     ${codes.map((code) => `
       <span class="status1-chip status1-chip-${status1Group(code)}">
         <strong>${escapeHtml(code)}</strong>
@@ -334,7 +334,7 @@ async function generateLevelSummary() {
   els.levelSummaryButton.disabled = true;
   els.exportLevelSummaryButton.disabled = true;
   els.levelSummaryTables.innerHTML = '<div class="empty-state">กำลังโหลด...</div>';
-  els.levelSummarySubtitle.textContent = `${monthName(month)} ${year} • นักเรียน Active ตามเลเวลปัจจุบัน`;
+  els.levelSummarySubtitle.textContent = `${monthName(month)} ${year} • กลุ่มรายวิชาที่อยู่ในงวดนี้ ใช้สถานะ Active และเลเวลปัจจุบัน ไม่ใช่ภาพย้อนหลัง ณ สิ้นงวด`;
   setStatus("กำลังสรุปนักเรียนตามเลเวล...");
   try {
     const data = await requestJson(`/api/report/level-summary?month=${month}&year=${year}`);
@@ -342,8 +342,8 @@ async function generateLevelSummary() {
     state.levelSummary = { month, year, subjects: data.subjects };
     els.levelSummaryTables.innerHTML = data.subjects.map((subject) => `
       <table>
-        <caption>${escapeHtml(subject.subject)} • ${subject.total} คน</caption>
-        <thead><tr><th>เลเวล</th><th>นักเรียน (คน)</th></tr></thead>
+        <caption>${escapeHtml(subject.subject)} • ${subject.total} รายวิชา</caption>
+        <thead><tr><th>เลเวล</th><th>จำนวนรายวิชา</th></tr></thead>
         <tbody>${subject.rows.map((row) => `<tr><td>${escapeHtml(row.level)}</td><td>${row.count}</td></tr>`).join("")}</tbody>
         <tfoot><tr><td>รวม</td><td>${subject.total}</td></tr></tfoot>
       </table>
@@ -371,7 +371,7 @@ async function exportLevelSummary() {
       body: JSON.stringify({
         filename,
         sheetName: "นักเรียนตามเลเวล",
-        columns: ["เดือน", "ปี", "วิชา", "เลเวล", "นักเรียน (คน)"],
+        columns: ["เดือน", "ปี", "วิชา", "เลเวล", "จำนวนรายวิชา"],
         rows: summary.subjects.flatMap((subject) => [
           ...subject.rows.map((row) => [summary.month, summary.year, subject.subject, row.level, row.count]),
           [summary.month, summary.year, subject.subject, "รวม", subject.total]

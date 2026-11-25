@@ -2,6 +2,7 @@ import express from "express";
 import { createSendError } from "./routeErrorHandler.js";
 import {
     applyEnrollmentStatusAction,
+    previewEnrollmentStatusAction,
     createEnrollment,
     createStudent,
     deleteEnrollmentIfNoBilling,
@@ -218,6 +219,12 @@ router.delete("/:studentId/enrollments/:enrollmentId", requireStaff, async (req,
     } catch (error) {
         sendError(res, error);
     }
+});
+
+router.get('/:studentId/enrollments/:enrollmentId/status-preview', requireStaff, async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    try { res.json({ success: true, ...(await previewEnrollmentStatusAction(req.params.studentId, req.params.enrollmentId, req.query)) }); }
+    catch (error) { sendError(res, error); }
 });
 
 router.post("/:studentId/enrollments/:enrollmentId/status-action", requireStaff, async (req, res) => {

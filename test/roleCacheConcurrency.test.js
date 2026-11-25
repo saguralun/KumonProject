@@ -28,6 +28,8 @@ for (const seedFreshCache of [false, true]) {
         });
         t.mock.method(pool, 'connect', async () => ({
             async query(sql) {
+                if (sql.startsWith('SELECT role_code FROM role_master')) return { rows: [{ role_code: 'staff' }] };
+                if (sql.startsWith('SELECT permission_key FROM role_permission')) return { rows: grants.map(permission_key => ({ permission_key })) };
                 if (sql.startsWith('DELETE FROM role_permission')) grants = [];
                 else assert.ok(['BEGIN', 'COMMIT', 'ROLLBACK'].includes(sql), sql);
                 return { rows: [] };

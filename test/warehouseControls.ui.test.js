@@ -98,7 +98,7 @@ for (const embedded of [false, true]) {
     let fail = true, release;
     const f = await controlFixture('stock-receive', async (req, res) => {
       if (req.path === '/stock-receive/masters') {
-        res.json({ success: true, masters: { subjects: [{ subjectId: 1, subjectCode: 'ME' }], levels: [{ levelMasterId: 1, subjectId: 1, levelCode: 'A', levelType: 1 }], worksheets: [{ levelMasterId: 1, worksheetMasterId: 101, worksheetNo: 1 }], cds: [] } }); return true;
+        res.json({ success: true, retryScope: { epoch: '00000000-0000-4000-8000-000000000001', actor: 'fixture' }, masters: { subjects: [{ subjectId: 1, subjectCode: 'ME' }], levels: [{ levelMasterId: 1, subjectId: 1, levelCode: 'A', levelType: 1 }], worksheets: [{ levelMasterId: 1, worksheetMasterId: 101, worksheetNo: 1 }], cds: [] } }); return true;
       }
       if (req.path === '/stock-receive/dos' && req.method === 'POST') {
         assert.equal(req.body.doNo, 'FIXTURE-ONLY'); assert.deepEqual(req.body.items, [{ masterId: 101, quantity: 3 }]);

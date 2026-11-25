@@ -1,0 +1,496 @@
+{
+  "scenario": "Print three subjects, deselect the third, then receive payment",
+  "syntheticOnly": true,
+  "setup": {
+    "billingDate": "2026-11-24",
+    "billingMonth": 12,
+    "billingYear": 2026,
+    "periodReason": "Payment defaults to the following month after day 20."
+  },
+  "status": "completed",
+  "mismatch": true,
+  "limitations": [
+    "Observes actual browser HTTP requests against synthetic endpoints, not production persistence or physical printing.",
+    "Payment requests contain enrollment IDs, not an amount; payment net is derived from the fixture catalog (1700 THB per subject)."
+  ],
+  "catalog": [
+    {
+      "enrollmentId": 101,
+      "subjectCode": "ME",
+      "subjectName": "Synthetic ME",
+      "currentLevelCode": "A",
+      "tuitionFee": 1700,
+      "registrationFee": 0,
+      "additionalFee": 0,
+      "discountAmount": 0,
+      "netAmount": 1700
+    },
+    {
+      "enrollmentId": 102,
+      "subjectCode": "EFL",
+      "subjectName": "Synthetic EFL",
+      "currentLevelCode": "A",
+      "tuitionFee": 1700,
+      "registrationFee": 0,
+      "additionalFee": 0,
+      "discountAmount": 0,
+      "netAmount": 1700
+    },
+    {
+      "enrollmentId": 103,
+      "subjectCode": "TRP",
+      "subjectName": "Synthetic TRP",
+      "currentLevelCode": "A",
+      "tuitionFee": 1700,
+      "registrationFee": 0,
+      "additionalFee": 0,
+      "discountAmount": 0,
+      "netAmount": 1700
+    }
+  ],
+  "network": {
+    "fixtureOrigin": "http://localhost:57349",
+    "requests": [
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/api/payment/review-bootstrap.html"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/payment.html"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/css/payment.css?v=20261023-schema-prepare"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/css/app-scale.css?v=20261030-project-audit"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/css/app-menu.css?v=20261023-update-anytime"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/css/workspace-controls.css?v=20261023-page-tools"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/appDialogs.js?v=20261023-all-actions"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/authClient.js?v=20261030-code-only-update"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/payment.js?v=20261102-partial-reprint"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/appMenu.js?v=20261023-dialog-focus"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/navFlyout.js?v=20261023-static-menu"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/httpUtil.js?v=20261030-project-audit"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/htmlUtil.js?v=20260901-shared-utils"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/statusUtil.js?v=20260901-shared-utils"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/icons/lucide/menu.svg"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/api/auth/me"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/inputSelection.js"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/icons/lucide/chevron-right.svg"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/js/updateMonitor.js?v=20261023-update-anytime"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/api/payment/status?billingMonth=12&billingYear=2026&subject=ALL&status=unpaid&query=&limit=1000"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/api/payment/printer-status"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/icons/lucide/x.svg"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/api/system/update-check"
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:57349/api/payment/receipt/preview"
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:57349/api/payment/print-receipt"
+      },
+      {
+        "method": "POST",
+        "url": "http://localhost:57349/api/payment/receipt/payment"
+      },
+      {
+        "method": "GET",
+        "url": "http://localhost:57349/api/payment/status?billingMonth=12&billingYear=2026&subject=ALL&status=unpaid&query=&limit=1000"
+      }
+    ],
+    "blocked": []
+  },
+  "apiRequests": [
+    {
+      "sequence": 1,
+      "method": "GET",
+      "url": "http://localhost:57349/api/payment/review-bootstrap.html",
+      "body": null
+    },
+    {
+      "sequence": 2,
+      "method": "GET",
+      "url": "http://localhost:57349/api/payment/status?billingMonth=12&billingYear=2026&subject=ALL&status=unpaid&query=&limit=1000",
+      "body": null
+    },
+    {
+      "sequence": 3,
+      "method": "GET",
+      "url": "http://localhost:57349/api/payment/printer-status",
+      "body": null
+    },
+    {
+      "sequence": 4,
+      "method": "GET",
+      "url": "http://localhost:57349/api/system/update-check",
+      "body": null
+    },
+    {
+      "sequence": 5,
+      "method": "POST",
+      "url": "http://localhost:57349/api/payment/receipt/preview",
+      "body": {
+        "enrollmentId": 103,
+        "billingDate": "2026-11-24",
+        "billingMonth": 12,
+        "billingYear": 2026,
+        "existingBillingId": null,
+        "selectedEnrollmentIds": null
+      }
+    },
+    {
+      "sequence": 6,
+      "method": "POST",
+      "url": "http://localhost:57349/api/payment/print-receipt",
+      "body": {
+        "studentId": 900001,
+        "studentName": "Synthetic Payment Review Student",
+        "billingId": null,
+        "existingBillingId": null,
+        "alreadyPaid": false,
+        "partiallyPaid": false,
+        "sourceEnrollmentId": 103,
+        "receiptBook": 90,
+        "receiptNo": 1,
+        "billingDate": "2026-11-24",
+        "billingMonth": 12,
+        "billingYear": 2026,
+        "paymentMethodId": 1,
+        "paymentMethodName": "Cash",
+        "totalAmount": 5100,
+        "discountAmount": 0,
+        "netAmount": 5100,
+        "details": [
+          {
+            "enrollmentId": 101,
+            "subjectCode": "ME",
+            "subjectName": "Synthetic ME",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 102,
+            "subjectCode": "EFL",
+            "subjectName": "Synthetic EFL",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 103,
+            "subjectCode": "TRP",
+            "subjectName": "Synthetic TRP",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          }
+        ],
+        "receiptDetails": [
+          {
+            "enrollmentId": 101,
+            "subjectCode": "ME",
+            "subjectName": "Synthetic ME",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 102,
+            "subjectCode": "EFL",
+            "subjectName": "Synthetic EFL",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 103,
+            "subjectCode": "TRP",
+            "subjectName": "Synthetic TRP",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          }
+        ]
+      }
+    },
+    {
+      "sequence": 7,
+      "method": "POST",
+      "url": "http://localhost:57349/api/payment/receipt/payment",
+      "body": {
+        "enrollmentId": 103,
+        "billingDate": "2026-11-24",
+        "billingMonth": 12,
+        "billingYear": 2026,
+        "paymentMethodId": "1",
+        "selectedEnrollmentIds": [
+          101,
+          102
+        ]
+      }
+    },
+    {
+      "sequence": 8,
+      "method": "GET",
+      "url": "http://localhost:57349/api/payment/status?billingMonth=12&billingYear=2026&subject=ALL&status=unpaid&query=&limit=1000",
+      "body": null
+    }
+  ],
+  "previewRequests": [
+    {
+      "sequence": 5,
+      "method": "POST",
+      "url": "http://localhost:57349/api/payment/receipt/preview",
+      "body": {
+        "enrollmentId": 103,
+        "billingDate": "2026-11-24",
+        "billingMonth": 12,
+        "billingYear": 2026,
+        "existingBillingId": null,
+        "selectedEnrollmentIds": null
+      }
+    }
+  ],
+  "printRequests": [
+    {
+      "sequence": 6,
+      "method": "POST",
+      "url": "http://localhost:57349/api/payment/print-receipt",
+      "body": {
+        "studentId": 900001,
+        "studentName": "Synthetic Payment Review Student",
+        "billingId": null,
+        "existingBillingId": null,
+        "alreadyPaid": false,
+        "partiallyPaid": false,
+        "sourceEnrollmentId": 103,
+        "receiptBook": 90,
+        "receiptNo": 1,
+        "billingDate": "2026-11-24",
+        "billingMonth": 12,
+        "billingYear": 2026,
+        "paymentMethodId": 1,
+        "paymentMethodName": "Cash",
+        "totalAmount": 5100,
+        "discountAmount": 0,
+        "netAmount": 5100,
+        "details": [
+          {
+            "enrollmentId": 101,
+            "subjectCode": "ME",
+            "subjectName": "Synthetic ME",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 102,
+            "subjectCode": "EFL",
+            "subjectName": "Synthetic EFL",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 103,
+            "subjectCode": "TRP",
+            "subjectName": "Synthetic TRP",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          }
+        ],
+        "receiptDetails": [
+          {
+            "enrollmentId": 101,
+            "subjectCode": "ME",
+            "subjectName": "Synthetic ME",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 102,
+            "subjectCode": "EFL",
+            "subjectName": "Synthetic EFL",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          },
+          {
+            "enrollmentId": 103,
+            "subjectCode": "TRP",
+            "subjectName": "Synthetic TRP",
+            "currentLevelCode": "A",
+            "tuitionFee": 1700,
+            "registrationFee": 0,
+            "additionalFee": 0,
+            "discountAmount": 0,
+            "netAmount": 1700,
+            "isPaid": false,
+            "isSelected": true
+          }
+        ]
+      }
+    }
+  ],
+  "paymentRequests": [
+    {
+      "sequence": 7,
+      "method": "POST",
+      "url": "http://localhost:57349/api/payment/receipt/payment",
+      "body": {
+        "enrollmentId": 103,
+        "billingDate": "2026-11-24",
+        "billingMonth": 12,
+        "billingYear": 2026,
+        "paymentMethodId": "1",
+        "selectedEnrollmentIds": [
+          101,
+          102
+        ]
+      }
+    }
+  ],
+  "ui": {
+    "beforePrint": "Net\n5,100.00 บาท",
+    "afterDeselect": "Net\n3,400.00 บาท",
+    "printDisabledAfterDeselect": true,
+    "confirmation": "รับเงินและบันทึกใบเสร็จนี้ใช่ไหม?\nนักเรียน: Synthetic Payment Review Student\nค่าเรียน: ธันวาคม 2026\nจำนวนวิชา: 2\nยอดสุทธิ: 3,400.00\nวิธีจ่าย:\nCash\n"
+  },
+  "comparison": {
+    "printedIds": [
+      101,
+      102,
+      103
+    ],
+    "paymentIds": [
+      101,
+      102
+    ],
+    "printedNet": 5100,
+    "paymentNetFromCatalog": 3400,
+    "sameSubjects": false,
+    "sameNet": false
+  },
+  "fixtureErrors": [],
+  "generatedAt": "2026-11-24T01:20:52.305Z"
+}

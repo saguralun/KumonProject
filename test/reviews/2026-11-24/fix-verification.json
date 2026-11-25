@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-24",
+  "kind": "synthetic-regression-verification-after-review-fixes",
+  "baseCommit": "6afa0847489b23cfc0b524cf478e15771f4402f5",
+  "uncommittedWorkingTree": true,
+  "productionOperations": false,
+  "productionSchemaChanges": false,
+  "realKsisAuthenticationTested": false,
+  "devices": {
+    "pcPercent": 99,
+    "tabletPercent": 1,
+    "smartphoneDesignInScope": false
+  },
+  "runs": {
+    "services": {
+      "log": "logs/regression-unit-20261124.log",
+      "sha256": "2e9d571886660c4af4c6a3c6288c8e3471794e6687a677ad3e2c45bcf92eba26",
+      "tests": 329,
+      "passed": 325,
+      "failed": 0,
+      "skipped": 4,
+      "cancelled": 0
+    },
+    "database": {
+      "log": "logs/regression-database-final-20261124.log",
+      "sha256": "555bc3a9099d4866dc4f5e0df92e4fe6265b22bf3a3d6d05465488bca1f7b2ee",
+      "tests": 41,
+      "passed": 41,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "remainingUi": {
+      "log": "logs/regression-ui-20261124.log",
+      "sha256": "1abd34ac7adc3dd6f17255a17d89626ae08e1668d764c53027e957c7b519a622",
+      "tests": 179,
+      "passed": 179,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "paymentUi": {
+      "passed": 28,
+      "failed": 0,
+      "source": "parent terminal run of five payment UI files"
+    },
+    "worksheetNewUi": {
+      "passed": 8,
+      "failed": 0,
+      "source": "WS worker final result, worksheetAuditRecovery.ui.test.js"
+    },
+    "adminCli": {
+      "passed": 3,
+      "failed": 0,
+      "source": "parent terminal run authCreateAdminCli.test.js"
+    }
+  },
+  "totals": {
+    "passed": 584,
+    "failed": 0,
+    "cancelled": 0,
+    "skipped": 4,
+    "uiPassed": 215
+  },
+  "code": {
+    "public/js/payment.js": "f1bb2f7574a2868c51d3e9927d91a096fc417701df27b4dfd1238250d5a23831",
+    "public/js/receiptSnapshot.js": "4099efb05a247b639dd0c2158d00f02da2807b5af01b8d5954e67b2f1bd8d807",
+    "public/payment.html": "2d224330be268e8c0f73c1f4ed9733b41c7b121c42921c266ccb05949738fb0c",
+    "services/paymentService.js": "7f757434c61812025671f21e4aad34f4c636a78a02c172f74dee63c795eca5a1",
+    "services/stockReceiveService.js": "e987e8358be43f3ce153089f4010f0e3a46e1f8edab9d9ae1810e9b229fceb0f",
+    "services/stockReceiveRetry.js": "c3f105b6adc44c6ea7e9a70ff6f2590d3446c9b322dd29d863612e5cf6b2a551",
+    "routes/stockReceiveRoutes.js": "e3654c11b9d8c5dce489156a2bd2e53ae213f86f0f9b949f83482a715383a28d",
+    "public/js/stock-receive.js": "b328689f61b98bddedb1d77436ecda6148883662dfd8a3efb8e8a334e6be4e02",
+    "services/authService.js": "a93c41e367b67846b90f927ba0e6d279bb6b726c3eb4d09838e61c6f2db18199",
+    "services/accountSession.js": "45e91166b9990bd2f384a2501b071e0eba6e55815f96a104665b35fb535c01bc",
+    "middleware/auth.js": "c5b2f6f498b250fd2c5265f9be679f90eeb22eba28792489d3b20e2170dc232e",
+    "routes/authRoutes.js": "5f939d75e0d50505409f00ffd7ac606046d7cdb82c6d1790b22f2503f7b0aee6",
+    "public/users.html": "54758d6ec1f3b219ac5006cc2cff67e16fb7821083c3c9e8641297c6a2eb4551",
+    "public/js/worksheet/worksheet.js": "a390384d0d326c1e4fc40fcf8b6d3a5268aa08ad62a45f34c9eddbb635dd09f6",
+    "public/js/worksheet/worksheetInput.js": "6ef8ab6bdbe67dccab68add3777683fba63773c5929534c3da70855c16a03b95",
+    "public/js/worksheet/worksheetPreview.js": "8ba827e002f09a5a55190d90a26955052161bd124fff69ca24f5f1e1d6227316",
+    "public/js/worksheet/worksheetSearch.js": "caba51357a740538207da1f60113993b5e66dd0babc821608d3422c8883e23d9",
+    "services/ksisAtEntry.js": "d77a77c9846e990d9a04dc7400b19d60073f1e26608b25741babab4d89e99d9f",
+    "public/js/ksisAt.js": "f3ad790a1f6dad95f2e90000a2de21c6e7a40812567a70652b92d3ddd297dcd5"
+  },
+  "limitations": [
+    "Synthetic browser/Electron fixtures; no physical printer, real financial operation or real KSIS write.",
+    "Database tests use a verified disposable PostgreSQL cluster.",
+    "Four Windows restart-helper tests remain opt-in; real application was not restarted.",
+    "DO commit/journal crash window blocks automatic replay for manual reconciliation; journal must stay paired with its database.",
+    "Counts do not prove every possible button/data/state combination."
+  ]
+}

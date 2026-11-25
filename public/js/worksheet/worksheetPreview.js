@@ -15,6 +15,7 @@ import {
     escapeHtml,
     formatDateDisplay,
     moveWorksheetNo,
+    optionalWorksheetReady,
     requiredMainReady,
     selectedPattern,
     worksheetInputCount
@@ -302,7 +303,8 @@ function buildInputValues({
     const values = [firstValue || ""];
 
     if (count === 2) {
-        values.push(previousValues?.[1] ?? nextDefaultNo(firstValue, options));
+        const secondFallback = kind === "zun" && !firstValue ? "" : nextDefaultNo(firstValue, options);
+        values.push(previousValues?.[1] ?? secondFallback);
     }
 
     return values;
@@ -536,6 +538,7 @@ export function updatePreview() {
     const cdRequirement = currentCdRequirement();
     const cdReady = !cdRequirement || cdRequirement.hasReceived;
     const mainReady = requiredMainReady(pattern, mainWorksheetNos);
+    const zunReady = optionalWorksheetReady(pattern, zunWorksheetNos);
     const canSave = Boolean(
         state.context
         && !state.isSaving
@@ -543,20 +546,35 @@ export function updatePreview() {
         && !isHistoryEditPending()
         && els.receiveDate.value
         && mainReady
+        && zunReady
         && cdReady
     );
 
-    els.previewCount.textContent = `${records.length} records`;
+    els.previewCount.textContent = `${records.length} รายการ`;
     els.saveButton.disabled = !canSave;
+    const saveReason = !state.context ? 'เลือกเด็กเพื่อเริ่มกรอก WS'
+        : state.isSaving ? 'กำลังบันทึก WS กรุณารอผล'
+        : state.isLoadingContext ? 'กำลังโหลดข้อมูลเด็ก กรุณารอสักครู่'
+        : isHistoryEditPending() ? 'กำลังบันทึกการแก้ประวัติ WS กรุณารอผล'
+        : !els.receiveDate.value ? 'เลือกวันที่รับก่อนบันทึก'
+        : !mainReady ? 'เลือก Main WS ให้ครบก่อนบันทึก'
+        : !zunReady ? 'เลือก Zun ให้ครบ 2 ช่อง หรือเว้นว่างทั้งคู่'
+        : !cdReady ? 'รับ CD ก่อนบันทึก WS'
+        : `พร้อมบันทึก ${records.length} รายการ`;
+    els.saveHint.textContent = saveReason;
+    els.saveHint.dataset.ready = String(canSave);
+    els.saveButton.title = saveReason;
 
     if (!state.context) {
         setStatus("พร้อมใช้งาน");
     } else if (state.isSaving) {
         setStatus("กำลังบันทึก WS...");
     } else if (!els.receiveDate.value) {
-        setStatus("กรุณาเลือก Receive Date", "error");
+        setStatus("กรุณาเลือกวันที่รับ (Receive Date)", "error");
     } else if (!mainReady) {
         setStatus("กรุณาเลือก WS ก่อนบันทึก", "error");
+    } else if (!zunReady) {
+        setStatus("Zun วันละ 20 แผ่นต้องเลือกให้ครบ 2 ช่อง หรือเว้นว่างทั้งคู่", "error");
     } else if (!cdReady) {
         setStatus("กรุณารับ CD ก่อนบันทึก WS", "error");
     } else {
@@ -674,6 +692,10 @@ function setActionButton(button, icon, text) {
 
 export function updateSecondaryActions() {
     const context = state.context;
+    const latestAt = context?.completionState?.latestAtCompletion;
+    els.editLastAtButton.classList.toggle('hidden', !latestAt);
+    els.editLastAtButton.disabled = !latestAt || state.isLoadingContext || state.isSaving || state.isCompletingLevel || state.isCompletingZun || isHistoryEditPending();
+    els.editLastAtButton.title = latestAt ? `แก้ผลสอบ ${latestAt.levelCode} วันที่ ${formatDateDisplay(latestAt.atDate)} โดยไม่เลื่อนระดับซ้ำ` : '';
 
     if (!context) {
         els.completeWsLevel.disabled = true;
@@ -719,7 +741,8 @@ export function updateSecondaryActions() {
     els.completeZunLevel.classList.toggle("hidden", !canUseZunButton);
     setActionButton(els.completeZunLevel, "🎯", "จบ Zun");
 
-    const cdRequirement = currentCdRequirement();
+    const cdRequirements = currentCdRequirements();
+    const cdRequirement = cdRequirements.find(item => !item.hasReceived) || cdRequirements[0] || null;
     const shouldShowCdButton = Boolean(cdRequirement && !cdRequirement.hasReceived);
 
     // Always visible once a student's loaded (was hidden entirely when
@@ -737,7 +760,9 @@ export function updateSecondaryActions() {
         els.receiveCd,
         "💿",
         cdRequirement
-            ? (cdRequirement.hasReceived ? `CD ${cdRequirement.cdNo} ${cdRequirement.cpcd ? "รับแล้ว" : "ไม่รับ"}` : `รับ CD ${cdRequirement.cdNo}`)
+            ? (cdRequirement.hasReceived
+                ? cdRequirements.map(item => `CD ${item.cdNo} ${item.cpcd ? "รับแล้ว" : "ไม่รับ"}`).join(" • ")
+                : `รับ CD ${cdRequirement.cdNo}`)
             : "ไม่ต้องใช้ CD"
     );
 }
@@ -776,58 +801,49 @@ function cdNoForThaiLevel({
     return null;
 }
 
-function requiredCdNoForCurrentInput() {
+function requiredCdNosForCurrentInput() {
     if (!state.context) {
-        return null;
+        return [];
     }
 
     const enrollment = state.context.enrollment;
     const subjectCode = String(enrollment.subjectCode || "").toUpperCase();
 
     if (subjectCode === "EFL") {
-        return 1;
+        return [1];
     }
 
     if (subjectCode !== "TRP") {
-        return null;
+        return [];
     }
 
-    const firstMainNo = readWorksheetNos("main")[0];
-
-    return cdNoForThaiLevel({
+    return [...new Set(readWorksheetNos("main").map(worksheetNo => cdNoForThaiLevel({
         levelCode: enrollment.currentLevelCode,
-        worksheetNo: firstMainNo
+        worksheetNo
+    })).filter(Boolean))];
+}
+
+export function currentCdRequirements() {
+    const requiredCdNos = requiredCdNosForCurrentInput();
+    const cdState = state.context?.cdState;
+    if (!requiredCdNos.length || !cdState?.availableCds?.length) return [];
+    const receivedIds = new Set(
+        (cdState.receivedCdMasterIds || []).map(Number)
+    );
+    return requiredCdNos.flatMap(cdNo => {
+        const master = cdState.availableCds.find(item => Number(item.cdNo) === Number(cdNo));
+        // Keep the existing behavior when this center has no matching CD master.
+        if (!master) return [];
+        const record = (cdState.receivedCds || []).find(item => Number(item.cdMasterId) === Number(master.cdMasterId));
+        return [{ cdMasterId: master.cdMasterId, cdNo: master.cdNo,
+            hasReceived: receivedIds.has(Number(master.cdMasterId)), cpcd: record?.cpcd ?? null }];
     });
 }
 
+// Callers act on one explicit decision at a time; never skip another pending CD.
 export function currentCdRequirement() {
-    const requiredCdNo = requiredCdNoForCurrentInput();
-
-    if (!requiredCdNo || !state.context?.cdState?.availableCds?.length) {
-        return null;
-    }
-
-    const cdMaster = state.context.cdState.availableCds.find((item) =>
-        Number(item.cdNo) === Number(requiredCdNo)
-    );
-
-    if (!cdMaster) {
-        return null;
-    }
-
-    const receivedIds = new Set(
-        (state.context.cdState.receivedCdMasterIds || []).map(Number)
-    );
-    const receivedRecord = (state.context.cdState.receivedCds || []).find((item) =>
-        Number(item.cdMasterId) === Number(cdMaster.cdMasterId)
-    );
-
-    return {
-        cdMasterId: cdMaster.cdMasterId,
-        cdNo: cdMaster.cdNo,
-        hasReceived: receivedIds.has(Number(cdMaster.cdMasterId)),
-        cpcd: receivedRecord?.cpcd ?? null
-    };
+    const requirements = currentCdRequirements();
+    return requirements.find(item => !item.hasReceived) || requirements[0] || null;
 }
 
 function monthName(month) {
@@ -926,11 +942,13 @@ export async function receiveCd() {
 
         updateSecondaryActions();
         updatePreview();
+        const remainingCdNos = currentCdRequirements().filter(item => !item.hasReceived).map(item => item.cdNo);
         setStatus(
-            result.inserted
+            (result.inserted
                 ? `บันทึก CD ${result.cdNo} (${result.cpcd ? "รับ CD" : "ไม่รับ CD"}) แล้ว`
-                : `CD ${result.cdNo} เคยบันทึกแล้ว`,
-            "success"
+                : `CD ${result.cdNo} เคยบันทึกแล้ว`)
+                + (remainingCdNos.length ? ` • ยังต้องรับหรือยืนยันไม่รับ CD ${remainingCdNos.join(', ')}` : ''),
+            remainingCdNos.length ? "neutral" : "success"
         );
     } catch (error) {
         if (state.context === context) setStatus(error.message, "error");

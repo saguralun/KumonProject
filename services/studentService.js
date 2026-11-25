@@ -1,9 +1,11 @@
+import { normalizeDate, assertIsoDate as requiredDate } from "./dateHelpers.js";
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
 import { normalizeKumonStudentId } from "./kumonStudentId.js";
 import { specialStatusForStartDate, canCorrectEnrollmentDateStatus } from '../public/js/enrollmentDateStatus.js';
 import { waitForSpecialStatusPreparation } from './specialStatusCatalogService.js';
+import { createHash } from 'node:crypto';
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
@@ -38,21 +40,6 @@ async function hasOpeningScheduleActiveColumn() {
     `, [TABLE_SCHEMA]);
 
     return result.rows.length > 0;
-}
-
-function normalizeDate(value) {
-    if (value instanceof Date) {
-        const year = value.getFullYear();
-        const month = String(value.getMonth() + 1).padStart(2, "0");
-        const day = String(value.getDate()).padStart(2, "0");
-        return `${year}-${month}-${day}`;
-    }
-
-    if (typeof value === "string") {
-        return value.slice(0, 10);
-    }
-
-    return "";
 }
 
 function nullableText(value) {
@@ -130,16 +117,6 @@ function optionalPositiveInt(value) {
 
     const numberValue = Number(value);
     return Number.isInteger(numberValue) && numberValue > 0 ? numberValue : null;
-}
-
-function requiredDate(value, label) {
-    const dateText = normalizeDate(value);
-
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
-        throw httpError(400, `${label} ไม่ถูกต้อง`);
-    }
-
-    return dateText;
 }
 
 function kumonPeriodFromDate(dateText) {
@@ -952,6 +929,15 @@ export async function updateStudent(studentId, payload) {
         throw httpError(400, "กรุณากรอกชื่อและนามสกุล");
     }
 
+    if (data.birthDate && data.birthDate > normalizeDate(new Date())) {
+        const current = await pool.query(`SELECT birth_date FROM ${TABLE_SCHEMA}.student WHERE student_id = $1`, [normalizedStudentId]);
+        if (!current.rows[0]) throw httpError(404, "ไม่พบ student");
+        // Existing legacy values must not block unrelated profile corrections.
+        if (normalizeDate(current.rows[0].birth_date) !== data.birthDate) {
+            throw httpError(400, "วันเกิดต้องไม่เป็นวันที่ในอนาคต กรุณาตรวจปี ค.ศ.");
+        }
+    }
+
     const result = await pool.query(`
         UPDATE ${TABLE_SCHEMA}.student
         SET
@@ -1350,7 +1336,7 @@ async function insertEnrollmentStatusIfMissing(client, {
     return Boolean(result.rows[0]);
 }
 
-async function lockEnrollmentForAction(client, studentId, enrollmentId) {
+async function lockEnrollmentForAction(client, studentId, enrollmentId, { lock = true } = {}) {
     const result = await client.query(`
         SELECT
             e.*,
@@ -1372,7 +1358,7 @@ async function lockEnrollmentForAction(client, studentId, enrollmentId) {
             ON level.level_master_id = e.current_level_master_id
         WHERE e.student_id = $1
           AND e.enrollment_id = $2
-        FOR UPDATE
+        ${lock ? 'FOR UPDATE' : ''}
     `, [studentId, enrollmentId]);
 
     if (!result.rows[0]) {
@@ -1397,6 +1383,51 @@ async function hasOtherActiveEnrollment(client, studentId, enrollmentId) {
     return Boolean(result.rows[0]);
 }
 
+async function enrollmentStatusPlan(client, studentId, enrollmentId, payload, enrollment) {
+    const action = String(payload.action || '').trim();
+    let statusCode, period, latestPeriod = null, missedMonths = null, resumeDate = null;
+    let halfMonth = false, changesStartDate = false, periodSource;
+    if (action === 'absent' || action === 'outgoingTransfer') {
+        statusCode = action === 'absent' ? 'A' : 'OT';
+        latestPeriod = await latestBillingPeriodForEnrollment(client, enrollmentId);
+        period = latestPeriod ? nextPeriod(latestPeriod) : currentKumonPeriod();
+        periodSource = latestPeriod ? 'next_billing' : 'current';
+    } else if (action === 'resume') {
+        resumeDate = requiredDate(payload.resumeDate, 'วันที่กลับมาเรียน');
+        period = kumonPeriodFromDate(resumeDate);
+        latestPeriod = await latestBillingPeriodForEnrollment(client, enrollmentId);
+        missedMonths = latestPeriod ? Math.max(0, monthIndex(period) - monthIndex(latestPeriod) - 1) : 0;
+        statusCode = missedMonths <= 3 ? 'R'
+            : (await hasOtherActiveEnrollment(client, studentId, enrollmentId) ? 'EO' : 'N');
+        halfMonth = isHalfMonthDate(resumeDate);
+        changesStartDate = ['N', 'EO'].includes(statusCode);
+        periodSource = 'resume_date';
+    } else if (action === 'completer') {
+        if (!isCompleterLevel(enrollment.subject_code, enrollment.current_level_code) || enrollment.has_passed_current_level_at !== true) {
+            throw httpError(400, 'Completer ใช้ได้เฉพาะ ME/EFL level O หรือ TRP level III ที่สอบ AT ผ่านแล้ว');
+        }
+        statusCode = 'CP'; period = currentKumonPeriod(); periodSource = 'current';
+    } else throw httpError(400, 'Action ไม่ถูกต้อง');
+    const plan = { studentId, enrollmentId, action, statusCode, period, periodSource, latestPeriod, missedMonths, resumeDate,
+        halfMonth, changesStartDate, startDate: changesStartDate ? resumeDate : normalizeDate(enrollment.en_start_date),
+        currentStatusId: enrollment.current_status_group1_id ?? null, currentSpecialStatusId: enrollment.current_status_group2_id ?? null };
+    return { ...plan, fingerprint: createHash('sha256').update(JSON.stringify(plan)).digest('hex') };
+}
+
+export async function previewEnrollmentStatusAction(studentId, enrollmentId, payload = {}) {
+    const normalizedStudentId = requiredInt(studentId, 'Student ID');
+    const normalizedEnrollmentId = requiredInt(enrollmentId, 'Enrollment ID');
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+        const enrollment = await lockEnrollmentForAction(client, normalizedStudentId, normalizedEnrollmentId, { lock: false });
+        const preview = await enrollmentStatusPlan(client, normalizedStudentId, normalizedEnrollmentId, payload, enrollment);
+        await client.query('COMMIT');
+        return { preview };
+    } catch (error) { await client.query('ROLLBACK'); throw error; }
+    finally { client.release(); }
+}
+
 export async function applyEnrollmentStatusAction(studentId, enrollmentId, payload = {}) {
     const normalizedStudentId = requiredInt(studentId, "Student ID");
     const normalizedEnrollmentId = requiredInt(enrollmentId, "Enrollment ID");
@@ -1410,6 +1441,10 @@ export async function applyEnrollmentStatusAction(studentId, enrollmentId, paylo
             normalizedStudentId,
             normalizedEnrollmentId
         );
+        const plan = await enrollmentStatusPlan(client, normalizedStudentId, normalizedEnrollmentId, payload, enrollment);
+        if (payload.expectedPlan && payload.expectedPlan !== plan.fingerprint) {
+            throw httpError(409, 'ข้อมูลสำหรับเปลี่ยนสถานะเปลี่ยนแล้ว กรุณาตรวจสรุปใหม่ก่อนยืนยัน');
+        }
         let statusCode = null;
         let period = null;
         let message = "";
@@ -1417,9 +1452,7 @@ export async function applyEnrollmentStatusAction(studentId, enrollmentId, paylo
 
         if (action === "absent" || action === "outgoingTransfer") {
             statusCode = action === "absent" ? "A" : "OT";
-            const latestPeriod = await latestBillingPeriodForEnrollment(client, normalizedEnrollmentId);
-
-            period = latestPeriod ? nextPeriod(latestPeriod) : currentKumonPeriod();
+            period = plan.period;
             const statusId = await statusIdByCode(client, statusCode);
 
             await client.query(`
@@ -1436,20 +1469,11 @@ export async function applyEnrollmentStatusAction(studentId, enrollmentId, paylo
             });
             message = `${statusCode} แล้ว: ลง enrollment status เดือน ${period.month}/${period.year}${insertedStatus ? "" : " (มีรายการนี้อยู่แล้ว)"}`;
         } else if (action === "resume") {
-            const resumeDate = requiredDate(payload.resumeDate, "วันที่กลับมาเรียน");
-            const resumePeriod = kumonPeriodFromDate(resumeDate);
-            const latestPeriod = await latestBillingPeriodForEnrollment(client, normalizedEnrollmentId);
-            const missedMonths = latestPeriod
-                ? Math.max(0, monthIndex(resumePeriod) - monthIndex(latestPeriod) - 1)
-                : 0;
-            const resumeStatusCode = missedMonths <= 3
-                ? "R"
-                : (await hasOtherActiveEnrollment(client, normalizedStudentId, normalizedEnrollmentId) ? "EO" : "N");
+            const { resumeDate, period: resumePeriod, missedMonths, statusCode: resumeStatusCode, changesStartDate: shouldUpdateStartDate } = plan;
             const statusId = await statusIdByCode(client, resumeStatusCode);
-            const halfMonthStatusId = isHalfMonthDate(resumeDate)
+            const halfMonthStatusId = plan.halfMonth
                 ? await statusIdByCode(client, "H", 2)
                 : null;
-            const shouldUpdateStartDate = ["N", "EO"].includes(resumeStatusCode);
 
             await client.query(`
                 UPDATE ${TABLE_SCHEMA}.enrollment
@@ -1469,13 +1493,8 @@ export async function applyEnrollmentStatusAction(studentId, enrollmentId, paylo
             ]);
             message = `Resume แล้ว: status ${resumeStatusCode}, เดือนคิดเงิน ${resumePeriod.month}/${resumePeriod.year}, หยุด ${missedMonths} เดือน${halfMonthStatusId ? ", Half Month" : ""}${shouldUpdateStartDate ? ", อัปเดต start date" : ""}`;
         } else if (action === "completer") {
-            if (!isCompleterLevel(enrollment.subject_code, enrollment.current_level_code)
-                || enrollment.has_passed_current_level_at !== true) {
-                throw httpError(400, "Completer ใช้ได้เฉพาะ ME/EFL level O หรือ TRP level III ที่สอบ AT ผ่านแล้ว");
-            }
-
             statusCode = "CP";
-            period = currentKumonPeriod();
+            period = plan.period;
             const statusId = await statusIdByCode(client, statusCode);
 
             await client.query(`

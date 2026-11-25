@@ -13,6 +13,14 @@ import {
     readSourceRecords,
     summaryValue
 } from "./migrationImportCommon.js";
+import {
+    clean,
+    nullable,
+    lookupKey,
+    issueList,
+    issueCount,
+    validationItem
+} from "./migrationValueHelpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,27 +41,6 @@ const SOURCE_COLUMNS = [
 ];
 
 const ISSUE_SAMPLE_COUNT = 5;
-
-function clean(value) {
-    if (value === undefined || value === null) {
-        return "";
-    }
-
-    return String(value)
-        .replace(/\uFEFF/g, "")
-        .replace(/\s+/g, " ")
-        .trim();
-}
-
-function nullable(value) {
-    const text = clean(value);
-
-    return text || null;
-}
-
-function lookupKey(value) {
-    return clean(value).toLowerCase();
-}
 
 function previewKey(...parts) {
     return parts.map((part) => lookupKey(part)).join("|");
@@ -153,16 +140,6 @@ function addIssue(issueMap, value, row, message) {
             message
         });
     }
-}
-
-function issueList(issueMap) {
-    return [...issueMap.values()]
-        .sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
-}
-
-function issueCount(issueMap) {
-    return [...issueMap.values()]
-        .reduce((sum, issue) => sum + issue.count, 0);
 }
 
 function addRowError(row, issues, category, value, message) {
@@ -372,31 +349,6 @@ function finalizeRows(rows) {
     });
 }
 
-function validationItem(label, count, warningCount = 0) {
-    if (count > 0) {
-        return {
-            label,
-            status: "ERROR",
-            errors: count
-        };
-    }
-
-    if (warningCount > 0) {
-        return {
-            label,
-            status: "WARNING",
-            errors: 0,
-            warnings: warningCount
-        };
-    }
-
-    return {
-        label,
-        status: "READY",
-        errors: 0
-    };
-}
-
 const HISTORY_COLUMNS = [
     { key: "row_number", label: "#" },
     { key: "enrollment_status_id", label: "Enrollment Status ID", defaultValue: "DB default" },
@@ -467,7 +419,6 @@ export async function previewEnrollmentStatus() {
             ...row
         }));
     const skippedCount = records.length - rows.length - blockedRows;
-    const validRows = rows.length;
     const status = statusFromIssueCounts(errorTotal, warningTotal);
 
     return {

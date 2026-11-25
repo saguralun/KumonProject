@@ -59,12 +59,15 @@ for (const embedded of [false, true]) {
         }
         await page.locator(pageName === 'login' ? '#loginUpdateButton' : '#authUpdateButton').click();
         await fixture.choose(false); assert.equal(fixture.writes().length, 0);
+        await page.waitForFunction(() => !document.getElementById('appActionDialog'));
         offline = true;
         await page.clock.runFor(5 * 60000);
+        await page.locator('#updateCheckStatus[data-stale="true"]').waitFor({ state: 'attached' });
+        assert.match(await page.locator('#updateCheckMessage').innerText(), /ตรวจเวอร์ชันไม่ได้.*ตรวจสำเร็จล่าสุด/);
         assert.equal(await notice.evaluate(element => element.classList.contains('hidden')), false);
         if (pageName !== 'login') assert.equal(await page.locator('.app-menu-toggle').evaluate(element => element.classList.contains('app-menu-has-update')), true);
         offline = false; current = true;
-        await page.clock.runFor(5 * 60000);
+        await page.locator('#updateCheckRetry').click();
         await page.waitForFunction(selector => document.querySelector(selector).classList.contains('hidden'), pageName === 'login' ? '#updateBanner' : '#authUpdateButton');
         if (pageName !== 'login') {
           const toggle = page.locator('.app-menu-toggle');
@@ -78,3 +81,23 @@ for (const embedded of [false, true]) {
     }
   });
 }
+
+for (const embedded of [false, true]) test(`Offline first launch explains unknown version and retry never installs (${embedded ? 'desktop' : 'browser'})`, {
+  skip: process.env.TEST_BROWSER_UI !== '1', timeout: 30000
+}, async () => {
+  let offline = true;
+  const f = await controlFixture('login', (req, res) => {
+    if (req.path !== '/system/update-check') return false;
+    res.status(offline ? 503 : 200).json(offline ? { checked: false } : { checked: true, upToDate: false, remoteMessage: 'Fixture version' }); return true;
+  }, { embedded });
+  try {
+    const { page } = f;
+    await page.locator('#updateCheckStatus[data-stale="true"]').waitFor();
+    assert.match(await page.locator('#updateCheckMessage').innerText(), /ตรวจเวอร์ชันไม่ได้.*ยังไม่เคยตรวจสำเร็จ/);
+    await page.locator('#adminForm [name=username]').fill('synthetic-user');
+    offline = false; await page.locator('#updateCheckRetry').click();
+    await page.waitForFunction(() => document.getElementById('updateCheckStatus').dataset.stale === 'false' && !document.getElementById('updateBanner').classList.contains('hidden'));
+    assert.equal(await page.locator('#adminForm [name=username]').inputValue(), 'synthetic-user');
+    assert.equal(f.writes().length, 0); assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});

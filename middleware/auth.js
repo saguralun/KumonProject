@@ -26,7 +26,7 @@
 //                role_permission, can't be granted more.
 
 import { roleHasPermission } from "../services/roleService.js";
-import { getActiveSessionAccount } from '../services/authService.js';
+import { refreshAccountSessionData } from '../services/accountSession.js';
 
 export async function refreshAccountSession(req, res, next) {
     const user = req.session?.user;
@@ -35,8 +35,13 @@ export async function refreshAccountSession(req, res, next) {
     const requestPath = req.path.toLowerCase();
     if (requestPath !== '/' && requestPath !== '/api' && !requestPath.startsWith('/api/') && !requestPath.endsWith('.html')) return next();
     try {
-        const account = await getActiveSessionAccount(user.userId);
-        if (!account) return req.session.regenerate((error) => error ? next(error) : next());
+        const account = await refreshAccountSessionData(req.sessionID, req.session);
+        if (!account) {
+            // Deny access even when the session store cannot destroy/regenerate.
+            delete req.session.user;
+            delete req.session.accountCredentialVersion;
+            return req.session.regenerate((error) => error ? next(error) : next());
+        }
         req.session.user = account;
         next();
     } catch {

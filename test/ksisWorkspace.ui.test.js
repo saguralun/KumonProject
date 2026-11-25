@@ -253,10 +253,11 @@ test('Two isolated browser windows share AT preview, identity checks, busy locks
     } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 });
 
-test('Pending AT inspection is available without acknowledgement and displays saved evidence without enabling another fill', { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
-    const userId = 920002, input = { month: 10, year: 2026, subject: 'EFL' };
+for (const mode of ['ID', 'no ID', 'temporary ID']) test(`Pending AT inspection is available without acknowledgement and displays saved evidence without enabling another fill (${mode})`, { skip: process.env.TEST_BROWSER_UI !== '1', timeout: 20000 }, async () => {
+    const noKumonId = mode === 'no ID', byIdentity = mode !== 'ID';
+    const userId = 920002 + ['ID', 'no ID', 'temporary ID'].indexOf(mode), input = { month: 10, year: 2026, subject: 'EFL' };
     const desired = { date: '2026-10-15', level: '7A', time: 4, score: 96, group: 1, passed: true };
-    const row = { id: '10:0', key: 'guid-class-0', kumonId: '7642650000001', name: 'เด็ก ทดสอบ', subject: 'EFL', outcome: 'ready', desired };
+    const row = { id: '10:0', enrollmentId: 10, key: 'guid-class-0', kumonId: noKumonId ? '' : '7642650000001', matchMethod: byIdentity ? 'name_birth_date' : 'kumon_id', name: 'เด็ก ทดสอบ', subject: 'EFL', outcome: 'ready', desired };
     await runKsisWorkspace(userId, 'at', 'preview', input, async () => ({ previewId: 'inspect-preview', context: 'TEST Oct - 2026', page: 1, period: { month: 10, year: 2026 }, subject: 'EFL', rows: [row] }));
     await runKsisWorkspace(userId, 'at', 'fill', { previewId: 'inspect-preview' }, async () => ({ message: 'ยังไม่ยืนยันผลบันทึก', pendingDraft: true, failedId: row.id, rows: [{ ...row, outcome: 'review' }] }));
     const app = express(); app.use(express.json()); const actions = [];
@@ -264,7 +265,7 @@ test('Pending AT inspection is available without acknowledgement and displays sa
     app.get('/api/ksis/workspace', (_req, res) => res.json({ success: true, ...readKsisWorkspace(userId), connection: { pendingDraft: true, pendingWork: 'AT' } }));
     app.get('/api/ksis/desktop/status', (_req, res) => res.json({ success: true, pendingDraft: true, pendingWork: 'AT' }));
     app.post('/api/ksis/at/inspect', async (req, res) => {
-        actions.push('inspect'); assert.deepEqual(req.body, { ...input, kumonId: row.kumonId });
+        actions.push('inspect'); assert.deepEqual(req.body, { ...input, ...(byIdentity ? { enrollmentId: 10 } : { kumonId: row.kumonId }) });
         const data = await runKsisWorkspace(userId, 'at', 'inspect', req.body, async () => ({ readOnly: true, refreshed: true, dirty: false, page: 1, subject: 'EFL', name: row.name, kumonId: row.kumonId,
             comparisons: [{ desired, matches: true, persisted: true, actual: { date: { value: '15/10/2026' }, level: { value: '7A' }, time: { value: '4' }, score: { value: '96' }, group: { value: 'G1' }, passed: true } }], tests: [], lastSave: null }));
         res.json({ success: true, ...data });
@@ -282,9 +283,11 @@ test('Pending AT inspection is available without acknowledgement and displays sa
         assert.equal(await page.locator('#ksisAtFill').isDisabled(), true);
         assert.equal(readKsisWorkspace(userId).tools.at.pending, true); assert.deepEqual(actions, ['inspect']);
         await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ksis-readonly-inspection-desktop.png'), fullPage: true });
-        await page.setViewportSize({ width: 390, height: 844 });
+        // Keep the original ID-case viewport regression; new identity cases
+        // target the requested PC/tablet usage rather than smartphone layouts.
+        await page.setViewportSize(mode === 'ID' ? { width: 390, height: 844 } : { width: 1024, height: 768 });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
-        await page.screenshot({ path: path.join(os.tmpdir(), 'kumondb-ksis-readonly-inspection-mobile.png'), fullPage: true });
+        await page.screenshot({ path: path.join(os.tmpdir(), `kumondb-ksis-readonly-inspection-${mode === 'ID' ? 'mobile' : 'tablet'}.png`), fullPage: true });
         assert.deepEqual(errors, []);
     } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 });

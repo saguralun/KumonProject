@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs/promises";
 import { openSync, closeSync } from "fs";
 import { randomUUID } from "crypto";
+import os from 'node:os';
 import { httpError } from "./httpError.js";
 import { prepareUpdateWorktree } from './updateWorktreeService.js';
 
@@ -17,9 +18,10 @@ let updateCheckPending;
 let updateCheckCache;
 let updateCheckExpires = 0;
 let updateNeedsRetry = false;
+let lastUpdate = null;
 
 export function getRuntimeStatus() {
-    return { instanceId: INSTANCE_ID, processId: process.pid };
+    return { instanceId: INSTANCE_ID, processId: process.pid, serverName: os.hostname(), update: lastUpdate ? { ...lastUpdate } : null };
 }
 
 async function launchRestartHelper() {
@@ -158,18 +160,26 @@ async function readRemoteVersion() {
 
 export async function applyUpdate(steps = {}) {
     if (updateInProgress) throw httpError(409, "กำลังอัพเดทหรือ restart อยู่ กรุณารอให้โปรแกรมเปิดกลับมา");
-    const context = {};
+    const context = { attemptId: randomUUID() };
+    const status = { attemptId: context.attemptId, phase: 'updating', message: '' };
+    lastUpdate = status;
     updateInProgress = context;
     context.onRestartFailure = () => {
         if (updateInProgress === context) {
             updateNeedsRetry = true;
+            status.phase = 'failed';
+            status.message = `เปิดโปรแกรมรุ่นใหม่บนเครื่องแม่ ${os.hostname()} ไม่สำเร็จ กรุณาลองอัปเดตอีกครั้ง หากยังไม่สำเร็จให้เปิด KumonDB จากเครื่องแม่นี้`;
             updateInProgress = null;
         }
     };
     try {
-        return await performUpdate(context, steps);
+        const result = await performUpdate(context, steps);
+        if (status.phase !== 'failed') status.phase = 'restarting';
+        return result;
     } catch (error) {
         if (updateInProgress === context) updateInProgress = null;
+        status.phase = 'failed';
+        status.message = `อัปเดตบนเครื่องแม่ ${os.hostname()} ยังไม่เสร็จ กรุณาตรวจข้อความผิดพลาดแล้วลองอัปเดตอีกครั้ง`;
         if (context.fileRecovery?.backupDirectory) error.message += `\nสำรองไฟล์สร้างอัตโนมัติไว้ที่ ${context.fileRecovery.backupDirectory}`;
         throw error;
     }
@@ -217,7 +227,7 @@ export async function performUpdate(context = {}, steps = {}) {
     } catch (error) {
         throw httpError(
             500,
-            `git pull สำเร็จ (${pullOut.trim()}) แต่ npm install ไม่สำเร็จ: ${error.message} — โค้ดใหม่ถูกดึงมาแล้วแต่ dependency อาจไม่ครบ ลองรัน "npm install" ที่เครื่องนี้เอง`
+            `อัปเดตบนเครื่องแม่ ${os.hostname()} ยังไม่ครบ: ติดตั้งส่วนประกอบไม่สำเร็จ ยังไม่ได้รีสตาร์ต กรุณาตรวจการเชื่อมต่อแล้วกดอัปเดตอีกครั้ง\nรายละเอียดสำหรับผู้ดูแล: npm install — ${error.message}`
         );
     }
 
@@ -232,6 +242,7 @@ export async function performUpdate(context = {}, steps = {}) {
         restartRequired: true,
         restartScheduled: true,
         previousInstanceId: INSTANCE_ID,
+        updateAttemptId: context.attemptId,
         message: "อัพเดทสำเร็จแล้ว โปรแกรมจะ restart อัตโนมัติในอีกสักครู่"
     };
 }

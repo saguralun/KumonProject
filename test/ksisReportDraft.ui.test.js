@@ -747,11 +747,13 @@ test("Draft UI previews before fill, requires confirmation, and locks reads unti
         assert.equal(await page.locator("#ksisDraftIncludeAt").count(), 0);
         assert.equal(await page.locator("#ksisAudit").isVisible(), false);
         await page.locator("#ksisDraftPreview").click();
-        await page.locator("#ksisDraftRows table").waitFor();
+        await page.locator("#ksisDraftRows [data-ksis-group=ready] table").waitFor();
         await page.waitForFunction(() => !document.getElementById("ksisDraftFill").disabled);
         assert.doesNotMatch(await page.locator("#ksisDraftRows").innerText(), /150 นาที|Zun Zun/);
-        assert.equal(await page.locator("#ksisDraftRows th").count(), 5);
-        assert.equal(await page.locator("#ksisDraftRows tbody tr").count(), 3);
+        assert.equal(await page.locator("#ksisDraftRows [data-ksis-group=ready] th").count(), 5);
+        assert.equal(await page.locator("#ksisDraftRows [data-ksis-group=ready] tbody tr").count(), 3);
+        assert.equal(await page.locator("#ksisDraftRows [data-ksis-group=skipped] tbody tr").count(), 1);
+        assert.equal(await page.locator("#ksisDraftRows [data-ksis-group=skipped]").getAttribute('open'), null);
         assert.equal(await page.locator("#ksisDraftRows").innerText().then((value) => value.includes("เด็กสถานะ A")), false);
         assert.match(await page.locator("#ksisDraftRows tbody tr").first().innerText(), /KC/);
         assert.match(await page.locator("#ksisDraftSource").innerText(), /ข้าม A 1/);
@@ -765,7 +767,8 @@ test("Draft UI previews before fill, requires confirmation, and locks reads unti
         await page.locator("#ksisDraftConfirm").click();
         await page.waitForFunction(() => document.getElementById("ksisDraftSource").textContent.includes("กรอกแล้ว"));
         assert.equal(fills, 1);
-        assert.equal(await page.locator("#ksisDraftRows .match-state").allTextContents().then((labels) => labels.every((label) => label === "กรอกและบันทึกแล้ว")), true);
+        assert.deepEqual(await page.locator("#ksisDraftRows [data-ksis-group=ready] .match-state").allTextContents(), Array(3).fill('กรอกและบันทึกแล้ว'));
+        assert.deepEqual(await page.locator("#ksisDraftRows [data-ksis-group=skipped] .match-state").allTextContents(), ['ข้ามสถานะ A']);
         assert.match(await page.locator("#ksisDraftSource").innerText(), /1 คน \/ 3 รายวิชา/);
         assert.match(await page.locator("#ksisDraftSource").innerText(), /ข้อความตัวกรองเดิม 1 รายวิชา/);
         assert.equal(await page.locator("#ksisDraftRows .draft-result-notice").count(), 1);
@@ -784,7 +787,7 @@ test("Draft UI previews before fill, requires confirmation, and locks reads unti
         assert.match(await page.locator("#ksisDraftConfirmScope").innerText(), /บันทึกทุก 10 คน/);
         await page.locator("#ksisDraftConfirm").click();
         await page.waitForFunction(() => document.getElementById("ksisDraftSource").textContent.includes("WS used ต้องการ 8"));
-        assert.deepEqual(await page.locator("#ksisDraftRows .match-state").allTextContents(), ["กรอกแล้ว (รอตรวจการบันทึก)", "ต้องตรวจ", "ยังไม่ได้กรอก"]);
+        assert.deepEqual(await page.locator("#ksisDraftRows [data-ksis-group=ready] .match-state, #ksisDraftRows [data-ksis-group=review] .match-state").allTextContents(), ["กรอกแล้ว (รอตรวจการบันทึก)", "ต้องตรวจ", "ยังไม่ได้กรอก"]);
         assert.match(await page.locator("#ksisDraftRows .draft-result-reason:not(.draft-result-notice)").innerText(), /ต้องการ 8 แต่ KSIS แสดง 0/);
         assert.equal(await page.locator("#ksisDraftPreview").isDisabled(), true);
         await page.screenshot({ path: path.join(os.tmpdir(), "kumondb-ksis-draft-stopped-summary.png"), fullPage: true });

@@ -118,7 +118,10 @@ export async function listBackups() {
 
     backups.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    return { backups, backupDir, dbName };
+    return { backups, backupDir, dbName, target: {
+        serverName: os.hostname(), databaseHost: process.env.DB_HOST || 'localhost',
+        databasePort: Number(process.env.DB_PORT) || 5432, dbName
+    } };
 }
 
 export async function resolveDownloadPath(filename) {
@@ -176,7 +179,7 @@ export async function runBackupNow() {
 //      out to be wrong (old, from another environment, corrupt), the admin
 //      still has a way back. The import is refused outright if this step
 //      itself fails, rather than proceeding without a safety net.
-export async function importBackup(buffer, { confirmDbName } = {}) {
+export async function importBackup(buffer, { confirmDbName } = {}, steps = {}) {
     const dbName = currentDbName();
 
     if (!buffer || !buffer.length) {
@@ -190,7 +193,7 @@ export async function importBackup(buffer, { confirmDbName } = {}) {
     let preImportBackup;
 
     try {
-        preImportBackup = await runBackupNow();
+        preImportBackup = await (steps.backup || runBackupNow)();
     } catch (error) {
         throw httpError(
             500,
@@ -199,19 +202,20 @@ export async function importBackup(buffer, { confirmDbName } = {}) {
     }
 
     const tempFile = path.join(os.tmpdir(), `kumondb-import-${Date.now()}.backup`);
-    await fsp.writeFile(tempFile, buffer);
-
     try {
+        await fsp.writeFile(tempFile, buffer);
         const pgRestore = resolvePgBinary("pg_restore", "PG_RESTORE_PATH");
         const env = { ...process.env, PGPASSWORD: process.env.DB_PASSWORD || "" };
 
-        await restoreBackupFile({ executable: pgRestore, host: process.env.DB_HOST, port: process.env.DB_PORT,
+        await (steps.restore || restoreBackupFile)({ executable: pgRestore, host: process.env.DB_HOST, port: process.env.DB_PORT,
             user: process.env.DB_USER, dbName, tempFile, env });
     } catch (error) {
-        throw httpError(
+        const failure = httpError(
             500,
             `Restore ไม่สำเร็จ: ${String(error.stderr || error.message || error).trim()} — ข้อมูลก่อน import ถูกสำรองไว้ที่ไฟล์ "${preImportBackup.filename}" แล้ว ถ้าต้องกู้กลับ`
         );
+        failure.preImportBackup = preImportBackup;
+        throw failure;
     } finally {
         await fsp.unlink(tempFile).catch(() => {});
     }

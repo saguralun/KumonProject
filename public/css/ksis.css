@@ -101,3 +101,12 @@
 .ksis-embedded #ksisAuditRows td:nth-child(4)::before { content: "หน้า"; }
 .ksis-embedded #ksisAuditRows td:nth-child(5)::before { content: "WS used"; }
 .ksis-embedded #ksisAuditRows td:nth-child(6)::before { content: "ST1"; }
+/* Groups describe the existing plan; only the original fill controls write. */
+.ksis-row-group { margin: 10px 0; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; }
+.ksis-row-group > summary { padding: 10px 12px; cursor: pointer; font-weight: 700; color: #334155; background: #f1f5f9; border-radius: 7px; }
+.ksis-row-group > summary strong { margin-left: 8px; }
+.ksis-row-group[data-ksis-group="ready"] > summary { color: #065f46; background: #ecfdf5; }
+.ksis-row-group[data-ksis-group="review"] > summary { color: #92400e; background: #fffbeb; }
+.ksis-row-group[data-ksis-group="outside"] > summary { color: #1e40af; background: #eff6ff; }
+.ksis-row-group > summary:focus-visible { outline: 3px solid #93c5fd; outline-offset: 2px; }
+.ksis-row-group .matching-table { margin: 0; }

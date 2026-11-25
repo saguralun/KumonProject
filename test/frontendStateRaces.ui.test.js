@@ -39,6 +39,62 @@ async function studentFixture(handle = async () => false) {
   return f;
 }
 
+for (const fail of [false, true]) test(`CDlate return ${fail ? 'error' : 'success'} cannot replace another student's status`, ui, async () => {
+  const started = deferred(), release = deferred();
+  const f = await studentFixture(async (req, res) => {
+    if (req.path === '/students/1/history' && req.query.type === 'cd') {
+      res.json({ type: 'cd', columns: ['name'], rows: [{ name: 'Only student A', cdUsedId: 77, cpcd: true, stock: false }] }); return true;
+    }
+    if (req.path === '/students/1/history/cd/77') {
+      started.resolve(); await release.promise;
+      if (fail) res.status(503).json({ error: 'Only A CD return failed' });
+      else res.json({ success: true, stockReturned: false });
+      return true;
+    }
+    return false;
+  });
+  try {
+    await f.page.locator('[data-history="cd"]').click();
+    await f.page.locator('[data-return-cd-id="77"]').click(); await f.choose(true); await waitForSignal(started);
+    await f.page.locator('[data-student-id="2"]').click();
+    await f.page.waitForFunction(() => document.querySelector('#studentForm [name=firstName]').value === 'First2' && !document.getElementById('saveStudentButton').disabled);
+    const before = await f.page.locator('#statusLine').innerText();
+    const response = f.page.waitForResponse(r => r.url().endsWith('/students/1/history/cd/77'));
+    release.resolve(); await (await response).finished();
+    await f.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(await f.page.locator('#statusLine').innerText(), before, 'A CD result must not appear as B status');
+    assert.equal(await f.page.locator('#studentForm [name=firstName]').inputValue(), 'First2');
+    assert.deepEqual(f.writes().map(r => r.path), ['/students/1/history/cd/77']); assert.deepEqual(f.errors, []);
+  } finally { release.resolve(); await f.close(); }
+});
+
+test('StudentDOB future edits are stopped before PUT without losing typed fields', ui, async () => {
+  const f = await studentFixture();
+  try {
+    await f.page.locator('#studentForm [name=birthDate]').fill(`${new Date().getFullYear() + 5}-01-01`);
+    await f.page.locator('#studentForm [name=firstName]').fill('Keep typed name');
+    await f.page.locator('#saveStudentButton').click();
+    await f.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(f.writes().length, 0);
+    assert.match(await f.page.locator('#statusLine').innerText(), /วันเกิด.*อนาคต/);
+    assert.equal(await f.page.locator('#studentForm [name=firstName]').inputValue(), 'Keep typed name');
+    assert.equal(await f.page.locator('#saveStudentButton').isEnabled(), true); assert.deepEqual(f.errors, []);
+  } finally { await f.close(); }
+});
+
+test('StudentDT deletion confirmation discloses the child, subject and DT before any write', ui, async () => {
+  const f = await studentFixture(async (req,res) => {
+    if (req.path === '/students/1') { const data=profile(1); data.enrollments[0].canDeleteEnrollment=true; res.json(data); return true; }
+    return false;
+  });
+  try {
+    await f.page.locator('#deleteEnrollmentButton').click();
+    const message=await f.page.locator('#appActionDialog').innerText();
+    assert.match(message,/DT/); assert.match(message,/First1/); assert.match(message,/ME/); assert.match(message,/10/);
+    await f.choose(false); assert.equal(f.writes().length,0); assert.deepEqual(f.errors,[]);
+  } finally { await f.close(); }
+});
+
 for (const kind of ['student', 'enrollment']) test(`Student ${kind} save locks selection, rejects duplicate submit, and preserves failed input for retry`, ui, async () => {
   const started = deferred(), release = deferred(); let fail = true;
   const endpoint = kind === 'student' ? '/students/1' : '/students/1/enrollments/10';
@@ -370,7 +426,7 @@ test('WS save sends the captured main and explicit nullable Zun context and pres
   } finally { await f.close(); }
 });
 
-test('WS date edit failure retains its original date and can be retried successfully in the same context', ui, async () => {
+test('WS date edit failure retains its draft date and can be retried successfully in the same context', ui, async () => {
   let fail = true, savedDate = '2026-10-10';
   const f = await controlFixture('worksheet', async (req, res) => {
     if (req.path.endsWith('/context')) { res.json(wsContext(1)); return true; }
@@ -390,7 +446,7 @@ test('WS date edit failure retains its original date and can be retried successf
     const input = page.locator('[data-edit-history-date-id="10"]');
     await input.fill('2026-10-11'); await input.press('Enter');
     await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('Fixture date rejected'));
-    assert.equal(await input.isEnabled(), true); assert.equal(await input.inputValue(), '2026-10-10');
+    assert.equal(await input.isEnabled(), true); assert.equal(await input.inputValue(), '2026-10-11');
     fail = false; await input.fill('2026-10-11'); await input.press('Enter');
     await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('แก้วันที่แล้ว'));
     assert.equal(await input.inputValue(), '2026-10-11'); assert.equal(f.writes().length, 2);
@@ -514,6 +570,9 @@ test('Pending CD return stays locked through student-list and history rerenders 
 test('Status action verifies its confirmed target and blocks selection while its response is pending', ui, async () => {
   const started = deferred(), release = deferred(); let current = profile(1);
   const f = await studentFixture(async (req, res) => {
+    if (req.path === '/students/1/enrollments/10/status-preview') {
+      res.json({ preview: { fingerprint: 'fixture-status', statusCode: 'A', period: { month: 11, year: 2026 }, periodSource: 'current', startDate: '2026-01-01', missedMonths: null } }); return true;
+    }
     if (req.path === '/students/1' && req.method === 'GET') { res.json({ success: true, ...current }); return true; }
     if (req.path === '/students/1/enrollments/10/status-action') {
       started.resolve(); await release.promise;

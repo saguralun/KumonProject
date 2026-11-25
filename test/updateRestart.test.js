@@ -34,6 +34,25 @@ test("legacy server without a runtime ID must go offline before recovery counts"
     assert.equal(calls, 3);
 });
 
+test('Restart wait reports a matching attempt failure promptly while the old runtime is still alive', async t => {
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => {
+        calls++;
+        return { ok: true, json: async () => ({ instanceId: 'old', update: { attemptId: 'active', phase: 'failed', message: 'Synthetic helper failure: retry' } }) };
+    });
+    await assert.rejects(waitForUpdatedServer('old', { updateAttemptId: 'active', intervalMs: 1, timeoutMs: 1000 }), /Synthetic helper failure/);
+    assert.equal(calls, 1);
+});
+
+test('Restart wait ignores failures of another attempt and accepts only a new runtime', async t => {
+    let calls = 0;
+    t.mock.method(globalThis, 'fetch', async () => ({ ok: true, json: async () => ({
+        instanceId: ++calls === 1 ? 'old' : 'new', update: { attemptId: 'earlier', phase: 'failed', message: 'Wrong attempt' }
+    }) }));
+    await waitForUpdatedServer('old', { updateAttemptId: 'active', intervalMs: 1, timeoutMs: 1000 });
+    assert.equal(calls, 2);
+});
+
 test("Windows helper replaces a real isolated Node server and confirms readiness", {
     skip: process.platform !== "win32" || process.env.TEST_WINDOWS_RESTART !== "1",
     timeout: 25000

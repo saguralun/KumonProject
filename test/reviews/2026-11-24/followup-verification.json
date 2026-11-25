@@ -1,0 +1,200 @@
+{
+  "date": "2026-11-24",
+  "kind": "followup-reproduce-fix-verify",
+  "baseCommit": "6afa0847489b23cfc0b524cf478e15771f4402f5",
+  "uncommittedWorkingTree": true,
+  "productionDataOperations": false,
+  "productionSchemaChanges": false,
+  "actualKsisAuthenticationTested": false,
+  "commitPushOrProductionRestart": false,
+  "devices": {
+    "pcPercent": 99,
+    "tabletPercent": 1,
+    "smartphoneDesign": false
+  },
+  "before": [
+    {
+      "log": "logs/round2-stock-before.log",
+      "sha256": "5c911c0384929f717e93cee6f442d178c7a250eee3c4a93fe1cdd5e4e644a0a9"
+    },
+    {
+      "log": "logs/round2-students-before.log",
+      "sha256": "1c19e6f90dbdf3353c88cc9d332e20940f7abdbcf63d3f2350f57ad1fd408b43"
+    },
+    {
+      "log": "logs/round2-reports-before.log",
+      "sha256": "784deb911e654b63857fcf4e86270518a4705195eeba7ca40511fb4b16f53bd1"
+    },
+    {
+      "log": "logs/round2-level-units-before.log",
+      "sha256": "9c1941e776f539fb846f046e2c32541cbe489150fdc5036ef98493d6e81fb82a"
+    },
+    {
+      "log": "logs/round2-at-before.log",
+      "sha256": "d446cfb0bede1c540b1143826658cebba625214df13081a840f01ba5abc6ba93"
+    },
+    {
+      "log": "logs/round2-stock-legacy-before.log",
+      "sha256": "9070fdcd91c3e01a0b0117b32a0db8458369c38150746c7fa65f05b760f574df"
+    }
+  ],
+  "runs": {
+    "services": {
+      "log": "logs/round2-services.log",
+      "sha256": "4fb97b415123d0951dceb0cd1378145ef1906e6b6308fe9aa51855fb0bdccc4c",
+      "tests": 336,
+      "passed": 332,
+      "failed": 0,
+      "skipped": 4,
+      "cancelled": 0
+    },
+    "database": {
+      "log": "logs/round2-database.log",
+      "sha256": "6159910347596283ea00b4f5c31041fd4ab5077212ecef45de30b56120bffa2d",
+      "tests": 41,
+      "passed": 41,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "stockUi": {
+      "log": "logs/round2-stock-after.log",
+      "sha256": "1eeda1b260928901de61ff45acde02ecba1112196c9eaaab3892271dc3a6b0cf",
+      "tests": 14,
+      "passed": 14,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "studentsUi": {
+      "log": "logs/round2-students-after.log",
+      "sha256": "e2524341afd3593b0ab167766c81522773ed4c492f1eee837b93f56517287d14",
+      "tests": 29,
+      "passed": 29,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "reportsUi": {
+      "log": "logs/round2-reports-final.log",
+      "sha256": "d9f636dd99ecf74731430da5abf0e7d6d85d11acb7a64246c80287ae2fdf72da",
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "atUi": {
+      "log": "logs/round2-at-after.log",
+      "sha256": "dd6bd397b8a3d7bb9409e201529a7370e51da0e16444a5e6a961dd895c1ac0d5",
+      "tests": 27,
+      "passed": 27,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "atDomUi": {
+      "log": "logs/round2-at-dom.log",
+      "sha256": "4196653d7875fb9e0d0ff838c01a7d945fc4be0d026f43bc52afe9cd1b7822b1",
+      "tests": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "remainingUi": {
+      "log": "logs/round2-ui-final.log",
+      "sha256": "6ea75d532205d2cd74f0fb660c617331d6f099b99fc1e0393bbcf1b1668c4044",
+      "tests": 149,
+      "passed": 149,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "detailRecheck": {
+      "log": "logs/round2-final-details.log",
+      "sha256": "d3a9780dc4e0eda9096778992fa87ce2ae96bbe2816f2c786cd57a87280a2521",
+      "tests": 11,
+      "passed": 11,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "complexFormRecheck": {
+      "log": "logs/round2-students-complex.log",
+      "sha256": "f9e807cdb306e376b389ee73d284080c425b4cf0058c60f12be9517b4d89a63c",
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    },
+    "legacyQuantityRecheck": {
+      "log": "logs/round2-stock-legacy-after.log",
+      "sha256": "b10c3ba819ab72e71d8d768621e02065416086245d21fe4bb4462b2c820ba66a",
+      "tests": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "cancelled": 0
+    }
+  },
+  "totals": {
+    "passed": 606,
+    "servicesPassed": 333,
+    "uiPassed": 232,
+    "databasePassed": 41,
+    "skipped": 4,
+    "failed": 0,
+    "cancelled": 0,
+    "uiFiles": 52
+  },
+  "deduplication": "Details recheck repeats 10 existing UI cases and adds one temporary-ID case; legacy recheck repeats one service case and adds one zero-quantity case. Complex-form rechecks repeat two student cases. PostgreSQL total includes the parent test.",
+  "deadlineAllowance": {
+    "remainingUi": 3,
+    "detailRecheck": 3,
+    "helper": "test/support/uiTimeoutAllowance.mjs",
+    "assertionsAndActionDeadlinesUnchanged": true,
+    "initialInterruptedRun": "logs/round2-ui-remaining.log",
+    "reason": "Enclosing 20-second test deadlines during busy/cold browser startup; only verified synthetic runner and descendants stopped."
+  },
+  "code": {
+    "services/stockReceiveService.js": "16fe867581ef316580b6536ee7bb4806b8dd8f91e98f6f7bbe43c0e2269b6869",
+    "routes/stockReceiveRoutes.js": "d802ddd057a8e5d147c3b200aa3f2d0c8b6f92dfcc5214ec2f4fb3d614531fe9",
+    "public/js/stock-receive.js": "c5cfe610d67453f35c60f9d6599282c80d3ab105d5f1282017353fd7d427ddc5",
+    "public/js/httpUtil.js": "d442982a8f1ab23e7e2c9bde6b30664b1c40194b2ea39fc0d28dc6ff52ec1d8d",
+    "public/js/student-manager.js": "2759706bd19ccef4b5ade333aad51e29db32d479c537d303675b5f6eca7ae8af",
+    "public/js/forecast.js": "f171ba9bea1ca4dbeda76c7ecb169d5789689e1275a4c9f5a1f4344668baa7ae",
+    "public/css/forecast.css": "3b85dbea3767ea57dcbe2586aeb598270ab1ae325d568b3129a63c5826d2454e",
+    "public/forecast.html": "0a0c3764d341e67b5a9f55f929921020d0dfa71a76cc339f7eb0d11847b0abe7",
+    "public/js/report.js": "ee55588c85f1e5dfded3128a67ae4d6e526c41cef740318d250ddea2696e75d8",
+    "public/report.html": "08775d1eb5a882762572894354662571cf12a7cb8d5ed47098f85259306f7606",
+    "public/js/statistics.js": "97e87d9ab4b1835f0c039fc8d5edafd71043ca490f1ff200165194739c2c9a92",
+    "public/statistics.html": "656050f1becf3b559716a8711dc26a9f690f87e66b85e6a02340a1f356be05fc",
+    "services/ksisAtEntry.js": "15e4f4602cab7556df7a8d3c48ae2d55bc4fba27529bed4bfc0236f276a5ad3f",
+    "routes/ksisRoutes.js": "c4505e341345c313d274181a41e24006e3cc73deb5ce83d49d557c82f8dc7e37",
+    "public/js/ksisAt.js": "3dc44345cf97daadeaf20d42338fdf6ebb3eb2d36d1212b03ed1bfb9857b4717",
+    "public/worksheet.html": "79aa3635f8e571b2b1a67173c57eb29a363d4f5fe464c421a519bd34c3bd199a",
+    "public/js/worksheet/worksheetState.js": "764a7846a6235a0cb06670e9145a668798d36fa50229dc3189f851a9f57ba219",
+    "public/js/worksheet/worksheetPreview.js": "f1ec037a972c2983d3b20d6de0c663942525bdd1fa2af38e31090e966403d676",
+    "public/js/worksheet/worksheet.js": "7f6733532130bf1c11542ace4f1ce41cfc0187d85af8f6908967b58bb4a488b4"
+  },
+  "preservedPreviousFixes": {
+    "public/js/payment.js": "f1bb2f7574a2868c51d3e9927d91a096fc417701df27b4dfd1238250d5a23831",
+    "public/js/receiptSnapshot.js": "4099efb05a247b639dd0c2158d00f02da2807b5af01b8d5954e67b2f1bd8d807",
+    "services/paymentService.js": "7f757434c61812025671f21e4aad34f4c636a78a02c172f74dee63c795eca5a1",
+    "public/payment.html": "2d224330be268e8c0f73c1f4ed9733b41c7b121c42921c266ccb05949738fb0c",
+    "services/authService.js": "a93c41e367b67846b90f927ba0e6d279bb6b726c3eb4d09838e61c6f2db18199",
+    "services/accountSession.js": "45e91166b9990bd2f384a2501b071e0eba6e55815f96a104665b35fb535c01bc",
+    "middleware/auth.js": "c5b2f6f498b250fd2c5265f9be679f90eeb22eba28792489d3b20e2170dc232e",
+    "routes/authRoutes.js": "5f939d75e0d50505409f00ffd7ac606046d7cdb82c6d1790b22f2503f7b0aee6"
+  },
+  "limitations": [
+    "Synthetic fixtures only; real KSIS login/session expiry remains untested.",
+    "No production schema/data change or app restart.",
+    "Student drafts remain in the current page, not persistent autosave.",
+    "Expected quantity is a value snapshot, not a version of every DO field.",
+    "Four explicit Windows restart-helper tests remain skipped.",
+    "Counts do not prove every possible data/button/state combination."
+  ]
+}

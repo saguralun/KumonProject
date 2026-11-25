@@ -90,8 +90,10 @@ function renderAuthBar(user) {
   bar.querySelector(".auth-name").textContent = user.displayName;
 
   document.getElementById("authLogoutButton").addEventListener("click", async () => {
+    if (window.kumonLeaveGuard && !await window.kumonLeaveGuard.confirmLeave()) return;
     await fetch("/api/auth/logout", { method: "POST" });
-    window.location.href = "/login.html";
+    if (window.kumonLeaveGuard) window.kumonLeaveGuard.navigate('/login.html');
+    else window.location.href = "/login.html";
   });
 
   bindUpdateButton();
@@ -123,26 +125,32 @@ function bindUpdateButton() {
   }
 
   button.addEventListener("click", async () => {
-    if (button.disabled || !await confirmAction('อัปเดตและรีสตาร์ต KumonDB ใช่ไหม? ระบบจะสำรองไฟล์ที่โปรแกรมสร้างก่อนจัดการไฟล์ค้าง กรุณาตรวจว่าไม่มีงานที่ยังไม่บันทึกในโปรแกรมหรือ KSIS')) return;
-    button.disabled = true;
-    button.textContent = "⏳ กำลังอัพเดท...";
-
+    if (button.disabled) return;
     try {
-      const { getRuntimeInstanceId, waitForUpdatedServer } = await import("./updateRestart.js?v=20261030-code-only-update");
-      let previousInstanceId = await getRuntimeInstanceId();
+      const { readUpdateRuntime, waitForUpdatedServer, updateConfirmationText } = await import("./updateRestart.js?v=20261124-restart-feedback");
+      const runtime = await readUpdateRuntime();
+      const leave = window.kumonLeaveGuard?.readState();
+      if (leave?.busy) { await window.kumonLeaveGuard.confirmLeave(); return; }
+      const draftWarning = leave?.dirty ? '\nหน้านี้มีข้อมูลที่ยังไม่ได้บันทึก การอัปเดตจะทิ้งข้อมูลที่แก้ค้างนี้' : '';
+      if (button.disabled || !await confirmAction(updateConfirmationText(runtime?.serverName) + draftWarning)) return;
+      button.disabled = true;
+      button.textContent = "⏳ กำลังอัพเดท...";
+      let previousInstanceId = runtime?.instanceId || null, updateAttemptId;
       let recoveredFiles = 0;
       try {
         const response = await fetch("/api/system/update-apply", { method: "POST", headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: true }) });
         const data = await response.json().catch(() => ({}));
         if (!response.ok || data.success === false) throw new Error(data.error || "อัพเดทไม่สำเร็จ");
         previousInstanceId = data.previousInstanceId || previousInstanceId;
+        updateAttemptId = data.updateAttemptId;
         recoveredFiles = Array.isArray(data.fileRecovery?.files) ? data.fileRecovery.files.length : 0;
       } catch (error) {
         if (!(error instanceof TypeError)) throw error;
       }
       button.textContent = "กำลังรอโปรแกรมเปิดใหม่...";
       button.title = `${recoveredFiles ? `สำรองไฟล์สร้างอัตโนมัติแล้ว ${recoveredFiles} ไฟล์ • ` : ''}กำลังตรวจว่า server ใหม่พร้อมใช้งาน`;
-      await waitForUpdatedServer(previousInstanceId);
+      await waitForUpdatedServer(previousInstanceId, { updateAttemptId });
+      window.kumonLeaveGuard?.allowNextUnload();
       window.location.reload();
     } catch (error) {
       await showAppMessage(error.message);
@@ -151,8 +159,9 @@ function bindUpdateButton() {
     }
   });
 
-  import('./updateMonitor.js?v=20261023-update-anytime').then(({ startUpdateMonitor }) => {
-    startUpdateMonitor((data) => {
+  Promise.all([import('./updateMonitor.js?v=20261124-ui-clarity'), import('./updateStatusView.js')]).then(([{ startUpdateMonitor }, { createUpdateStatusView }]) => {
+    const feedback = createUpdateStatusView(document.getElementById('authBar'));
+    const monitor = startUpdateMonitor((data) => {
       button.title = data.retryRequired ? 'การอัปเดตก่อนหน้ายังไม่เสร็จ กรุณาลองใหม่' : data.remoteMessage || `commit ${data.remoteCommit}`;
       button.classList.toggle('hidden', data.upToDate);
       const toggle = document.querySelector('.app-menu-toggle');
@@ -162,7 +171,8 @@ function bindUpdateButton() {
         const menuLabel = toggle.getAttribute('aria-expanded') === 'true' ? 'ปิดเมนู' : 'เปิดเมนู';
         toggle.setAttribute('aria-label', menuLabel + (data.upToDate ? '' : ' · มีอัปเดตโปรแกรม'));
       }
-    }, { isBusy: () => button.disabled });
+    }, { isBusy: () => button.disabled, onCheckState: feedback.update });
+    feedback.onRetry(monitor.check);
   }).catch(() => {});
 }
 

@@ -1,5 +1,8 @@
+import { createStockTypeResolver } from "./stockTypeResolver.js";
+import { normalizeNullableDate as normalizeDate } from "./dateHelpers.js";
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
+import { runStockReceiveOperation } from "./stockReceiveRetry.js";
 
 const TABLE_SCHEMA = "kumon";
 
@@ -22,55 +25,7 @@ const ITEM_TYPE_CONFIG = {
     }
 };
 
-let stockTypeIdCache = null;
-
-async function loadStockTypeIds() {
-    if (stockTypeIdCache) {
-        return stockTypeIdCache;
-    }
-
-    const result = await pool.query(`SELECT stock_type_code, stock_type_id FROM ${TABLE_SCHEMA}.stock_type_master`);
-    const byCode = new Map(result.rows.map((row) => [row.stock_type_code, row.stock_type_id]));
-
-    stockTypeIdCache = {};
-
-    for (const [type, config] of Object.entries(ITEM_TYPE_CONFIG)) {
-        const stockTypeId = byCode.get(config.stockTypeCode);
-
-        if (!stockTypeId) {
-            throw httpError(500, `ไม่พบ stock_type_master สำหรับ ${config.stockTypeCode}`);
-        }
-
-        stockTypeIdCache[type] = stockTypeId;
-    }
-
-    return stockTypeIdCache;
-}
-
-async function resolveType(type) {
-    const normalized = String(type || "").trim().toLowerCase();
-    const config = ITEM_TYPE_CONFIG[normalized];
-
-    if (!config) {
-        throw httpError(400, "ประเภทสต็อกไม่ถูกต้อง (ต้องเป็น ws หรือ cd)");
-    }
-
-    const stockTypeIds = await loadStockTypeIds();
-
-    return { type: normalized, stockTypeId: stockTypeIds[normalized], ...config };
-}
-
-function normalizeDate(value) {
-    if (value instanceof Date) {
-        const year = value.getFullYear();
-        const month = String(value.getMonth() + 1).padStart(2, "0");
-        const day = String(value.getDate()).padStart(2, "0");
-
-        return `${year}-${month}-${day}`;
-    }
-
-    return value ? String(value).slice(0, 10) : null;
-}
+const resolveType = createStockTypeResolver({ pool, schema: TABLE_SCHEMA, itemTypes: ITEM_TYPE_CONFIG });
 
 function assertIsoDate(value, label) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) {
@@ -281,7 +236,16 @@ export async function getDeliveryOrderDetail(doId) {
     };
 }
 
-export async function createDeliveryOrder(type, payload) {
+export async function createDeliveryOrder(type, payload, retry) {
+    // Internal callers without an operation context retain deliberate additive
+    // behavior. The HTTP route always requires an actor-bound operation key.
+    if (retry) {
+        return runStockReceiveOperation(type, payload, retry, () => createDeliveryOrderOnce(type, payload));
+    }
+    return createDeliveryOrderOnce(type, payload);
+}
+
+async function createDeliveryOrderOnce(type, payload) {
     const config = await resolveType(type);
     const doNo = String(payload?.doNo || "").trim();
     const outDate = assertIsoDate(payload?.outDate, "Out Date");
@@ -319,12 +283,13 @@ export async function createDeliveryOrder(type, payload) {
 
     const period = kumonPeriodFromDate(receiveDate);
     const client = await pool.connect();
+    let committing = false;
 
     try {
         await client.query("BEGIN");
 
         const existing = await client.query(
-            `SELECT stock_do_id, is_stock_processed FROM ${TABLE_SCHEMA}.stock_do WHERE do_no = $1 FOR UPDATE`,
+            `SELECT stock_do_id, is_stock_processed, out_date, receive_date FROM ${TABLE_SCHEMA}.stock_do WHERE do_no = $1 FOR UPDATE`,
             [doNo]
         );
         const existingDo = existing.rows[0];
@@ -334,6 +299,13 @@ export async function createDeliveryOrder(type, payload) {
         if (existingDo) {
             if (existingDo.is_stock_processed) {
                 throw httpError(409, `เลข DO '${doNo}' ถูก process เข้า stock ไปแล้ว ไม่สามารถเพิ่มรายการได้`);
+            }
+
+            const originalOutDate = normalizeDate(existingDo.out_date);
+            const originalReceiveDate = normalizeDate(existingDo.receive_date);
+            if ((originalOutDate && originalOutDate !== outDate)
+                || (payload?.receiveDate && originalReceiveDate && originalReceiveDate !== receiveDate)) {
+                throw httpError(409, `วันที่ไม่ตรงกับ DO '${doNo}' เดิม (Out Date ${originalOutDate || '-'}, Receive Date ${originalReceiveDate || '-'}) ยังไม่เพิ่มจำนวน กรุณาใช้วันที่เดิมเมื่อเพิ่มรายการ หรือเริ่ม DO ใหม่ด้วยเลขอื่น`);
             }
 
             // A DO is homogeneous (all-WS or all-CD, see the comment on
@@ -393,14 +365,30 @@ export async function createDeliveryOrder(type, payload) {
             }
         }
 
+        committing = true;
         await client.query("COMMIT");
 
         return { type: config.type, doId, doNo, appended };
     } catch (error) {
-        await client.query("ROLLBACK");
+        // A lost COMMIT acknowledgement cannot prove rollback. Keep that key
+        // blocked until the operator reconciles the DO, even if ROLLBACK works.
+        error.stockReceiveOutcomeUnknown = committing;
+        try {
+            await client.query("ROLLBACK");
+        } catch {
+            error.stockReceiveOutcomeUnknown = true;
+        }
+        if (error.stockReceiveOutcomeUnknown) {
+            error.message = 'ไม่สามารถยืนยันผลบันทึก DO ได้ กรุณาตรวจ DO ก่อนเริ่มรายการใหม่ ห้ามเพิ่มซ้ำโดยไม่ตรวจสอบ';
+        }
         throw error;
     } finally {
-        client.release();
+        try {
+            client.release();
+        } catch (error) {
+            error.stockReceiveOutcomeUnknown = true;
+            throw error;
+        }
     }
 }
 
@@ -559,7 +547,7 @@ async function lockPendingDoForItem(client, doId, receiveId) {
     }
 
     const itemResult = await client.query(
-        `SELECT stock_receive_id FROM ${TABLE_SCHEMA}.stock_receive WHERE stock_receive_id = $1 AND stock_do_id = $2`,
+        `SELECT stock_receive_id, quantity FROM ${TABLE_SCHEMA}.stock_receive WHERE stock_receive_id = $1 AND stock_do_id = $2 FOR UPDATE`,
         [normalizedReceiveId, normalizedDoId]
     );
 
@@ -567,7 +555,7 @@ async function lockPendingDoForItem(client, doId, receiveId) {
         throw httpError(404, "ไม่พบรายการนี้ใน DO นี้");
     }
 
-    return { doId: normalizedDoId, receiveId: normalizedReceiveId };
+    return { doId: normalizedDoId, receiveId: normalizedReceiveId, quantity: Number(itemResult.rows[0].quantity) };
 }
 
 export async function deleteDeliveryOrderItem(doId, receiveId) {
@@ -604,11 +592,17 @@ export async function deleteDeliveryOrderItem(doId, receiveId) {
     }
 }
 
-export async function updateDeliveryOrderItemQuantity(doId, receiveId, quantity) {
+export async function updateDeliveryOrderItemQuantity(doId, receiveId, quantity, expectedQuantity) {
     const normalizedQuantity = Number(quantity);
 
     if (!Number.isInteger(normalizedQuantity) || normalizedQuantity < 1) {
         throw httpError(400, "จำนวนต้องเป็นเลขจำนวนเต็มมากกว่า 0");
+    }
+    // The snapshot can be zero/negative in legacy data. It is read-only
+    // evidence, not a new receipt quantity; allow correcting such a row.
+    if (expectedQuantity !== undefined && (!['number', 'string'].includes(typeof expectedQuantity)
+        || String(expectedQuantity).trim() === '' || !Number.isInteger(Number(expectedQuantity)))) {
+        throw httpError(400, 'จำนวนเดิมไม่ถูกต้อง กรุณาโหลด DO ใหม่');
     }
 
     const client = await pool.connect();
@@ -616,9 +610,12 @@ export async function updateDeliveryOrderItemQuantity(doId, receiveId, quantity)
     try {
         await client.query("BEGIN");
 
-        const { doId: normalizedDoId, receiveId: normalizedReceiveId } =
+        const { doId: normalizedDoId, receiveId: normalizedReceiveId, quantity: currentQuantity } =
             await lockPendingDoForItem(client, doId, receiveId);
 
+        if (expectedQuantity !== undefined && currentQuantity !== Number(expectedQuantity)) {
+            throw httpError(409, `รายการนี้เปลี่ยนแล้ว จำนวนล่าสุด ${currentQuantity} ชุด กรุณาตรวจจำนวนใหม่ก่อนแก้ ยังไม่ได้เขียนทับ`);
+        }
         await client.query(
             `UPDATE ${TABLE_SCHEMA}.stock_receive SET quantity = $1 WHERE stock_receive_id = $2`,
             [normalizedQuantity, normalizedReceiveId]

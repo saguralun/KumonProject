@@ -25,6 +25,7 @@ import { resolveAddZunLevelId, zunValueForLevelId } from "./studentMasters.js";
 import {
     alignStartDateForHalfMonth,
     alignEnrollmentDateForHalfStatus,
+    clearHalfMonthNotice,
     fillAddEnrollmentDefaults,
     fillMasterSelects,
     refreshAddEnrollmentOptions,
@@ -34,6 +35,8 @@ import {
     refreshLevelSelects,
     setEnrollmentLocked,
     syncEnrollmentDateStatus,
+    readHalfMonthNotice,
+    restoreHalfMonthNotice,
     showAddEnrollmentCurrentCheck,
     updateAddEnrollmentDerivedFields,
     updateAddOpeningSchedule,
@@ -82,6 +85,8 @@ export const els = {
     enrollmentResumeError: document.getElementById('enrollmentResumeError'),
     enrollmentResumeCancel: document.getElementById('enrollmentResumeCancel'),
     enrollmentResumeSave: document.getElementById('enrollmentResumeSave'),
+    enrollmentStatusPreview: document.getElementById('enrollmentStatusPreview'),
+    enrollmentStatusPreviewRetry: document.getElementById('enrollmentStatusPreviewRetry'),
     enrollmentCompleterButton: document.getElementById("enrollmentCompleterButton"),
     enrollmentOtButton: document.getElementById("enrollmentOtButton"),
     deleteEnrollmentButton: document.getElementById("deleteEnrollmentButton"),
@@ -143,9 +148,55 @@ export const state = {
 };
 
 let resumeTarget = null, resumeBusy = false;
+let statusPreview = null, statusPreviewRequest = 0;
 let studentMutationBusy = false, profileLoading = false, profileLoadFailed = false;
+const formBaselines = new WeakMap();
+function rememberForm(form, owner) {
+    formBaselines.set(form, { owner: String(owner || ''), values: readForm(form) });
+}
+function formChanges(form, owner) {
+    const baseline = formBaselines.get(form);
+    if (!baseline || baseline.owner !== String(owner || '')) return {};
+    return Object.fromEntries(Object.entries(readForm(form)).filter(([name, value]) => value !== baseline.values[name]));
+}
+const hasFormChanges = (form, owner) => Object.keys(formChanges(form, owner)).length > 0;
+function restoreFormChanges(form, changes) {
+    for (const [name, value] of Object.entries(changes)) {
+        const field = form.elements[name];
+        if (field && !field.disabled) setFormValue(form, name, value);
+    }
+}
+function restoreEnrollmentChanges(changes) {
+    const form = els.enrollmentForm;
+    // Rebuild dependent options before restoring their values. Never unlock
+    // fields that the newly loaded profile no longer permits editing.
+    if (Object.hasOwn(changes, 'subjectId') && !form.elements.subjectId.disabled) {
+        setFormValue(form, 'subjectId', changes.subjectId);
+        refreshLevelSelects({ keepZun: true });
+    }
+    if (Object.hasOwn(changes, 'currentLevelMasterId') && !form.elements.currentLevelMasterId.disabled) {
+        setFormValue(form, 'currentLevelMasterId', changes.currentLevelMasterId);
+        refreshLevelSelects({ keepLevel: true, keepZun: true, allSubjectWorksheets: true });
+    }
+    restoreFormChanges(form, changes);
+    const enrollment = selectedEnrollment();
+    if (Object.hasOwn(changes, 'enStartDate') && !form.elements.enStartDate.disabled
+        && canCorrectEnrollmentDateStatus(enrollment?.statusGroup1Code, enrollment?.canDeleteEnrollment)) {
+        syncEnrollmentDateStatus(form);
+    }
+}
 let profileRequest = 0, studentsRequest = 0, historyRequest = 0;
+let studentSearchQuery = '';
 const pendingCdReturns = new Set();
+let resumeLeaveBaseline = null;
+window.kumonLeaveGuard?.register('นักเรียน/วิชา', () => ({
+    dirty: hasFormChanges(els.studentForm, state.selectedStudentId)
+        || hasFormChanges(els.enrollmentForm, state.selectedEnrollmentId)
+        || (!els.addStudentModal.classList.contains('hidden') && hasFormChanges(els.addStudentForm, 'new-student'))
+        || (!els.addEnrollmentModal.classList.contains('hidden') && hasFormChanges(els.addEnrollmentForm, 'new-enrollment'))
+        || (els.enrollmentResumeDialog.open && resumeTarget?.action === 'resume' && els.enrollmentResumeDate.value !== resumeLeaveBaseline),
+    busy: studentMutationBusy || resumeBusy || pendingCdReturns.size > 0
+}));
 
 function syncStudentControls() {
     const blocked = studentMutationBusy || profileLoading || profileLoadFailed;
@@ -192,6 +243,10 @@ function renderStudentList() {
                 data-preferred-enrollment-id="${escapeHtml(student.matchedEnrollmentId || "")}"
             >
                 <div class="student-item-name">${escapeHtml(student.displayName)}</div>
+                <div class="student-item-ids">Student ID #${escapeHtml(student.studentId)}${(student.enrollments || []).map(enrollment =>
+                    `<span>${escapeHtml(enrollment.subjectCode)} • Enrollment #${escapeHtml(enrollment.enrollmentId)}</span>`
+                ).join('')}</div>
+                ${studentNumericMatchLabel(student)}
                 <span class="student-item-statuses">${(student.enrollments || []).map((enrollment) => {
                     const status = directoryStatus(enrollment);
                     return `<span class="directory-status status-${status.tone}" title="${escapeHtml(status.title)}">${escapeHtml(status.label)}</span>`;
@@ -199,6 +254,18 @@ function renderStudentList() {
             </button>
         `).join("");
     syncStudentControls();
+}
+
+function studentNumericMatchLabel(student) {
+    if (!/^\d+$/.test(studentSearchQuery)) return '';
+    const labels = [];
+    if (String(student.matchedEnrollmentId) === studentSearchQuery) labels.push(`ตรงกับ Enrollment #${student.matchedEnrollmentId}`);
+    if (String(student.studentId) === studentSearchQuery) labels.push(`ตรงกับ Student ID #${student.studentId}`);
+    if (!labels.length) {
+        if (String(student.studentId).startsWith(studentSearchQuery)) labels.push(`Student ID ขึ้นต้นด้วย ${studentSearchQuery}`);
+        if ((student.enrollments || []).some(enrollment => String(enrollment.enrollmentId).startsWith(studentSearchQuery))) labels.push(`Enrollment ขึ้นต้นด้วย ${studentSearchQuery}`);
+    }
+    return labels.length ? `<div class="student-item-match">${escapeHtml(labels.join(' • '))}</div>` : '';
 }
 
 function scrollSelectedStudentIntoView() {
@@ -218,6 +285,7 @@ async function loadStudents() {
     if (requestId !== studentsRequest || params.get('query') !== els.studentSearch.value || params.get('status') !== els.statusFilter.value) return;
 
     state.students = data.rows || [];
+    studentSearchQuery = params.get('query').trim();
     renderStudentList();
 }
 
@@ -259,6 +327,7 @@ function fillStudentForm(student = {}) {
     if (form.elements.addressZipcode.value) {
         formatZipcodeField(form.elements.addressZipcode);
     }
+    rememberForm(form, student.studentId);
 }
 
 export function defaultEnrollmentDate() {
@@ -267,6 +336,7 @@ export function defaultEnrollmentDate() {
 
 function fillEnrollmentForm(enrollment = null) {
     const form = els.enrollmentForm;
+    clearHalfMonthNotice(form);
 
     els.enrollmentForm.classList.remove("hidden");
     els.enrollmentEmpty.classList.add("hidden");
@@ -287,6 +357,7 @@ function fillEnrollmentForm(enrollment = null) {
             state.profile?.enrollments?.length ? enrollingOtherStatus?.id : newStatus?.id
         );
         els.saveEnrollmentButton.textContent = "💾 Add Enrollment";
+        rememberForm(form, null);
         return;
     }
 
@@ -321,6 +392,7 @@ function fillEnrollmentForm(enrollment = null) {
     setFormValue(form, "currentStatusGroup2Id", enrollment.currentStatusGroup2Id);
     setFormValue(form, "remark", enrollment.remark);
     els.saveEnrollmentButton.textContent = "💾 Save Enrollment";
+    rememberForm(form, enrollment.enrollmentId);
 }
 
 function renderEnrollmentTabs() {
@@ -389,14 +461,18 @@ function updateDeleteStudentButton() {
     els.deleteStudentButton.disabled = studentMutationBusy || profileLoading || profileLoadFailed || !canDeleteStudent;
 }
 
-function renderProfile() {
+function renderProfile({ keepStudentDraft = true, keepEnrollmentDraft = true } = {}) {
     const student = state.profile?.student;
 
     if (!student) {
         return;
     }
 
+    const studentChanges = keepStudentDraft ? formChanges(els.studentForm, student.studentId) : {};
+    const enrollmentChanges = keepEnrollmentDraft ? formChanges(els.enrollmentForm, state.selectedEnrollmentId) : {};
+    const dateNotice = keepEnrollmentDraft ? readHalfMonthNotice(els.enrollmentForm) : null;
     fillStudentForm(student);
+    restoreFormChanges(els.studentForm, studentChanges);
     els.pageTitle.textContent = student.displayName;
     els.pageSubtitle.textContent = `Student ID #${student.studentId}`;
     els.newEnrollmentButton.disabled = (state.profile.enrollments || []).length >= 3;
@@ -406,6 +482,8 @@ function renderProfile() {
         : "+ Subject";
     updateDeleteStudentButton();
     renderEnrollmentTabs();
+    restoreEnrollmentChanges(enrollmentChanges);
+    restoreHalfMonthNotice(els.enrollmentForm, dateNotice);
     renderStudentList();
     syncStudentControls();
 }
@@ -414,6 +492,15 @@ async function loadProfile(studentId, {
     preferredEnrollmentId = null
 } = {}) {
     if (studentMutationBusy) return;
+    const sameStudent = Number(studentId) === Number(state.selectedStudentId);
+    const changesEnrollment = preferredEnrollmentId && Number(preferredEnrollmentId) !== Number(state.selectedEnrollmentId);
+    if ((!sameStudent && hasFormChanges(els.studentForm, state.selectedStudentId))
+        || ((!sameStudent || changesEnrollment) && hasFormChanges(els.enrollmentForm, state.selectedEnrollmentId))) {
+        const currentStudent = state.selectedStudentId, currentRequest = profileRequest;
+        if (!await confirmAction('มีข้อมูลนักเรียน/วิชาที่แก้ค้างและยังไม่ได้บันทึก เปลี่ยนรายการและทิ้งค่าที่แก้ค้างใช่ไหม?')) return;
+        if (studentMutationBusy || currentStudent !== state.selectedStudentId || currentRequest !== profileRequest) return;
+    }
+    if (sameStudent && !preferredEnrollmentId) preferredEnrollmentId = state.selectedEnrollmentId;
     const requestId = ++profileRequest;
     profileLoading = true;
     profileLoadFailed = false;
@@ -470,6 +557,7 @@ function openAddStudentModal() {
     updateAddStudentGenderFromPrefix();
     updateAddStudentAddressHints();
     setAddStudentMessage();
+    rememberForm(form, 'new-student');
     els.addStudentModal.classList.remove("hidden");
     setTimeout(() => form.elements.firstName.focus(), 80);
 }
@@ -585,6 +673,14 @@ async function saveStudent(event) {
     event.preventDefault();
     if (studentMutationBusy || profileLoading || profileLoadFailed) return;
     const studentId = state.selectedStudentId;
+    const birthDate = els.studentForm.elements.birthDate.value;
+    const today = new Date();
+    const todayText = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    if (birthDate && birthDate !== (state.profile?.student?.birthDate || '') && birthDate > todayText) {
+        setStatus('วันเกิดต้องไม่เป็นวันที่ในอนาคต กรุณาตรวจปี ค.ศ.', 'error');
+        els.studentForm.elements.birthDate.focus();
+        return;
+    }
     setStudentMutationBusy(true);
     setStatus("กำลังบันทึก student...");
 
@@ -605,7 +701,7 @@ async function saveStudent(event) {
             student: data.student,
             enrollments: data.enrollments || []
         };
-        renderProfile();
+        renderProfile({ keepStudentDraft: false });
         await loadStudents();
         setStatus("บันทึก student แล้ว");
     } catch (error) {
@@ -640,7 +736,7 @@ async function saveEnrollment(event) {
         state.profile = data.profile;
         state.selectedEnrollmentId = data.enrollmentId;
         state.isNewEnrollment = false;
-        renderProfile();
+        renderProfile({ keepEnrollmentDraft: false });
         await loadStudents();
         setStatus("บันทึก enrollment แล้ว");
     } catch (error) {
@@ -690,10 +786,47 @@ function openEnrollmentStatusDialog(action) {
     els.enrollmentResumeDate.disabled = !resume;
     els.enrollmentResumeStudent.textContent = `${state.profile.student.displayName} • ${enrollment.subjectCode} #${enrollment.enrollmentId}`;
     els.enrollmentResumeDate.value = todayIsoDate();
+    resumeLeaveBaseline = els.enrollmentResumeDate.value;
     els.enrollmentResumeError.textContent = '';
     els.enrollmentResumeError.classList.add('hidden');
     els.enrollmentResumeDialog.showModal();
     if (resume) els.enrollmentResumeDate.focus(); else els.enrollmentResumeCancel.focus();
+    void refreshEnrollmentStatusPreview();
+}
+
+async function refreshEnrollmentStatusPreview() {
+    if (resumeBusy || !resumeTarget || !els.enrollmentResumeDialog.open) return;
+    const target = resumeTarget, revision = ++statusPreviewRequest;
+    const date = target.action === 'resume' ? els.enrollmentResumeDate.value : '';
+    statusPreview = null; els.enrollmentResumeSave.disabled = true;
+    els.enrollmentStatusPreviewRetry.classList.add('hidden');
+    if (target.action === 'resume' && !els.enrollmentResumeDate.checkValidity()) {
+        els.enrollmentStatusPreview.textContent = 'เลือกวันที่กลับมาเรียนให้ครบก่อนตรวจสรุป'; return;
+    }
+    els.enrollmentStatusPreview.textContent = 'กำลังตรวจงวด สถานะ และวันเริ่มเรียนก่อนยืนยัน...';
+    const current = () => revision === statusPreviewRequest && resumeTarget === target && els.enrollmentResumeDialog.open;
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+        const query = new URLSearchParams({ action: target.action, ...(date ? { resumeDate: date } : {}) });
+        const data = await requestJson(`/api/students/${target.studentId}/enrollments/${target.enrollmentId}/status-preview?${query}`, { signal: controller.signal });
+        if (!current()) return;
+        if (!data.preview?.fingerprint || !data.preview.period) throw new Error('ตรวจสรุปไม่สำเร็จ กรุณาลองอีกครั้ง');
+        statusPreview = data.preview;
+        const p = statusPreview, enrollment = selectedEnrollment();
+        const reason = p.periodSource === 'next_billing' ? `อิงงวดบิลล่าสุด ${p.latestPeriod.month}/${p.latestPeriod.year} แล้วนับงวดถัดไป`
+            : p.periodSource === 'resume_date' ? 'อิงวันที่กลับมาเรียน • วันที่ 21 เป็นต้นไปเป็นงวดเดือนถัดไป'
+                : target.action === 'completer' ? 'ใช้งวดปัจจุบันตามกติกาเดิม' : 'ยังไม่มีบิล ใช้งวดปัจจุบันตามกติกาเดิม';
+        const special = target.action === 'resume' ? p.halfMonth ? 'H — ครึ่งเดือน' : 'ไม่มีสถานะพิเศษ' : 'คงเดิม';
+        els.enrollmentStatusPreview.innerHTML = `<dl><dt>สถานะ</dt><dd>${escapeHtml(enrollment?.statusGroup1Code || '—')} → <strong>${escapeHtml(p.statusCode)}</strong></dd>
+          <dt>งวดที่จะใช้</dt><dd><strong>${p.period.month}/${p.period.year}</strong></dd>
+          <dt>วันเริ่มเรียน</dt><dd>${escapeHtml(formatDate(p.startDate) || '—')} • ${p.changesStartDate ? 'เปลี่ยนตามวันที่กลับมาเรียน' : 'คงเดิม'}</dd>
+          <dt>สถานะพิเศษ</dt><dd>${escapeHtml(special)}</dd></dl><div>${escapeHtml(reason)}</div>${p.missedMonths !== null ? `<div>เว้นจากงวดบิลล่าสุด ${p.missedMonths} เดือน</div>` : ''}`;
+        els.enrollmentResumeSave.disabled = false;
+    } catch (error) {
+        if (!current()) return;
+        els.enrollmentStatusPreview.textContent = error.message;
+        els.enrollmentStatusPreviewRetry.classList.remove('hidden');
+    } finally { clearTimeout(timeout); }
 }
 
 async function saveEnrollmentStatusAction(event) {
@@ -704,17 +837,20 @@ async function saveEnrollmentStatusAction(event) {
         els.enrollmentResumeError.classList.remove('hidden');
         return;
     }
+    if (!statusPreview) return;
     const { studentId, enrollmentId, action } = resumeTarget;
     const requestId = profileRequest;
     const label = enrollmentActionLabels[action];
     const resumeDate = els.enrollmentResumeDate.value;
+    if (action === 'resume' && statusPreview.resumeDate !== resumeDate) { void refreshEnrollmentStatusPreview(); return; }
+    const expectedPlan = statusPreview.fingerprint;
     if (studentMutationBusy || profileLoading || profileLoadFailed) return;
     setStudentMutationBusy(true);
     resumeBusy = true;
     els.enrollmentResumeSave.disabled = els.enrollmentResumeCancel.disabled = els.enrollmentResumeDate.disabled = true;
     els.enrollmentResumeError.classList.add('hidden');
     setStatus(`กำลังบันทึก ${label}...`);
-    let saved = false;
+    let saved = false, previewChanged = false;
     try {
         const data = await requestJson(
             `/api/students/${encodeURIComponent(studentId)}/enrollments/${encodeURIComponent(enrollmentId)}/status-action`,
@@ -722,6 +858,7 @@ async function saveEnrollmentStatusAction(event) {
                 method: "POST",
                 body: JSON.stringify({
                     action,
+                    expectedPlan,
                     ...(action === 'resume' ? { resumeDate } : {})
                 })
             }
@@ -740,11 +877,14 @@ async function saveEnrollmentStatusAction(event) {
         els.enrollmentResumeError.textContent = message;
         els.enrollmentResumeError.classList.toggle('hidden', saved);
         setStatus(message, "error");
+        if (!saved && error.statusCode === 409) { statusPreview = null; previewChanged = true; }
     } finally {
         resumeBusy = false;
-        els.enrollmentResumeSave.disabled = els.enrollmentResumeCancel.disabled = false;
+        els.enrollmentResumeSave.disabled = !statusPreview;
+        els.enrollmentResumeCancel.disabled = false;
         els.enrollmentResumeDate.disabled = action !== 'resume';
         setStudentMutationBusy(false);
+        if (previewChanged) void refreshEnrollmentStatusPreview();
     }
 }
 
@@ -758,7 +898,8 @@ async function deleteSelectedEnrollment() {
         return;
     }
 
-    const ok = await confirmAction(`ลบ ${enrollment.subjectCode} enrollment #${enrollment.enrollmentId} ใช่ไหม?`);
+    const childName = [state.profile?.student?.firstName, state.profile?.student?.lastName].filter(Boolean).join(' ');
+    const ok = await confirmAction(`ลบวิชา ${enrollment.subjectCode} ของ ${childName} (Student #${studentId}, Enrollment #${enrollment.enrollmentId}) ใช่ไหม? ผล DT ของวิชานี้จะถูกลบด้วย`);
 
     if (!ok || studentMutationBusy || profileLoading || profileLoadFailed || requestId !== profileRequest
         || state.selectedStudentId !== studentId || selectedEnrollment() !== enrollment) {
@@ -882,16 +1023,19 @@ async function returnCd(button) {
     pendingCdReturns.add(pendingKey);
     button.disabled = true;
     syncStudentControls();
+    let resultRequestId = requestId;
     try {
         const data = await requestJson(`/api/students/${encodeURIComponent(studentId)}/history/cd/${encodeURIComponent(cdUsedId)}`, { method: "DELETE" });
-        if (state.selectedStudentId === studentId && requestId === profileRequest) {
-            await loadProfile(studentId, { preferredEnrollmentId: state.selectedEnrollmentId });
-            await loadHistory();
-        }
+        if (state.selectedStudentId !== studentId || requestId !== profileRequest) return;
+        resultRequestId = profileRequest + 1;
+        await loadProfile(studentId, { preferredEnrollmentId: state.selectedEnrollmentId });
+        if (state.selectedStudentId !== studentId || resultRequestId !== profileRequest) return;
+        await loadHistory();
+        if (state.selectedStudentId !== studentId || resultRequestId !== profileRequest) return;
         setStatus(data.stockReturned ? "เอา CD คืนแล้ว และคืนสต็อก 1 แผ่น"
             : receivedCd ? "เอา CD คืนแล้ว (ยังไม่ได้ตัดสต็อก)" : "ยกเลิกรายการ CD แล้ว สต็อกไม่เปลี่ยน");
     } catch (error) {
-        setStatus(error.message, "error");
+        if (state.selectedStudentId === studentId && resultRequestId === profileRequest) setStatus(error.message, "error");
     } finally {
         pendingCdReturns.delete(pendingKey);
         syncStudentControls();
@@ -1000,6 +1144,7 @@ function startNewEnrollment() {
     }
 
     fillAddEnrollmentDefaults();
+    rememberForm(els.addEnrollmentForm, 'new-enrollment');
     els.addEnrollmentModal.classList.remove("hidden");
 }
 
@@ -1172,6 +1317,8 @@ function bindEvents() {
     els.enrollmentAbsentButton.addEventListener("click", () => runEnrollmentStatusAction("absent"));
     els.enrollmentResumeButton.addEventListener("click", runEnrollmentResumeAction);
     els.enrollmentResumeForm.addEventListener('submit', saveEnrollmentStatusAction);
+    els.enrollmentResumeDate.addEventListener('input', () => { void refreshEnrollmentStatusPreview(); });
+    els.enrollmentStatusPreviewRetry.addEventListener('click', () => { void refreshEnrollmentStatusPreview(); });
     els.enrollmentResumeCancel.addEventListener('click', () => { if (!resumeBusy) { els.enrollmentResumeDialog.close(); resumeTarget = null; } });
     els.enrollmentResumeDialog.addEventListener('cancel', (event) => { if (resumeBusy) event.preventDefault(); else resumeTarget = null; });
     els.enrollmentCompleterButton.addEventListener("click", () => runEnrollmentStatusAction("completer"));
@@ -1215,14 +1362,19 @@ function bindEvents() {
             updateAddOpeningSchedule(slot);
         });
     });
-    els.enrollmentTabs.addEventListener("click", (event) => {
+    els.enrollmentTabs.addEventListener("click", async (event) => {
         if (studentMutationBusy || profileLoading || profileLoadFailed) return;
         const button = event.target.closest("[data-enrollment-id]");
 
         if (!button) {
             return;
         }
-
+        if (Number(button.dataset.enrollmentId) === Number(state.selectedEnrollmentId)) return;
+        if (hasFormChanges(els.enrollmentForm, state.selectedEnrollmentId)) {
+            const currentStudent = state.selectedStudentId, currentEnrollment = state.selectedEnrollmentId, currentRequest = profileRequest;
+            if (!await confirmAction('มีข้อมูลวิชาที่แก้ค้างและยังไม่ได้บันทึก เปลี่ยนวิชาและทิ้งค่าที่แก้ค้างใช่ไหม?')) return;
+            if (studentMutationBusy || profileLoading || currentStudent !== state.selectedStudentId || currentEnrollment !== state.selectedEnrollmentId || currentRequest !== profileRequest) return;
+        }
         state.selectedEnrollmentId = Number(button.dataset.enrollmentId);
         state.isNewEnrollment = false;
         renderEnrollmentTabs();

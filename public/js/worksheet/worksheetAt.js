@@ -7,9 +7,28 @@ import { formatDateDisplay } from "./worksheetInput.js";
 import { worksheetApi } from "./worksheetApi.js";
 import { updateSecondaryActions } from "./worksheetPreview.js";
 import { loadEnrollmentContext } from "./worksheet.js";
+import { createModalDialog } from "../modalDialog.js";
 
 let pendingAtSave = null;
 let atModalRevision = 0;
+let atLeaveBaseline = null;
+const atDialog = createModalDialog(els.atModal, {
+    initialFocus: () => els.atScore,
+    returnFocus: () => els.completeWsLevel,
+    onCancel: closeAtModal
+});
+
+function showAtMessage(message = "") {
+    els.atModalMessage.textContent = message;
+    els.atModalMessage.classList.toggle("hidden", !message);
+}
+function atLeaveSnapshot() {
+    return JSON.stringify([els.atDate.value, els.atScore.value, els.atTime.value, els.atGroup.value, state.atModal.isPass]);
+}
+window.kumonLeaveGuard?.register('AT', () => ({
+    dirty: !els.atModal.classList.contains('hidden') && atLeaveBaseline !== null && atLeaveSnapshot() !== atLeaveBaseline,
+    busy: Boolean(pendingAtSave)
+}));
 
 function captureContext() {
     return { context: state.context, requestId: state.contextRequestId };
@@ -61,6 +80,12 @@ function isAtFormReady() {
 
 export function updateAtSaveState() {
     els.atSaveButton.disabled = Boolean(pendingAtSave) || !isAtFormReady();
+    els.atSaveHint.textContent = pendingAtSave ? 'กำลังบันทึก AT กรุณารอผล'
+        : !Number.isInteger(Number(els.atScore.value)) || Number(els.atScore.value) <= 0 || Number(els.atScore.value) > Number(els.atMaxScore.value)
+            ? `กรอกคะแนนตั้งแต่ 1 ถึง ${els.atMaxScore.value || 'คะแนนเต็ม'}`
+            : !Number.isInteger(Number(els.atTime.value)) || Number(els.atTime.value) <= 0 ? 'กรอกเวลาเป็นจำนวนนาที มากกว่า 0'
+                : !Number.isInteger(Number(els.atGroup.value)) || Number(els.atGroup.value) < 1 || Number(els.atGroup.value) > 5
+                    ? 'เลือก Group ตั้งแต่ 1 ถึง 5' : 'พร้อมบันทึก AT • ตรวจวันที่และผลผ่าน/ไม่ผ่านก่อนยืนยัน';
 }
 
 function focusAndSelect(input) {
@@ -73,11 +98,7 @@ function focusAndSelect(input) {
 
 export function moveAtFocus(event, nextElement) {
     if (pendingAtSave) { event.preventDefault(); return; }
-    if (event.key !== "Enter" && event.key !== "Tab") {
-        return;
-    }
-
-    if (event.key === "Tab" && event.shiftKey) {
+    if (event.key !== "Enter") {
         return;
     }
 
@@ -122,6 +143,7 @@ export function fillAtFormFromSource({
     edit = false
 }) {
     if (pendingAtSave || !state.context || state.isLoadingContext) return;
+    showAtMessage();
     atModalRevision++;
     const enrollment = state.context.enrollment;
     const latestAttempt = source?.latestAttempt || null;
@@ -150,6 +172,7 @@ export function fillAtFormFromSource({
     els.atSaveButton.textContent = edit ? "💾 บันทึกการแก้ไข" : "💾 บันทึก AT";
     setAtPass(edit && attempt ? attempt.isPass : true);
     updateAtSaveState();
+    atLeaveBaseline = atLeaveSnapshot();
 }
 
 export function openAtModal({ editLatest = false } = {}) {
@@ -184,16 +207,13 @@ export function openAtModal({ editLatest = false } = {}) {
         "hidden",
         isEdit || !atCompletion?.latestAttempt
     );
-    els.atModal.classList.remove("hidden");
-    window.setTimeout(() => {
-        els.atScore.focus();
-        els.atScore.select();
-    }, 20);
+    atDialog.show();
+    els.atScore.select();
 }
 
 export function closeAtModal() {
     if (pendingAtSave) return;
-    els.atModal.classList.add("hidden");
+    atDialog.close();
 }
 
 function validateAtForm() {
@@ -236,7 +256,9 @@ export async function saveAtCompletion(event) {
         && modal.enrollmentId === enrollmentId;
     if (Number(enrollmentId) !== Number(scope.context.enrollment.enrollmentId)) return;
     let controls;
+    const focusedControl = document.activeElement;
     try {
+        showAtMessage();
         const values = validateAtForm();
         const payload = {
             enrollmentId,
@@ -250,12 +272,15 @@ export async function saveAtCompletion(event) {
             isPass: modal.isPass
         };
         pendingAtSave = scope;
+        updateAtSaveState();
         controls = [...els.atForm.querySelectorAll("input, button, select, textarea")].map(control => [control, control.disabled]);
         for (const [control] of controls) control.disabled = true;
+        els.atModal.setAttribute("aria-busy", "true");
+        els.atModal.focus({ preventScroll: true });
         const result = await worksheetApi.saveAtCompletion(payload);
 
         if (!isCurrent()) return;
-        els.atModal.classList.add("hidden");
+        atDialog.close();
         const resetMainLevelMasterId = result.isPass && result.nextLevelMasterId
             && Number(result.nextLevelMasterId) !== Number(scope.context.enrollment.currentLevelMasterId)
             ? result.nextLevelMasterId : null;
@@ -267,13 +292,21 @@ export async function saveAtCompletion(event) {
             "success"
         );
     } catch (error) {
-        if (isCurrent()) setStatus(error.message, "error");
+        if (isCurrent()) {
+            setStatus(error.message, "error");
+            showAtMessage(error.message);
+        }
     } finally {
         if (pendingAtSave === scope) {
             pendingAtSave = null;
             for (const [control, disabled] of controls || []) control.disabled = disabled;
+            els.atModal.removeAttribute("aria-busy");
         }
         updateAtSaveState();
+        if (isCurrent() && els.atModal.open) {
+            const target = els.atModal.contains(focusedControl) && !focusedControl.disabled ? focusedControl : els.atScore;
+            target.focus({ preventScroll: true });
+        }
     }
 }
 

@@ -50,6 +50,9 @@ for (const embedded of [false, true]) test(`New levels start at WS 1 after passi
       await page.waitForFunction(() => document.activeElement?.matches('[data-ws-input][data-kind=main]'));
       assert.equal(await main.inputValue(), '101');
       const zunBefore = await page.locator('[data-ws-input][data-kind=zun]').first().inputValue();
+      const requestIdBeforeCompletion = await page.evaluate(async () => (await import('/js/worksheet/worksheetState.js')).state.contextRequestId);
+      const completionResponse = page.waitForResponse(response => response.request().method() === 'POST'
+        && response.url().endsWith(name === 'free' ? '/worksheet/level-completion' : '/worksheet/at-completion'));
       if (name === 'free') {
         await page.evaluate(() => { void import('/js/worksheet/worksheetAt.js').then(at => at.completeWorksheetLevelWithoutAt()); });
         await f.choose(true);
@@ -61,11 +64,14 @@ for (const embedded of [false, true]) test(`New levels start at WS 1 after passi
         if (name === 'fail') await page.locator('[data-at-pass=false]').click();
         await page.locator('#atSaveButton').click();
       }
-      await page.waitForFunction(async () => {
+      await (await completionResponse).finished();
+      await page.waitForFunction(async requestIdBeforeCompletion => {
         const { state } = await import('/js/worksheet/worksheetState.js');
-        return !state.isLoadingContext && !state.isCompletingLevel && /บันทึก AT|จบ C แล้ว/.test(document.getElementById('statusLine').textContent)
+        // The previous scenario's success text can remain visible until the
+        // POST continuation starts its refresh. Wait for this refresh too.
+        return state.contextRequestId > requestIdBeforeCompletion && !state.isLoadingContext && !state.isCompletingLevel && /บันทึก AT|จบ C แล้ว/.test(document.getElementById('statusLine').textContent)
           && document.getElementById('atModal').classList.contains('hidden');
-      });
+      }, requestIdBeforeCompletion);
       const observed = await page.evaluate(async () => {
         const { state } = await import('/js/worksheet/worksheetState.js');
         return { defaults: state.context.defaults, level: state.context.enrollment.currentLevelMasterId,

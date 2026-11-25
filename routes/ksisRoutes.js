@@ -71,7 +71,7 @@ router.post('/at/:action', async (req, res) => {
         } else if (req.params.action === 'preview') result = await run(() => previewKsisAt({ userId, month: req.body?.month, year: req.body?.year, subject: req.body?.subject }));
         else if (req.params.action === 'fill') result = await run(() => applyKsisAt({ userId, previewId: req.body?.previewId, confirmedIdentityMatches: req.body?.confirmedIdentityMatches, confirmSave: req.body?.confirmSave === true }));
         else if (req.params.action === 'acknowledge') result = await run(() => acknowledgeKsisAt({ userId }));
-        else if (req.params.action === 'inspect') result = await run(() => inspectKsisAt({ userId, month: req.body?.month, year: req.body?.year, subject: req.body?.subject, kumonId: req.body?.kumonId }));
+        else if (req.params.action === 'inspect') result = await run(() => inspectKsisAt({ userId, month: req.body?.month, year: req.body?.year, subject: req.body?.subject, kumonId: req.body?.kumonId, enrollmentId: req.body?.enrollmentId }));
         else return res.status(404).json({ success: false, error: 'ไม่พบคำสั่ง AT' });
         res.json({ success: true, ...result });
     } catch (error) { sendError(res, error); }

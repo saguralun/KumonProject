@@ -113,7 +113,7 @@ function buildGroupPreview({
     if (pattern.code === "daily20") {
         const selectedNos = normalizedNos.slice(0, 2);
 
-        if (required && selectedNos.filter(Boolean).length < 2) {
+        if ((required || selectedNos.some(Boolean)) && selectedNos.filter(Boolean).length < 2) {
             return records;
         }
 
@@ -213,6 +213,11 @@ export function requiredMainReady(pattern, mainWorksheetNos) {
     return mainWorksheetNos.slice(0, count).filter((value) => (
         normalizeWorksheetNo(value)
     )).length === count;
+}
+
+export function optionalWorksheetReady(pattern, worksheetNos) {
+    return !worksheetNos.some((value) => normalizeWorksheetNo(value))
+        || requiredMainReady(pattern, worksheetNos);
 }
 
 // From htmlUtil.js — a plain classic script loaded before this module

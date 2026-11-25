@@ -1,3 +1,4 @@
+const requestApi = (url, options) => requestJson(url, options, "เกิดข้อผิดพลาด");
 const els = {
   createForm: document.getElementById("createForm"),
   createRoleSelect: document.getElementById("createRoleSelect"),
@@ -9,8 +10,16 @@ const els = {
   createRoleForm: document.getElementById("createRoleForm"),
   createRoleSubmit: document.getElementById("createRoleSubmit"),
   roleMessage: document.getElementById("roleMessage"),
-  matrixWrap: document.getElementById("permissionMatrixWrap")
+  matrixWrap: document.getElementById("permissionMatrixWrap"),
+  resetDialog: document.getElementById('resetPasswordDialog'),
+  resetForm: document.getElementById('resetPasswordForm'),
+  resetUsername: document.getElementById('resetPasswordUsername'),
+  resetValue: document.getElementById('resetPasswordValue'),
+  resetSubmit: document.getElementById('resetPasswordSubmit'),
+  resetCancel: document.getElementById('resetPasswordCancel'),
+  resetMessage: document.getElementById('resetPasswordMessage')
 };
+const setStatus = createStatusSetter(els.statusLine);
 
 // role_code -> { roleCode, roleName, isSystem, activeUserCount }, in display
 // order — kept in state so the account-role <select>s and the permission
@@ -23,31 +32,13 @@ const state = {
 const savingPermissionRoles = new Set();
 const permissionRevisions = new Map();
 let usersLoadRequest = 0;
+let resetTarget = null, resettingPassword = false;
 
 const NAV_GROUP_LABELS = {
   management: "จัดการ",
   warehouse: "คลัง",
   system: "ระบบ (Users/Migration เข้าถึงได้เฉพาะ Admin เสมอ ไม่อยู่ในตารางนี้)"
 };
-
-async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...options
-  });
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok || data.success === false) {
-    throw new Error(data.error || "เกิดข้อผิดพลาด");
-  }
-
-  return data;
-}
-
-function setStatus(text, isError = false) {
-  els.statusLine.textContent = text;
-  els.statusLine.classList.toggle("is-error", isError);
-}
 
 function setCreateMessage(text, isSuccess = false) {
   if (!text) {
@@ -112,8 +103,8 @@ async function loadAll() {
 
   try {
     const [usersData, rolesData] = await Promise.all([
-      requestJson("/api/users"),
-      requestJson("/api/roles")
+      requestApi("/api/users"),
+      requestApi("/api/roles")
     ]);
     if (requestId !== usersLoadRequest) return;
 
@@ -138,10 +129,12 @@ async function loadAll() {
     renderUsers(usersData.users);
     els.listSubtitle.textContent = `${usersData.users.length} บัญชี`;
     renderPermissionMatrix();
+    return true;
   } catch (error) {
     if (requestId !== usersLoadRequest) return;
     els.tableWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
     els.matrixWrap.innerHTML = `<div class="empty-state">${escapeHtml(error.message)}</div>`;
+    return false;
   }
 }
 
@@ -185,6 +178,7 @@ function renderUsers(users) {
             <td>${formatDate(user.created_at)}</td>
             <td>
               <div class="row-actions">
+                <button type="button" class="row-action-button" data-action="reset-password" data-username="${escapeHtml(user.username)}">รีเซ็ตรหัสผ่าน</button>
                 <select class="role-select" data-action="change-role" aria-label="เปลี่ยน role">
                   ${assignableRoles().map((role) => `
                     <option value="${escapeHtml(role.role_code)}" ${role.role_code === user.role ? "selected" : ""}>
@@ -206,6 +200,13 @@ function renderUsers(users) {
   els.tableWrap.querySelectorAll("[data-action=\"toggle-active\"]").forEach((button) => {
     button.addEventListener("click", () => handleToggleActive(button));
   });
+  els.tableWrap.querySelectorAll('[data-action="reset-password"]').forEach(button => button.addEventListener('click', () => {
+    if (resettingPassword) return;
+    resetTarget = { userId: button.closest('tr').dataset.userId, username: button.dataset.username };
+    els.resetForm.reset(); els.resetUsername.value = resetTarget.username;
+    els.resetMessage.textContent = ''; els.resetMessage.classList.add('hidden');
+    els.resetDialog.showModal(); els.resetValue.focus();
+  }));
   els.tableWrap.querySelectorAll("[data-action=\"change-role\"]").forEach((select) => {
     select.addEventListener("change", () => handleChangeRole(select));
   });
@@ -219,7 +220,7 @@ async function handleChangeRole(select) {
   select.disabled = true;
 
   try {
-    await requestJson(`/api/users/${userId}/role`, {
+    await requestApi(`/api/users/${userId}/role`, {
       method: "POST",
       body: JSON.stringify({ role: select.value })
     });
@@ -227,7 +228,7 @@ async function handleChangeRole(select) {
     setStatus("บันทึกแล้ว");
     await loadAll();
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, "error");
     select.disabled = false;
 
     if (previousValue) {
@@ -244,7 +245,7 @@ async function handleToggleActive(button) {
   button.disabled = true;
 
   try {
-    await requestJson(`/api/users/${userId}/active`, {
+    await requestApi(`/api/users/${userId}/active`, {
       method: "POST",
       body: JSON.stringify({ isActive: !isCurrentlyActive })
     });
@@ -252,7 +253,7 @@ async function handleToggleActive(button) {
     setStatus("บันทึกแล้ว");
     await loadAll();
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, "error");
     button.disabled = false;
   }
 }
@@ -344,16 +345,18 @@ async function handlePermissionToggle(checkbox) {
   for (const input of els.matrixWrap.querySelectorAll('input[data-role-code]')) if (input.dataset.roleCode === roleCode) input.disabled = true;
 
   try {
-    await requestJson(`/api/roles/${encodeURIComponent(roleCode)}/permissions`, {
+    const data = await requestApi(`/api/roles/${encodeURIComponent(roleCode)}/permissions`, {
       method: "PUT",
-      body: JSON.stringify({ permissionKeys: [...nextGrants] })
+      body: JSON.stringify({ permissionKeys: [...nextGrants], expectedPermissionKeys: [...currentGrants] })
     });
 
-    state.grants.set(roleCode, nextGrants);
+    state.grants.set(roleCode, new Set(data.permissions || nextGrants));
     setStatus(`อัพเดทสิทธิ์ ${roleName(roleCode)} แล้ว`);
   } catch (error) {
-    checkbox.checked = !checkbox.checked; // revert
-    setStatus(error.message, true);
+    savingPermissionRoles.delete(roleCode);
+    permissionRevisions.set(roleCode, (permissionRevisions.get(roleCode) || 0) + 1);
+    const refreshed = await loadAll();
+    setStatus(`${error.message}${refreshed ? ' • แสดงค่าล่าสุดแล้ว กรุณาตรวจก่อนกดใหม่' : ' • โหลดค่าล่าสุดไม่สำเร็จ กรุณาโหลดหน้าใหม่'}`, "error");
   } finally {
     savingPermissionRoles.delete(roleCode);
     for (const input of els.matrixWrap.querySelectorAll('input[data-role-code]')) if (input.dataset.roleCode === roleCode) {
@@ -373,11 +376,11 @@ async function handleDeleteRole(button) {
   button.disabled = true;
 
   try {
-    await requestJson(`/api/roles/${encodeURIComponent(roleCode)}`, { method: "DELETE" });
+    await requestApi(`/api/roles/${encodeURIComponent(roleCode)}`, { method: "DELETE" });
     setStatus(`ลบ role "${roleName(roleCode)}" แล้ว`);
     await loadAll();
   } catch (error) {
-    setStatus(error.message, true);
+    setStatus(error.message, "error");
     button.disabled = false;
   }
 }
@@ -389,7 +392,7 @@ els.createForm.addEventListener("submit", async (event) => {
 
   try {
     const formData = new FormData(els.createForm);
-    await requestJson("/api/users", {
+    await requestApi("/api/users", {
       method: "POST",
       body: JSON.stringify({
         username: formData.get("username"),
@@ -399,7 +402,7 @@ els.createForm.addEventListener("submit", async (event) => {
       })
     });
 
-    setCreateMessage("บันทึกบัญชีแล้ว", true);
+    setCreateMessage("สร้างบัญชีแล้ว", true);
     els.createForm.reset();
     await loadAll();
   } catch (error) {
@@ -416,7 +419,7 @@ els.createRoleForm.addEventListener("submit", async (event) => {
 
   try {
     const formData = new FormData(els.createRoleForm);
-    await requestJson("/api/roles", {
+    await requestApi("/api/roles", {
       method: "POST",
       body: JSON.stringify({
         roleCode: formData.get("roleCode"),
@@ -434,4 +437,45 @@ els.createRoleForm.addEventListener("submit", async (event) => {
   }
 });
 
+function clearPasswordReset() {
+  els.resetForm.reset();
+  resetTarget = null;
+  els.resetMessage.textContent = '';
+  els.resetMessage.classList.add('hidden');
+}
+
+function closePasswordReset() {
+  // The native close event is queued; clear secrets before returning control.
+  clearPasswordReset();
+  els.resetDialog.close();
+}
+
+els.resetCancel.addEventListener('click', () => { if (!resettingPassword) closePasswordReset(); });
+els.resetDialog.addEventListener('cancel', event => {
+  if (resettingPassword) event.preventDefault();
+  else clearPasswordReset();
+});
+els.resetDialog.addEventListener('close', () => {
+  // A previous close event must not clear a dialog that was already reopened.
+  if (!els.resetDialog.open) clearPasswordReset();
+});
+els.resetForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  if (resettingPassword || !resetTarget) return;
+  const target = resetTarget, password = els.resetValue.value;
+  if (password.length < 6) { els.resetMessage.textContent = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'; els.resetMessage.classList.remove('hidden'); return; }
+  resettingPassword = true;
+  els.resetSubmit.disabled = els.resetCancel.disabled = els.resetValue.disabled = true;
+  els.resetMessage.classList.add('hidden');
+  try {
+    await requestApi(`/api/users/${encodeURIComponent(target.userId)}/password`, { method: 'POST', body: JSON.stringify({ password }) });
+    closePasswordReset();
+    setStatus(`รีเซ็ตรหัสผ่านของ ${target.username} แล้ว บัญชีนี้ต้องเข้าสู่ระบบใหม่ทุกเครื่อง`);
+  } catch (error) {
+    els.resetMessage.textContent = error.message; els.resetMessage.classList.remove('hidden');
+  } finally {
+    resettingPassword = false;
+    els.resetSubmit.disabled = els.resetCancel.disabled = els.resetValue.disabled = false;
+  }
+});
 loadAll();

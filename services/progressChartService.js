@@ -154,6 +154,7 @@ export async function getProgressChartData({ subjectCode }) {
 
     const rows = await loadActiveStudentsForSubject(normalizedSubject);
     const missingLevel = [];
+    const unplottedStudents = [];
 
     const students = rows
         .map((row) => {
@@ -161,6 +162,16 @@ export async function getProgressChartData({ subjectCode }) {
 
             if (levelIndex === undefined) {
                 missingLevel.push(row.current_level_code);
+                // Keep the existing plotted-student payload compatible while
+                // accounting for active enrollments outside the chart's scale.
+                unplottedStudents.push({
+                    enrollmentId: row.enrollment_id,
+                    studentId: row.student_id,
+                    name: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+                    nickname: row.nickname || "",
+                    gradeClass: row.school_grade_class || null,
+                    levelCode: row.current_level_code
+                });
 
                 return null;
             }
@@ -210,6 +221,7 @@ export async function getProgressChartData({ subjectCode }) {
         levels: flatLevels,
         referenceLines,
         students,
+        unplottedStudents,
         missingLevelCount: missingLevel.length
     };
 }

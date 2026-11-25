@@ -5,7 +5,6 @@ import { loadCdSummary, loadWsSummary } from "./stockSummaryService.js";
 const TABLE_SCHEMA = "kumon";
 const FORECAST_CACHE_TABLE = "worksheet_forecast_average";
 const FORECAST_CACHE_MAX_AGE_DAYS = 7;
-const FORECAST_PACKET_NUMBERS = Array.from({ length: 20 }, (_, index) => (index * 10) + 1);
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
 
 // Order suggestion defaults — how many days it takes new stock to actually

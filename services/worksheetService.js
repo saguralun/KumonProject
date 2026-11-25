@@ -1,6 +1,9 @@
+import { normalizeDate, assertIsoDate } from "./dateHelpers.js";
 import pool from "../config/db.js";
 import { httpError } from "./httpError.js";
 import { formatStudentName, isCompleterLevel } from "./enrollmentHelpers.js";
+
+export { normalizeDate, assertIsoDate } from "./dateHelpers.js";
 
 const TABLE_SCHEMA = "kumon";
 const ACTIVE_STATUS_CODES = ["N", "EO", "IT", "R", "C"];
@@ -222,32 +225,6 @@ function normalizeSubjectCode(value) {
 function normalizeSearchMode(value) {
     const mode = String(value || 'all').toLowerCase();
     return ['id', 'name'].includes(mode) ? mode : 'all';
-}
-
-export function normalizeDate(value) {
-    if (value instanceof Date) {
-        const year = value.getFullYear();
-        const month = String(value.getMonth() + 1).padStart(2, "0");
-        const day = String(value.getDate()).padStart(2, "0");
-
-        return `${year}-${month}-${day}`;
-    }
-
-    if (typeof value === "string") {
-        return value.slice(0, 10);
-    }
-
-    return "";
-}
-
-export function assertIsoDate(value, label) {
-    const dateText = normalizeDate(value);
-
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) {
-        throw httpError(400, `${label} ไม่ถูกต้อง`);
-    }
-
-    return dateText;
 }
 
 function addDays(dateText, days) {

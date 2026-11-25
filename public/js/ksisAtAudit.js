@@ -1,3 +1,5 @@
+import { describeKsisAudit } from './ksisAuditDescription.js';
+
 const labels = { matched: 'ตรงกัน', mismatch: 'ไม่ตรงกัน', review: 'ต้องตรวจ', missing_ksis: 'ไม่พบใน KSIS', missing_report: 'ไม่พบใน Report' };
 const classes = { matched: 'match-exact', mismatch: 'match-conflict', review: 'match-review', missing_ksis: 'match-conflict', missing_report: 'match-review' };
 const fields = [['date', 'วันที่สอบ'], ['level', 'ระดับ'], ['time', 'เวลา'], ['score', 'คะแนน'], ['group', 'Group'], ['passed', 'ผ่าน']];
@@ -19,7 +21,7 @@ export function setupKsisAtAudit({ shared, getPeriod, setStatus, onStateChange }
       <td><span class="match-state ${classes[row.outcome]}">${labels[row.outcome]}</span>${row.reason ? `<div class="audit-reason">${text(row.reason)}</div>` : ''}</td></tr>`).join('')}</tbody></table>` : `<div class="empty-state">${result ? 'ไม่พบรายการตามตัวกรอง' : 'ยังไม่มีผลตรวจ AT'}</div>`;
   }
   function describe() {
-    source.textContent = result ? `${result.context} • ${result.subject} • ${result.scope === 'all' ? 'ทุกหน้าตามตัวกรอง KSIS' : `หน้าที่เลือก ${result.originalPage}`} • อ่าน ${result.pagesRead} หน้า • ตรวจเมื่อ ${new Date(result.verifiedAt).toLocaleString('th-TH')} • อ่านอย่างเดียว${result.outsidePage ? ` • นอกหน้า ${result.outsidePage} ผลสอบ` : ''}` : 'ยังไม่ได้ตรวจ AT';
+    source.textContent = result ? describeKsisAudit(result, { unit: 'ผลสอบ' }) : 'ยังไม่ได้ตรวจ AT';
   }
   async function read(scope) {
     if (busy) return;
