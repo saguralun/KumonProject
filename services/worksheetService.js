@@ -1033,15 +1033,15 @@ async function getWorksheetProgressForLevel({
     }
 
     const result = await client.query(`
-        SELECT wu.actual_worksheet_no
+        -- Progress is the furthest recorded worksheet in this level, across
+        -- all dates. Reviewing an earlier packet must not lower this value.
+        SELECT MAX(wu.actual_worksheet_no)::int AS actual_worksheet_no
         FROM ${TABLE_SCHEMA}.worksheet_used wu
         JOIN ${TABLE_SCHEMA}.worksheet_master wm
             ON wm.worksheet_master_id = wu.worksheet_master_id
         WHERE wu.enrollment_id = $1
           AND wm.level_master_id = $2
           AND wu.cpws = TRUE
-        ORDER BY wu.worksheet_date DESC, wu.worksheet_used_id DESC
-        LIMIT 1
     `, [
         enrollment.enrollmentId,
         levelMasterId

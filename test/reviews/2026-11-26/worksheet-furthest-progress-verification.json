@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-26",
+  "baseCommit": "185d313672c65d8c76fd7fbd23f5211c837bdc33",
+  "request": "Use the highest worksheet number ever recorded in the current level instead of the latest Receive Date for Main/Zun progress.",
+  "productionDataWrites": false,
+  "productionSchemaChanges": false,
+  "realPaymentPrintStockBackupRestoreOrKsisSave": false,
+  "commitPushOrProductionRestart": false,
+  "behavior": [
+    "MAX(actual_worksheet_no) over all CPWS records in the selected current level, independent of dates and history paging.",
+    "Keep existing +9 packet endpoint and 200/100 Main/Zun caps; repeated or reviewed lower packets cannot reduce progress.",
+    "Existing latest-WS/default/Incomplete calculations still use Receive Date then row ID. History remains ID descending.",
+    "CPWS/KC and AT-completion eligibility rules are unchanged; grade comparison uses the returned aggregate percentage.",
+    "Deleting or correcting the highest WS number recomputes the remaining maximum. No sticky achievement or schema is introduced.",
+    "Frontend history fallback uses the maximum available in its supplied history; the server remains authoritative over the complete history.",
+    "Removed the now-unused frontend Receive Date comparator and its implementation-only test; actual date behavior remains covered by the database suite."
+  ],
+  "before": {
+    "uiFailures": 2,
+    "reason": "Old UI showed 130 for the latest packet although a prior packet reached 160."
+  },
+  "after": {
+    "servicesPassed": 382,
+    "servicesExistingOptInSkip": 1,
+    "disposableDatabasePassed": 48,
+    "relatedUiPassed": 11,
+    "finalMainZunUiPassed": 2
+  },
+  "notes": [
+    "The first extended database fixture selected an EFL Zun that does not exist in the master data. It was corrected to a valid Math D/ZI pair; the full disposable database suite then passed.",
+    "All database test calls verify and use a private disposable PostgreSQL cluster; production pool use is poisoned until that identity is verified.",
+    "UI checks use synthetic APIs and separate browser/Electron profiles. The live application was not restarted."
+  ],
+  "sourceFingerprints": {
+    "public/js/worksheet/worksheetHistory.js": "c626b5775d23423a85ae8974bb2bbfc9977fdc22e645149f1048120e959569dc",
+    "public/js/worksheet/worksheetPreview.js": "c17890b01cfa00d39940358b8cbbf0cec2cd2c8a17c2ccfa91c4edd7bd3a2ea6",
+    "services/worksheetService.js": "9ca4d0cd799910ff2f27ffcb1e5ae517e10756a973bf6a03971dff38f82dc275",
+    "test/README.md": "bb2eb485043bd6f1b58c177171c8b20a7e6e86f1e7078f0a858caa3c1bdf4d2c",
+    "test/isolatedDatabase.integration.test.js": "d576bf14b09148ef2ffae3a88a3d1750af6c2aaf787e6d5337218e41a52556c3",
+    "test/worksheetHistoryOrder.test.js": "83fe808cf08c7ea540e9f4ad5aad0f628cf9be085948e2194b34b8033fb78cea",
+    "test/worksheetLatestDate.ui.test.js": "f7623f0ddb66d6074e46e053de265ccc520a27dab3229862a3c67535f9001a88"
+  },
+  "evidenceFingerprints": {
+    "logs/round4-furthest-progress-before.log": "37b1d1cc69229a5a09914c705be89f725ac7af81626f0d0e9862520006f3062e",
+    "logs/round4-furthest-progress-database.log": "f74b5f173ccfb2806aa064786cf2710cc73f28bea9d67419f180147e8b1720d7",
+    "logs/round4-furthest-progress-database-fixed.log": "0c40edeea175cdad8cafa2f2bab0c47bab8945fbca2e4debef1d8fc8acb79309",
+    "logs/round4-furthest-progress-ui.log": "582c13003768942865dbd078f0b7660100b09e239570b13c6daab1aaa0ae5982",
+    "logs/round4-furthest-progress-ui-final.log": "73faba5bb7c62172024c5e3a6d86fc4922486da4ac12c1d29f32dce4ff3a3193",
+    "logs/round4-furthest-progress-services.log": "28db4e70f37360c83da731c1c9c6a7cde676bd61fe6159089a5500ffc4bb8d05"
+  }
+}

@@ -9,7 +9,7 @@ import { execFile } from 'node:child_process';
 import pg from 'pg';
 import productionPool from '../config/db.js';
 import { receiveReceiptPayment, cancelReceiptPayment, previewReceipt, getPaymentStatus } from '../services/paymentService.js';
-import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel, getEnrollmentContext, deleteWorksheetEntry, updateWorksheetEntryNumber, searchEnrollments, getHistory, updateWorksheetEntryDate, getIncompleteWorksheetStudents } from '../services/worksheetService.js';
+import { saveWorksheetEntries, saveAtCompletion, completeWorksheetLevelWithoutAt, completeZunLevel, getEnrollmentContext, deleteWorksheetEntry, updateWorksheetEntryNumber, searchEnrollments, getHistory, updateWorksheetEntryDate, getIncompleteWorksheetStudents, computeGradeSyncStatus } from '../services/worksheetService.js';
 import { createDeliveryOrder, processDeliveryOrder } from '../services/stockReceiveService.js';
 import { processPendingDates } from '../services/stockCutService.js';
 import { restoreBackupFile } from '../services/backupService.js';
@@ -538,7 +538,7 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.ok(sameDay[0].worksheetUsedId>sameDay[1].worksheetUsedId);
             assert.deepEqual((await getHistory(id,30)).map(r=>r.worksheetUsedId),[...sameDay.map(r=>r.worksheetUsedId),...expected]);
         });
-        await t.test('Latest WS follows Receive Date and same-day ID while Input history follows insertion ID', async () => {
+        await t.test('Latest WS follows Receive Date while progress retains the furthest worksheet and history follows insertion ID', async () => {
             const id = await student('Receive Date latest WS');
             const year = new Date().getFullYear() - 2;
             const newerDate = `${year}-11-20`, olderDate = `${year}-10-20`;
@@ -553,8 +553,9 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.equal(context.history[0].worksheetUsedId, backdated.worksheetUsedId);
             assert.equal(context.defaults.receiveDate, `${year}-11-21`);
             assert.equal(context.defaults.mainWorksheetNo, 121);
-            assert.equal(context.worksheetProgress.main.actualWorksheetNo, 121);
-            assert.equal(context.worksheetProgress.main.displayWorksheetNo, 130);
+            assert.equal(context.worksheetProgress.main.actualWorksheetNo, 151);
+            assert.equal(context.worksheetProgress.main.displayWorksheetNo, 160);
+            assert.equal(context.worksheetProgress.main.percent, 80);
             const findIncomplete = async () => {
                 let result = await getIncompleteWorksheetStudents();
                 for (let page = 1; page <= result.regular.totalPages; page++) {
@@ -572,7 +573,7 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             assert.deepEqual(refreshed.history.map(row => row.worksheetUsedId),
                 [sameDay.worksheetUsedId, backdated.worksheetUsedId, latest.worksheetUsedId, first.worksheetUsedId]);
             assert.equal(refreshed.defaults.mainWorksheetNo, 31);
-            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 31);
+            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 151);
             incomplete = await findIncomplete();
             assert.equal(incomplete.latestPacketWorksheetNo, 31);
             // A newly entered ancient date stays visible, without becoming latest.
@@ -580,12 +581,51 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
             refreshed = await getEnrollmentContext(id, 1);
             assert.equal(refreshed.history[0].worksheetUsedId, incorrect.worksheetUsedId);
             assert.equal(refreshed.defaults.mainWorksheetNo, 31);
-            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 31);
+            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 191);
+            assert.equal(refreshed.worksheetProgress.main.percent, 100);
             await updateWorksheetEntryDate({ enrollmentId: id, worksheetUsedId: sameDay.worksheetUsedId, worksheetDate: olderDate });
             refreshed = await getEnrollmentContext(id, 30);
             assert.equal(refreshed.history[0].worksheetUsedId, incorrect.worksheetUsedId);
-            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 121);
+            assert.equal(refreshed.worksheetProgress.main.actualWorksheetNo, 191);
             assert.equal((await findIncomplete()).latestPacketWorksheetNo, 121);
+        });
+        await t.test('Main and Zun progress use all dates in their own current level, exclude continuations and recompute after removal', async () => {
+            const id = await student('Furthest progress');
+            const main = (await database.query(`SELECT lm.level_master_id,wm.worksheet_master_id FROM kumon.level_master lm
+                JOIN kumon.worksheet_master wm ON wm.level_master_id=lm.level_master_id
+                WHERE lm.subject_id=1 AND lm.level_type=1 AND lm.level_code='D' AND wm.worksheet_no=1`)).rows[0];
+            const zun = (await database.query(`SELECT level_master_id FROM kumon.level_master
+                WHERE subject_id=1 AND level_type=2 AND level_code='ZI'`)).rows[0];
+            assert.ok(main && zun, 'Use a valid Math Main/Zun fixture pair');
+            await database.query(`UPDATE kumon.enrollment SET subject_id=1,current_level_master_id=$2,
+                starting_worksheet_master_id=$3,current_zun_level_master_id=$4 WHERE enrollment_id=$1`, [id,main.level_master_id,main.worksheet_master_id,zun.level_master_id]);
+            await database.query(`UPDATE kumon.student SET school_grade_id=(SELECT school_grade_id FROM kumon.school_grade_master WHERE school_class='ป.4')
+                WHERE student_id=(SELECT student_id FROM kumon.enrollment WHERE enrollment_id=$1)`,[id]);
+            const stocks = (await database.query('SELECT * FROM kumon.stock ORDER BY stock_type_id,master_id')).rows;
+            const save = async (date, wsNo, zunNo) => saveWorksheetEntries({ enrollmentId:id,receiveDate:date,patternCode:'daily10',mainWorksheetNos:[wsNo],zunWorksheetNos:[zunNo] });
+            const high = await save('2023-01-01',181,81);
+            await database.query('UPDATE kumon.worksheet_used SET is_stock_processed=TRUE WHERE worksheet_used_id=ANY($1::int[])', [high.records.map(row=>row.worksheetUsedId)]);
+            await save('2026-11-20',11,1);
+            // Same pupil, another historical level must not advance this level.
+            const other = (await database.query(`SELECT wm.worksheet_master_id FROM kumon.worksheet_master wm
+                JOIN kumon.level_master lm ON lm.level_master_id=wm.level_master_id
+                WHERE lm.subject_id=1 AND lm.level_type=1 AND lm.level_code='E' AND wm.worksheet_no=191`)).rows[0];
+            const lastMain = (await database.query('SELECT worksheet_master_id FROM kumon.worksheet_master WHERE level_master_id=$1 AND worksheet_no=191',[main.level_master_id])).rows[0];
+            await database.query(`INSERT INTO kumon.worksheet_used(enrollment_id,worksheet_master_id,actual_worksheet_no,worksheet_date,worksheet_month,worksheet_year,cpws)
+                VALUES($1,$2,191,'2026-11-21',11,2026,TRUE),($1,$3,191,'2026-11-22',11,2026,FALSE)`,[id,other.worksheet_master_id,lastMain.worksheet_master_id]);
+            let context = await getEnrollmentContext(id,1);
+            assert.equal(context.history.length,1);
+            assert.deepEqual([context.worksheetProgress.main.actualWorksheetNo,context.worksheetProgress.main.displayWorksheetNo,context.worksheetProgress.main.percent],[181,190,95]);
+            assert.deepEqual([context.worksheetProgress.zun.actualWorksheetNo,context.worksheetProgress.zun.displayWorksheetNo,context.worksheetProgress.zun.percent],[81,90,90]);
+            const grade = computeGradeSyncStatus({subjectCode:'ME',schoolGradeClass:'ป.4',currentLevelCode:'D',progressPercent:95});
+            assert.equal(context.gradeSyncStatus?.code,grade?.code, 'The class comparison uses the same furthest-progress percentage');
+            const final = await save('2022-01-01',191,91);
+            context = await getEnrollmentContext(id,1);
+            assert.equal(context.worksheetProgress.main.percent,100); assert.equal(context.worksheetProgress.zun.percent,100);
+            const peak = final.records.find(row=>row.worksheetType==='WS');
+            const removed = await deleteWorksheetEntry({enrollmentId:id,worksheetUsedId:peak.worksheetUsedId});
+            assert.equal(removed.worksheetProgress.main.percent,95); assert.equal(removed.worksheetProgress.zun.percent,100);
+            assert.deepEqual((await database.query('SELECT * FROM kumon.stock ORDER BY stock_type_id,master_id')).rows,stocks);
         });
         await t.test('Ten real concurrent WS transactions finish with a ten-connection pool', async () => {
             const ids = await Promise.all(Array.from({ length: 10 }, (_, index) => student(`WS${index}`)));

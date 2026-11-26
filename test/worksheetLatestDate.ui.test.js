@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { controlFixture } from './support/controlFixture.js';
 
-for (const embedded of [false, true]) test(`WS history keeps new entries visible while Main/Zun progress follows Receive Date (${embedded ? 'desktop' : 'browser'})`, {
+for (const embedded of [false, true]) test(`WS history keeps new entries visible while Main/Zun progress retains the furthest recorded worksheet (${embedded ? 'desktop' : 'browser'})`, {
   skip: process.env.TEST_BROWSER_UI !== '1', timeout: 25000
 }, async () => {
   const summary = { billingMonth: 11, billingYear: 2026, usedDays: 2, cpwsRecords: 2 };
@@ -12,7 +12,8 @@ for (const embedded of [false, true]) test(`WS history keeps new entries visible
     worksheetType: level === 99 ? 'ZUN' : 'WS', worksheetLabel: `${level === 99 ? 'ZI' : 'D'}${number}`,
     packetWorksheetNo: number, cpws, isStockProcessed: false
   });
-  let history = [row(6, '2026-12-20', 191, 100, false), row(5, '2026-10-20', 81, 99),
+  let history = [row(8, '2026-12-20', 191, 101), row(7, '2026-12-20', 91, 99, false),
+    row(6, '2026-12-20', 191, 100, false), row(5, '2026-10-20', 81, 99),
     row(4, '2026-11-20', 21, 99), row(3, '2026-10-20', 151), row(2, '2026-11-20', 121), row(1, '2026-10-20', 131)];
   const context = () => ({
     enrollment: { enrollmentId: 1, subjectCode: 'ME', studentName: 'Receive Date fixture', currentLevelMasterId: 100,
@@ -28,7 +29,7 @@ for (const embedded of [false, true]) test(`WS history keeps new entries visible
     if (req.path.endsWith('/worksheet-summary')) { res.json({ success: true, worksheetMonthSummary: summary }); return true; }
     if (req.path === '/worksheet/entries') {
       assert.equal(req.method, 'POST'); assert.equal(req.body.enrollmentId, 1);
-      const saved = row(7, '0092-03-20', 191);
+      const saved = row(9, '0092-03-20', 191);
       history = [saved, ...history];
       res.json({ success: true, records: [saved], nextReceiveDate: '2026-11-21' }); return true;
     }
@@ -41,24 +42,28 @@ for (const embedded of [false, true]) test(`WS history keeps new entries visible
       await page.waitForFunction(() => document.activeElement?.matches('[data-ws-input][data-kind=main]'));
     };
     await load();
-    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '130');
+    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '160');
+    assert.equal(await page.locator('#worksheetProgressCaption').innerText(), '80%');
     await page.locator('[data-progress-kind="zun"]').click();
-    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '30');
+    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '90');
+    assert.equal(await page.locator('#worksheetProgressCaption').innerText(), '90%');
     await page.locator('[data-progress-kind="main"]').click();
     await page.locator('#saveButton').click();
     await page.waitForFunction(() => document.getElementById('statusLine').textContent.includes('บันทึก 1 รายการแล้ว'));
-    assert.equal(await page.locator('.history-table [data-delete-history-id]').first().getAttribute('data-delete-history-id'), '7');
-    assert.equal(await page.locator('[data-edit-history-date-id="7"]').inputValue(), '0092-03-20');
-    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '130');
+    assert.equal(await page.locator('.history-table [data-delete-history-id]').first().getAttribute('data-delete-history-id'), '9');
+    assert.equal(await page.locator('[data-edit-history-date-id="9"]').inputValue(), '0092-03-20');
+    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '200');
+    assert.equal(await page.locator('#worksheetProgressCaption').innerText(), '100%');
     await page.reload(); await load();
-    assert.equal(await page.locator('.history-table [data-delete-history-id]').first().getAttribute('data-delete-history-id'), '7');
-    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '130');
-    history = [row(8, '2026-11-20', 31), ...history];
+    assert.equal(await page.locator('.history-table [data-delete-history-id]').first().getAttribute('data-delete-history-id'), '9');
+    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '200');
+    history = [row(10, '2026-11-20', 31), ...history];
     await load();
-    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '40');
-    assert.equal(await page.locator('.history-table [data-delete-history-id]').first().getAttribute('data-delete-history-id'), '8');
+    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '200');
+    assert.equal(await page.locator('#worksheetProgressCaption').innerText(), '100%');
+    assert.equal(await page.locator('.history-table [data-delete-history-id]').first().getAttribute('data-delete-history-id'), '10');
     await page.locator('[data-progress-kind="zun"]').click();
-    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '30');
+    assert.equal(await page.locator('#worksheetProgressValue').innerText(), '90');
     assert.equal(f.writes().length, 1); assert.deepEqual(f.errors, []);
   } finally { await f.close(); }
 });

@@ -9,7 +9,6 @@
 // anything from worksheet.js (the reverse isn't true: worksheet.js imports
 // plenty from here), so there's no circular import for this pairing.
 import { els, setStatus, state, isHistoryEditPending } from "./worksheetState.js";
-import { compareWorksheetReceiveDate } from './worksheetHistory.js';
 import { completionControlHelp } from './worksheetCompletionHelp.js';
 import {
     buildPreviewRecords,
@@ -120,14 +119,16 @@ function fallbackWorksheetProgressFromHistory(context, kind) {
     const rows = (context.history || []).filter((row) => (
         row.cpws === true
         && Number(row.levelMasterId) === Number(target.levelMasterId)
-        && row.worksheetDate
     ));
 
     if (!rows.length) {
         return null;
     }
 
-    const actualWorksheetNo = Number([...rows].sort(compareWorksheetReceiveDate)[0].actualWorksheetNo || 0);
+    const actualWorksheetNo = rows.reduce((furthest, row) => {
+        const number = Number(row.actualWorksheetNo);
+        return Number.isInteger(number) && number > furthest ? number : furthest;
+    }, 0);
 
     if (!actualWorksheetNo) {
         return null;
@@ -205,6 +206,7 @@ export function renderWorksheetProgress() {
     els.worksheetProgressLevel.textContent = progress.levelCode;
     els.worksheetProgressValue.textContent = String(progress.displayWorksheetNo);
     els.worksheetProgressCaption.textContent = `${progress.percent}%`;
+    els.worksheetProgressCaption.title = 'ความคืบหน้าจากชุดสูงสุดที่เคยบันทึกในเลเวลนี้';
 
     renderGradeSyncBadge(state.progressKind === "main" ? state.context?.gradeSyncStatus : null);
 }
