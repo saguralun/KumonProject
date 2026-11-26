@@ -1251,6 +1251,7 @@ async function getLevelCompletionState(enrollment, client = pool) {
         },
         freeLevelCompletion: {
             canComplete: canCompleteWithoutAt,
+            isFreeCompletionLevel: FREE_COMPLETION_LEVEL_CODES.includes(row.current_level_code),
             hasWorksheet191,
             currentLevelMasterId: enrollment.currentLevelMasterId,
             currentLevelCode: row.current_level_code ?? enrollment.currentLevelCode,

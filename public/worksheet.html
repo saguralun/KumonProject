@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/worksheet.css?v=20261125-date-drafts">
+  <link rel="stylesheet" href="/css/worksheet.css?v=20261125-history-completion-help">
   <link rel="stylesheet" href="/css/app-scale.css?v=20261030-project-audit">
   <link rel="stylesheet" href="/css/app-menu.css?v=20261023-update-anytime">
   <link rel="stylesheet" href="/css/workspace-controls.css?v=20261023-page-tools">
@@ -133,14 +133,16 @@
             <div class="worksheet-progress-core">
               <div class="worksheet-progress-level" id="worksheetProgressLevel">-</div>
               <div class="worksheet-progress-value" id="worksheetProgressValue">0</div>
-              <button type="button" class="progress-at-button hidden" id="completeWsLevel" disabled>
+              <button type="button" class="progress-at-button hidden" id="completeWsLevel" aria-describedby="completionHint" disabled>
                 <span class="button-icon">📝</span><span>สอบ AT</span>
               </button>
-              <button type="button" class="progress-at-button hidden" id="completeZunLevel" disabled>
+              <button type="button" class="progress-at-button hidden" id="completeZunLevel" aria-describedby="completionHint" disabled>
                 <span class="button-icon">🎯</span><span>จบ Zun</span>
               </button>
             </div>
           </div>
+          <div class="completion-actions" id="completionActions"></div>
+          <div class="completion-hint" id="completionHint" role="status" aria-live="polite"></div>
         </div>
 
         <div class="date-control">
@@ -237,9 +239,11 @@
           </label>
           <label>
             <span>Date AT</span>
-            <input id="atDate" type="date" required>
+            <input id="atDate" type="date" aria-describedby="atDateHelp" required>
           </label>
         </div>
+
+        <div class="at-context-help" id="atDateHelp"></div>
 
         <div class="at-score-grid">
           <label>
@@ -269,6 +273,7 @@
           <button type="button" class="at-result-button active" data-at-pass="true">ผ่าน</button>
         </div>
 
+        <div class="at-context-help" id="atEffectHint" role="status" aria-live="polite"></div>
         <div class="save-hint" id="atSaveHint" role="status" aria-live="polite">กรอกคะแนน เวลา และ Group ก่อนบันทึก</div>
         <div class="at-dialog-footer">
           <button type="button" class="secondary-button hidden" id="atEditLatest">แก้รอบล่าสุด</button>

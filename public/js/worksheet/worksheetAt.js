@@ -58,6 +58,15 @@ export function setAtPass(isPass) {
             (button.dataset.atPass === "true") === state.atModal.isPass
         );
     });
+    const editing = Boolean(state.atModal.editingAtUsedId);
+    els.atDateHelp.textContent = editing
+        ? 'ใช้วันที่ของผลสอบเดิม ปรับวันสอบได้ก่อนบันทึกการแก้ไข'
+        : `วันสอบเริ่มจากวันที่รับ WS (Receive Date) ${formatDateDisplay(els.receiveDate.value)} • ปรับวันสอบได้ก่อนบันทึก`;
+    els.atEffectHint.textContent = editing
+        ? 'กำลังแก้ผลสอบเดิม การเปลี่ยนผ่าน/ไม่ผ่านอาจปรับระดับปัจจุบันตามกติกาเดิม'
+        : state.atModal.isPass
+            ? 'เมื่อบันทึกผ่าน จะเปลี่ยนระดับปัจจุบันทันที แม้เลือกวันสอบย้อนหลัง กรุณาตรวจวันที่และผลสอบก่อนบันทึก'
+            : 'บันทึกผลไม่ผ่านโดยคงระดับปัจจุบัน';
 }
 
 function isAtFormReady() {

@@ -63,7 +63,11 @@ for (const embedded of [false, true]) {
         offline = true;
         await page.clock.runFor(5 * 60000);
         await page.locator('#updateCheckStatus[data-stale="true"]').waitFor({ state: 'attached' });
-        assert.match(await page.locator('#updateCheckMessage').innerText(), /ตรวจเวอร์ชันไม่ได้.*ตรวจสำเร็จล่าสุด/);
+        assert.match(await page.locator('#updateCheckMessage').textContent(), /ตรวจเวอร์ชันไม่ได้.*ตรวจสำเร็จล่าสุด/);
+        if (pageName !== 'login') {
+          assert.equal(await page.locator('#updateCheckMessage').isVisible(), false);
+          assert.equal(await page.locator('#updateCheckToast').isVisible(), false, 'Background checks must stay quiet');
+        }
         assert.equal(await notice.evaluate(element => element.classList.contains('hidden')), false);
         if (pageName !== 'login') assert.equal(await page.locator('.app-menu-toggle').evaluate(element => element.classList.contains('app-menu-has-update')), true);
         offline = false; current = true;

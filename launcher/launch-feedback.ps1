@@ -30,18 +30,42 @@
     }
 }
 
+function Get-KumonLocalRuntime {
+    # Use the same local IPv4 listener as the server. On some Windows machines
+    # localhost resolution/fallback alone exceeds the short readiness timeout.
+    try {
+        $runtime = Invoke-RestMethod -Uri 'http://127.0.0.1:3000/api/system/runtime' -TimeoutSec 2 -ErrorAction Stop
+        if ($runtime.success -and $runtime.instanceId) { return $runtime }
+    } catch { }
+    return $null
+}
+
+function Open-KumonDesktopWindow {
+    # The server still opens the app at its existing localhost origin; this
+    # address is only the launcher's loopback request, not the browser URL.
+    $desktop = Invoke-RestMethod -Uri 'http://127.0.0.1:3000/api/system/desktop/show' -Method Post -ContentType 'application/json' -Body '{}' -TimeoutSec 40 -ErrorAction Stop
+    if (-not $desktop.success) { throw 'The server started but its desktop window could not be opened.' }
+}
+
 function Wait-KumonDesktop {
-    param([int]$TimeoutSeconds = 45)
+    param([int]$TimeoutSeconds = 90, $Progress = $null)
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
     $ready = $false
     while ((Get-Date) -lt $deadline) {
-        try {
-            $runtime = Invoke-RestMethod -Uri 'http://localhost:3000/api/system/runtime' -TimeoutSec 2 -ErrorAction Stop
-            if ($runtime.success -and $runtime.instanceId) { $ready = $true; break }
-        } catch { }
+        if ($Progress) {
+            $state = $null
+            try { $state = Get-Content -LiteralPath $Progress.Path -Raw -Encoding UTF8 -ErrorAction Stop | ConvertFrom-Json } catch { }
+            if ($state.attemptId -eq $Progress.Attempt -and $state.status -eq 'error') {
+                throw 'The server could not finish loading. Startup timing details are available in the KumonDB startup report.'
+            }
+        }
+        if (Get-KumonLocalRuntime) { $ready = $true; break }
         Start-Sleep -Milliseconds 500
     }
+    # A server can finish starting between the last poll and the deadline.
+    # Confirm once more before reporting a failed launch; still fail visibly
+    # when it is unavailable or the desktop cannot actually be opened.
+    if (-not $ready) { $ready = [bool](Get-KumonLocalRuntime) }
     if (-not $ready) { throw 'The local server did not become ready within the startup deadline.' }
-    $desktop = Invoke-RestMethod -Uri 'http://localhost:3000/api/system/desktop/show' -Method Post -ContentType 'application/json' -Body '{}' -TimeoutSec 40 -ErrorAction Stop
-    if (-not $desktop.success) { throw 'The server started but its desktop window could not be opened.' }
+    Open-KumonDesktopWindow
 }

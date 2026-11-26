@@ -62,7 +62,15 @@ export async function listRoles() {
             (
                 SELECT COUNT(*)::int FROM app_user
                 WHERE app_user.role = role_master.role_code AND app_user.is_active
-            ) AS active_user_count
+            ) AS active_user_count,
+            (
+                SELECT COUNT(*)::int FROM app_user
+                WHERE app_user.role = role_master.role_code AND NOT app_user.is_active
+            ) AS inactive_user_count,
+            (
+                SELECT COUNT(*)::int FROM app_user
+                WHERE app_user.role = role_master.role_code
+            ) AS total_user_count
          FROM role_master
          ORDER BY role_master.sort_order, role_master.role_code`
     );
@@ -122,7 +130,7 @@ export async function createRole({ roleCode, roleName }) {
         throw httpError(409, `role code "${normalizedCode}" มีอยู่แล้ว`);
     }
 
-    return { ...result.rows[0], active_user_count: 0 };
+    return { ...result.rows[0], active_user_count: 0, inactive_user_count: 0, total_user_count: 0 };
 }
 
 export async function renameRole(roleCode, roleName) {

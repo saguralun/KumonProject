@@ -27,6 +27,7 @@ import statisticsRoutes from "./routes/statisticsRoutes.js";
 import { checkAndApplySchoolYearUpgrade } from "./services/schoolYearUpgradeService.js";
 import { mainDesktop } from './services/appDesktop.js';
 import { startSpecialStatusPreparation } from './services/specialStatusCatalogService.js';
+import { reportStartupStage } from './services/startupProgressService.js';
 import {
   requireAuth,
   refreshAccountSession,
@@ -198,6 +199,7 @@ app.use(express.static(PUBLIC_DIR));
 app.use("/migration", requireAdmin, express.static("migration"));
 
 app.listen(PORT, HOST, () => {
+  reportStartupStage('server');
   // A missing FRGH reference value is backed up and inserted once; the app
   // stays available if the backup or catalog is unavailable on this machine.
   startSpecialStatusPreparation().then(result => {

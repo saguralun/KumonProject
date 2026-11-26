@@ -3,6 +3,7 @@ import { _electron } from 'playwright-core';
 import { parse } from 'cookie';
 import { httpError } from './httpError.js';
 import { installDesktopDownloads } from './desktopDownloadService.js';
+import { reportStartupStage } from './startupProgressService.js';
 
 const REPORT_URL = 'https://kao.ksis.kumon.com/kth/#/reportbeditgrid';
 const DESKTOP_ENTRY = path.resolve('desktop/main.cjs');
@@ -16,11 +17,15 @@ async function focusApplication(application) {
     await application.evaluate(({ BrowserWindow }) => { const window = BrowserWindow.getAllWindows()[0]; if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); } });
 }
 
-export async function createApplicationDesktop({ origin, profileDirectory, configureContext, cookieHeader, startPath = '/login.html', downloadDirectory }) {
+export async function createApplicationDesktop({ origin, profileDirectory, configureContext, cookieHeader, startPath = '/login.html', downloadDirectory, onStartupStage = reportStartupStage }) {
     const startUrl = new URL(startPath, origin);
     if (startUrl.origin !== origin || startUrl.username || startUrl.password) throw httpError(400, 'หน้าเริ่มต้นต้องอยู่ใน KumonDB');
-    const application = await _electron.launch({ args: ['--remote-debugging-address=127.0.0.1', DESKTOP_ENTRY], cwd: process.cwd(),
-        env: { ...desktopEnvironment(origin, profileDirectory), KUMON_DESKTOP_MAIN: '1', KUMON_DESKTOP_OWNER_PID: String(process.pid) }, chromiumSandbox: true, acceptDownloads: true, timeout: 30000 });
+    onStartupStage('desktop');
+    let application;
+    try {
+        application = await _electron.launch({ args: ['--remote-debugging-address=127.0.0.1', DESKTOP_ENTRY], cwd: process.cwd(),
+            env: { ...desktopEnvironment(origin, profileDirectory), KUMON_DESKTOP_MAIN: '1', KUMON_DESKTOP_OWNER_PID: String(process.pid) }, chromiumSandbox: true, acceptDownloads: true, timeout: 30000 });
+    } catch (error) { onStartupStage('error'); throw error; }
     try {
         const main = await application.firstWindow({ timeout: 20000 }), context = application.context();
         await application.evaluate(async ({ app }) => {
@@ -34,7 +39,9 @@ export async function createApplicationDesktop({ origin, profileDirectory, confi
         if (cookieHeader) await context.addCookies([desktopAppCookie(cookieHeader, origin)]);
         const directory = downloadDirectory || await application.evaluate(({ app }) => app.getPath('downloads'));
         const downloads = installDesktopDownloads({ page: main, origin, directory });
+        onStartupStage('login');
         await main.goto(startUrl.href, { waitUntil: 'domcontentloaded' });
+        onStartupStage('ready');
         const accounts = new Map();
         const desktop = { application, context, main, origin,
             downloadsIdle: () => downloads.waitForIdle(),
@@ -73,7 +80,7 @@ export async function createApplicationDesktop({ origin, profileDirectory, confi
             }
         };
         return desktop;
-    } catch (error) { await application.close().catch(() => {}); throw error; }
+    } catch (error) { onStartupStage('error'); await application.close().catch(() => {}); throw error; }
 }
 
 export function desktopAppCookie(header, origin) {

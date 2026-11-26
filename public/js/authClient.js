@@ -85,7 +85,7 @@ function renderAuthBar(user) {
       <span class="auth-name"></span>
       ${updateButtonHtml}
     </div>
-    <button type="button" class="auth-logout" id="authLogoutButton">ออกจากระบบ</button>
+    <div class="auth-actions"><button type="button" class="auth-logout" id="authLogoutButton">ออกจากระบบ</button></div>
   `;
   bar.querySelector(".auth-name").textContent = user.displayName;
 
@@ -159,8 +159,8 @@ function bindUpdateButton() {
     }
   });
 
-  Promise.all([import('./updateMonitor.js?v=20261124-ui-clarity'), import('./updateStatusView.js')]).then(([{ startUpdateMonitor }, { createUpdateStatusView }]) => {
-    const feedback = createUpdateStatusView(document.getElementById('authBar'));
+  Promise.all([import('./updateMonitor.js?v=20261124-ui-clarity'), import('./updateStatusView.js?v=20261126-compact-toast')]).then(([{ startUpdateMonitor }, { createUpdateStatusView }]) => {
+    const feedback = createUpdateStatusView(document.querySelector('#authBar .auth-actions'), { compact: true });
     const monitor = startUpdateMonitor((data) => {
       button.title = data.retryRequired ? 'การอัปเดตก่อนหน้ายังไม่เสร็จ กรุณาลองใหม่' : data.remoteMessage || `commit ${data.remoteCommit}`;
       button.classList.toggle('hidden', data.upToDate);

@@ -84,7 +84,7 @@ export function renderHistory(container, rows, monthSummary) {
                         : "";
 
                     return `
-                        <tr${rowClass}>
+                        <tr${rowClass} data-history-record-id="${escapeHtml(row.worksheetUsedId)}">
                             <td class="history-action-cell">
                                 ${isUnprocessedStockRecord(row)
                                     ? `
@@ -132,8 +132,16 @@ export function renderHistory(container, rows, monthSummary) {
                                 <span>${escapeHtml(row.levelCode)}</span><input type="number" required min="1" max="${row.worksheetType === 'ZUN' ? 100 : 200}" step="1"
                                     class="history-ws-input" value="${escapeHtml(row.actualWorksheetNo)}"
                                     data-edit-history-number-id="${escapeHtml(row.worksheetUsedId)}"
-                                    aria-label="แก้เลข WS ${escapeHtml(row.levelCode)} • ${escapeHtml(row.worksheetDate)}" title="แก้เลข WS แล้วกด Enter เพื่อบันทึก • Esc เพื่อยกเลิก">
-                                </label>` : `<strong>${escapeHtml(row.worksheetLabel)}</strong>`}</td>
+                                    aria-describedby="history-number-draft-${escapeHtml(row.worksheetUsedId)}"
+                                    aria-label="แก้เลข WS ${escapeHtml(row.levelCode)} • ${escapeHtml(row.worksheetDate)}" title="Enter บันทึก • Esc ยกเลิก • Tab เก็บค่าค้างไว้">
+                                </label>
+                                <div class="history-date-draft" id="history-number-draft-${escapeHtml(row.worksheetUsedId)}" data-history-number-draft-id="${escapeHtml(row.worksheetUsedId)}" hidden>
+                                    <div>ยังไม่บันทึก • เดิม ${escapeHtml(row.worksheetLabel)}</div>
+                                    <div class="history-date-actions">
+                                        <button type="button" data-save-history-number-id="${escapeHtml(row.worksheetUsedId)}">บันทึกเลข WS</button>
+                                        <button type="button" data-cancel-history-number-id="${escapeHtml(row.worksheetUsedId)}">ยกเลิก</button>
+                                    </div>
+                                </div>` : `<strong>${escapeHtml(row.worksheetLabel)}</strong>`}</td>
                             <td>${escapeHtml(row.packetWorksheetNo)}</td>
                             <td>${renderFlag(row.cpws, "จริง", "auto")}</td>
                             <td>${renderFlag(row.isStockProcessed, "ตัดแล้ว", "ยัง")}</td>

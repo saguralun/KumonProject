@@ -22,6 +22,7 @@ import { receiptSnapshot } from '../public/js/receiptSnapshot.js';
 import { assertPasswordResetDatabaseSafety } from './support/authPasswordResetDatabaseChecks.js';
 import { assertStockReceiveRetryDatabaseSafety } from './support/stockReceiveRetryDatabaseChecks.js';
 import { checkConcurrentPermissions, checkAccountSeparation } from './support/accountSeparationDatabaseChecks.js';
+import { listRoles, deleteRole } from '../services/roleService.js';
 
 const run = promisify(execFile);
 const enabled = process.platform === 'win32' && process.env.TEST_ISOLATED_PG === '1';
@@ -73,6 +74,29 @@ test('Transactions, migrations, concurrent payments/stock/WS and failed restore 
         });
         await t.test('Create-only accounts and concurrent password/role actions preserve inactive account data and schema', async () => {
             await checkAccountSeparation(database);
+        });
+        await t.test('Role usage counts include inactive accounts and server deletion remains protected in PostgreSQL', async () => {
+            const codes = ['review_empty', 'review_inactive', 'review_mixed'];
+            await database.query(`INSERT INTO kumon.role_master(role_code,role_name,is_system,sort_order)
+                SELECT code,code,FALSE,100 FROM unnest($1::text[]) AS code`, [codes]);
+            try {
+                await database.query(`INSERT INTO kumon.app_user(username,password_hash,display_name,role,is_active) VALUES
+                    ('review_inactive_user','fixture-only','Fixture','review_inactive',FALSE),
+                    ('review_mixed_active','fixture-only','Fixture','review_mixed',TRUE),
+                    ('review_mixed_inactive','fixture-only','Fixture','review_mixed',FALSE)`);
+                const roles = await listRoles();
+                for (const [code, active, inactive, total] of [['review_empty', 0, 0, 0], ['review_inactive', 0, 1, 1], ['review_mixed', 1, 1, 2]]) {
+                    const row = roles.find(role => role.role_code === code);
+                    assert.deepEqual([row.active_user_count, row.inactive_user_count, row.total_user_count], [active, inactive, total]);
+                }
+                await assert.rejects(deleteRole('review_inactive'), { statusCode: 409 });
+                assert.equal((await database.query("SELECT COUNT(*)::int AS n FROM kumon.app_user WHERE role='review_inactive'")).rows[0].n, 1);
+                await deleteRole('review_empty');
+                assert.equal((await database.query("SELECT COUNT(*)::int AS n FROM kumon.role_master WHERE role_code='review_empty'")).rows[0].n, 0);
+            } finally {
+                await database.query('DELETE FROM kumon.app_user WHERE role = ANY($1::text[])', [codes]);
+                await database.query('DELETE FROM kumon.role_master WHERE role_code = ANY($1::text[])', [codes]);
+            }
         });
         await t.test('WS/CD DO retries persist across restart, preserve intentional append and process only once', async () => {
             await assertStockReceiveRetryDatabaseSafety(database);

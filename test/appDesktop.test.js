@@ -7,7 +7,7 @@ import express from 'express';
 import { once } from 'node:events';
 import fs from 'node:fs/promises';
 import systemRoutes from '../routes/systemRoutes.js';
-import { chromium } from 'playwright-core';
+import { chromium, _electron } from 'playwright-core';
 import { withKsisPage } from '../services/ksisStudentService.js';
 import { createApplicationDesktop } from '../services/ksisDesktop.js';
 
@@ -56,7 +56,7 @@ test('The Windows launcher uses the integrated app and never silently kills a ru
     const launcher = await fs.readFile('launcher/start.ps1', 'utf8');
     assert.doesNotMatch(launcher, /Start-Process.*chrome|--app=|Resolve-ChromePath/);
     assert.match(launcher, /KUMON_DESKTOP_MAIN = '1'/);
-    const reuse = launcher.indexOf('/api/system/desktop/show'), stop = launcher.indexOf('Stop-Process');
+    const reuse = launcher.indexOf('Open-KumonDesktopWindow'), stop = launcher.indexOf('Stop-Process');
     assert.ok(reuse > 0 && reuse < stop); assert.match(launcher.slice(reuse, stop), /return/);
 });
 
@@ -68,4 +68,11 @@ test('Student import cannot open another Chrome while the integrated main app is
 
 test('The integrated desktop refuses a foreign startup page before launching anything', async () => {
     await assert.rejects(createApplicationDesktop({ origin: 'http://localhost:3000', profileDirectory: 'unused', startPath: 'https://foreign.invalid' }), { statusCode: 400 });
+});
+
+test('Desktop launch failure reports the actual loading stage and preserves retryable errors', async (t) => {
+    const stages = [];
+    t.mock.method(_electron, 'launch', async () => { throw new Error('Synthetic desktop dependency failure'); });
+    await assert.rejects(createApplicationDesktop({ origin: 'http://localhost:3000', profileDirectory: 'unused-fixture', onStartupStage: stage => stages.push(stage) }), /Synthetic desktop dependency failure/);
+    assert.deepEqual(stages, ['desktop', 'error']);
 });

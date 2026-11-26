@@ -1,4 +1,15 @@
-import ExcelJS from "exceljs";
+// Export is optional at startup. Share the first load across concurrent exports;
+// a failed load must remain retryable after dependencies have been repaired.
+let excelModule;
+function loadExcel() {
+    if (!excelModule) {
+        excelModule = import("exceljs").then(module => module.default).catch(error => {
+            excelModule = undefined;
+            throw error;
+        });
+    }
+    return excelModule;
+}
 
 // Sheet names in Excel are capped at 31 characters and can't contain
 // : \ / ? * [ ]
@@ -14,6 +25,7 @@ function safeSheetName(name) {
 // the browser) into one worksheet: header row (Level + columns + รวม), one
 // row per level, and a bold totals row at the bottom.
 export async function buildPivotWorkbook(sheets) {
+    const ExcelJS = await loadExcel();
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "KumonDB";
     workbook.created = new Date();
@@ -62,6 +74,7 @@ export async function buildPivotWorkbook(sheets) {
 // order — no pivoting, just a straight list export (e.g. the Report
 // page's event-summary roster).
 export async function buildFlatWorkbook({ sheetName, columns, rows }) {
+    const ExcelJS = await loadExcel();
     const workbook = new ExcelJS.Workbook();
     workbook.creator = "KumonDB";
     workbook.created = new Date();

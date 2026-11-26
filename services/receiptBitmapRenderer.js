@@ -6,7 +6,14 @@
 // 30-34, 255 did this). Rendering the text ourselves and printing it as a
 // picture sidesteps the printer's font ROM entirely — this is the standard
 // fix for this exact class of hardware limitation.
-import { createCanvas, GlobalFonts } from "@napi-rs/canvas";
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+let canvasModule;
+// Keep the synchronous renderer/payload API and its output unchanged. The
+// native binding is needed only when a receipt actually contains Thai text.
+function loadCanvas() {
+    return canvasModule ||= require("@napi-rs/canvas");
+}
 
 // 80mm thermal printers print on ~72mm of actual paper (the rest is edge
 // margin the paper guide takes up) at the near-universal 8 dots/mm
@@ -27,7 +34,7 @@ function ensureThaiFontRegistered() {
     // resolution) is what actually made Thai glyphs render instead of
     // empty tofu boxes — GlobalFonts needs the exact file, not just a name
     // that happens to match an installed Windows font.
-    GlobalFonts.registerFromPath("C:/Windows/Fonts/leelawad.ttf", THAI_FONT_FAMILY);
+    loadCanvas().GlobalFonts.registerFromPath("C:/Windows/Fonts/leelawad.ttf", THAI_FONT_FAMILY);
     thaiFontRegistered = true;
 }
 
@@ -74,6 +81,7 @@ function wrapToWidth(ctx, text, font, maxWidth) {
 // lines as needed (see wrapToWidth) rather than being cut off or forcing
 // every line down to a tiny font size to make one long line fit.
 export function renderLinesToBitmap(lines) {
+    const { createCanvas } = loadCanvas();
     ensureThaiFontRegistered();
 
     const lineHeightPadding = 6;

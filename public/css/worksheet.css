@@ -815,6 +815,15 @@ html[data-role="staff"] [data-staff-up] {
   display: none;
 }
 
+.completion-actions { display: flex; justify-content: center; padding-top: 4px; }
+.completion-actions:not(:has(button:not(.hidden))) { display: none; }
+.progress-at-button.completion-action-blocked:not(.hidden) {
+  position: static; display: flex; align-items: center; gap: 4px; border: 1px solid #cbd5e1;
+  border-radius: 6px; background: #f1f5f9; color: #52627a; opacity: 1;
+  padding: 4px 8px; min-height: 28px; box-shadow: none;
+}
+.progress-at-button.completion-action-blocked span:last-child { transform: none; }
+
 .progress-at-button .button-icon {
   width: auto;
   font-size: 18px;
@@ -1107,6 +1116,10 @@ html[data-role="staff"] [data-staff-up] {
   box-shadow: none;
 }
 
+.completion-hint { width: 100%; padding-top: 5px; color: #52627a; font-size: 11px; line-height: 1.5; text-align: center; }
+.completion-hint:empty { display: none; }
+.at-context-help { color: #52627a; font-size: 13px; line-height: 1.6; }
+.at-context-help:empty { display: none; }
 .save-hint { color: #52627a; font-size: 12px; line-height: 1.4; }
 .save-hint[data-ready="true"] { color: #047857; }
 
@@ -1366,8 +1379,8 @@ html[data-role="staff"] [data-staff-up] {
 .history-date-draft[hidden] { display: none; }
 .history-date-actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .history-date-actions button { padding: 4px 7px; min-height: 28px; border: 1px solid #c5d4e7; border-radius: 6px; background: #fff; color: #334b65; font: inherit; cursor: pointer; }
-.history-date-actions [data-save-history-date-id] { color: #fff; background: #059669; border-color: #059669; }
-.history-date-input.has-date-draft { border-color: #d99d26; background: #fff9e9; }
+.history-date-actions [data-save-history-date-id], .history-date-actions [data-save-history-number-id] { color: #fff; background: #059669; border-color: #059669; }
+.history-date-input.has-date-draft, .history-ws-input.has-number-draft { border-color: #d99d26; background: #fff9e9; }
 .history-date-actions button:focus-visible { outline: 2px solid #5083ff; outline-offset: 2px; }
 .history-date-actions button:disabled { opacity: .55; cursor: wait; }
 

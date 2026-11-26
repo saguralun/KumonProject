@@ -25,6 +25,7 @@ const setStatus = createStatusSetter(els.statusLine);
 // order — kept in state so the account-role <select>s and the permission
 // matrix's columns can both be built from one source of truth.
 const state = {
+  users: [],
   roles: [],
   permissions: [], // permission_master rows, ordered by nav_group/sort_order
   grants: new Map() // role_code -> Set<permission_key>
@@ -109,6 +110,7 @@ async function loadAll() {
     if (requestId !== usersLoadRequest) return;
 
     state.roles = rolesData.roles;
+    state.users = usersData.users;
     state.permissions = rolesData.permissions;
     const grants = new Map();
     rolesData.grants.forEach((grant) => {
@@ -258,6 +260,15 @@ async function handleToggleActive(button) {
   }
 }
 
+function roleUsage(role) {
+  const accounts = state.users.filter(user => user.role === role.role_code);
+  const validCount = value => value !== null && value !== undefined && value !== '' && Number.isSafeInteger(Number(value)) && Number(value) >= 0;
+  const active = validCount(role.active_user_count) ? Number(role.active_user_count) : accounts.filter(user => user.is_active).length;
+  const total = validCount(role.total_user_count) ? Number(role.total_user_count) : Math.max(active, accounts.length);
+  const inactive = validCount(role.inactive_user_count) ? Number(role.inactive_user_count) : Math.max(0, total - active);
+  return { active, inactive, total };
+}
+
 function renderPermissionMatrix() {
   const roles = configurableRoles();
 
@@ -273,7 +284,9 @@ function renderPermissionMatrix() {
       <thead>
         <tr>
           <th>Permission</th>
-          ${roles.map((role) => `
+          ${roles.map((role) => {
+            const usage = roleUsage(role);
+            return `
             <th>
               <div class="matrix-role-header">
                 <span>${escapeHtml(role.role_name)}</span>
@@ -284,13 +297,14 @@ function renderPermissionMatrix() {
                       type="button"
                       class="matrix-delete-role"
                       data-role-code="${escapeHtml(role.role_code)}"
-                      title="${role.active_user_count > 0 ? `ลบไม่ได้ — มี ${role.active_user_count} บัญชีใช้ role นี้อยู่` : "ลบ role นี้"}"
-                      ${role.active_user_count > 0 ? "disabled" : ""}
+                      title="${usage.total > 0 ? `ลบไม่ได้ — ใช้งาน ${usage.active} / ปิดใช้งาน ${usage.inactive} บัญชี ต้องเปลี่ยน role ของทุกบัญชีก่อน` : "ลบ role นี้ (ไม่มีบัญชีใช้งาน)"}"
+                      ${usage.total > 0 ? "disabled" : ""}
                     >🗑️</button>
                   `}
               </div>
+              <div class="matrix-role-usage">ใช้งาน ${usage.active} / ปิดใช้งาน ${usage.inactive}</div>
             </th>
-          `).join("")}
+          `; }).join("")}
         </tr>
       </thead>
       <tbody>
@@ -368,10 +382,16 @@ async function handlePermissionToggle(checkbox) {
 
 async function handleDeleteRole(button) {
   const roleCode = button.dataset.roleCode;
+  const canDelete = () => {
+    const role = state.roles.find(row => row.role_code === roleCode);
+    return role && !role.is_system && roleUsage(role).total === 0;
+  };
+  if (button.disabled || !canDelete()) return;
 
   if (!await confirmAction(`ลบ role "${roleName(roleCode)}" ใช่ไหม?`)) {
     return;
   }
+  if (!button.isConnected || !canDelete()) return;
 
   button.disabled = true;
 
@@ -381,7 +401,8 @@ async function handleDeleteRole(button) {
     await loadAll();
   } catch (error) {
     setStatus(error.message, "error");
-    button.disabled = false;
+    const refreshed = await loadAll();
+    if (!refreshed && button.isConnected) button.disabled = false;
   }
 }
 

@@ -60,6 +60,23 @@ restart-helper test, not necessary for this suite's application regression check
 
 ## Coverage
 
+- The account menu keeps only a compact manual update-check button alongside
+  Logout. Automatic checks stay silent while preserving update badges. Manual
+  latest/new-version/offline results use a non-focusing five-second toast outside
+  the menu; repeat checks replace its timer. Browser/Electron fixtures verify
+  pending requests, PC/tablet bounds and zero installation or logout requests.
+  Login retains its existing inline version feedback.
+
+- Startup loading: ExcelJS and the native receipt bitmap binding load only when
+  used. Synthetic workbooks and Thai/ASCII receipt buffers verify output without
+  printing; simultaneous exports and failed first native-load retry are covered.
+  Login remains interactive with delayed/failed external font CSS. Private status
+  fixtures verify per-stage timings, repeat-click sharing, immediate module-error
+  feedback, and the native loading window opening/closing without a server restart.
+  Electron's local loading card is verified before navigation; startup stays
+  pending while a synthetic login response waits. The separate native feedback
+  window spans navigation, including when Electron replaces the old document.
+
 - Remaining UI review: read-only status-action Preview, reviewed snapshots under
   the existing enrollment lock, date-read races/retries, grouped WS/AT plans,
   retained shared audit scope, readable Save/hints, offline version timestamps
@@ -292,6 +309,27 @@ restart-helper test, not necessary for this suite's application regression check
   date alignment in both enrollment forms. No new date or billing policy is
   introduced. Verification is recorded in
   `reviews/2026-11-25/four-point-verification.json`.
+
+- `reviewRemainingClarity.ui.test.js` and `reviewRemainingStress.ui.test.js`
+  cover retained WS number/date drafts, explicit save/cancel, mixed-field saves,
+  selection guards, concurrent number changes, processed/read-only drafts,
+  older payloads, AT prerequisite/date explanations, PC/tablet layouts, inactive
+  role usage and a role assigned by another machine during deletion. Existing
+  AT defaults, completion eligibility and backend deletion rules are retained.
+  `roleUsageCounts.test.js` and `worksheetCompletionHelp.test.js` cover the
+  read-only metadata and pure explanations; the disposable PostgreSQL suite
+  verifies real role counts and protects inactive accounts. Final evidence:
+  `reviews/2026-11-25/remaining-three-verification.json`.
+
+- `launcherFeedback.test.js` additionally reproduces a slow localhost lookup,
+  cold startup beyond the former deadline, readiness at the final polling
+  boundary and an invalid runtime response. The launcher uses direct local
+  IPv4 for its own requests, retains the app's existing localhost origin,
+  allows a bounded 90-second cold start and probes once more before failure.
+  True server/window/dependency failures still display diagnostics. Tests
+  replace process/network/dialog effects; the live confirmation only reads
+  runtime status and does not restart or focus the working app. Evidence:
+  `reviews/2026-11-26/launcher-readiness-verification.json`.
 
 Passing these checks does not prove an untested live KSIS change, printer,
 network outage or production deployment works. Never run live save/restore/

@@ -1,0 +1,61 @@
+{
+  "date": "2026-11-26",
+  "kind": "compact-menu-update-check-toast",
+  "productionDataOrSchemaWrites": false,
+  "actualUpdateInstallLogoutOrRestart": false,
+  "commitPush": false,
+  "uniquePassingTests": [
+    "Login update requires confirmation but no credentials, recovers errors and waits for the new runtime",
+    "Menu update check stays compact and reports only manual results for five seconds (browser)",
+    "Menu update check stays compact and reports only manual results for five seconds (desktop)",
+    "New updates appear while login and workspace stay open (Electron)",
+    "New updates appear while login and workspace stay open (browser)",
+    "Offline first launch explains unknown version and retry never installs (browser)",
+    "Offline first launch explains unknown version and retry never installs (desktop)",
+    "Offline version feedback retains the last success time and a manual read retry bypasses only the throttle",
+    "Update monitoring retries, throttles focus, serializes requests and never applies updates"
+  ],
+  "manualToastDurationMs": 5000,
+  "backgroundCheckToast": false,
+  "previousStartupFilesPreserved": {
+    "desktop/loading.html": "413270acd93c29af39ff77c2e125d24b5491312d62adfb5d78c5f2da74f3ca7d",
+    "launcher/launch-feedback.ps1": "7781e4dae9593f75958b0eb4b78759dd5d26202e12686e31498238c3169d7332",
+    "launcher/start.ps1": "0a83e8c449d8b0157cf1232f8fcd66549622ef6d25842f265db45fb29697bcd0",
+    "launcher/launch-progress.ps1": "83d7074f67562a6b105c02fcfbfa63015a21f6d8e997868797f5bfca23a886cb",
+    "launcher/launch-progress-view.ps1": "c31505b591bf7e0cf5b452be5ea08e9c8e0a8d8d98a8cd6f1cc39ed84ced5d47",
+    "launcher/server-entry.mjs": "aa667534b221445a4d8cece3bb3a18a3d2b2f1e66c17d706a3ba3c75ae4088c7",
+    "public/login.html": "dcffbe1a56cda03642c0dd0759093fc47f296e7f3f25cc5423c574dba7d31937",
+    "server.js": "c860da2a8be20da7586c1bdd130b83b4a3db97608c5d3fa7f87f13967c842336",
+    "services/excelExportService.js": "d9ca3cb86cbf320cae062d29c7edda588cd7c35c783a47eedb0b413f5839ed80",
+    "services/ksisDesktop.js": "7fa90cbbc683237466277e45af61a058480672930a0481b3e10482f1cfc9e474",
+    "services/receiptBitmapRenderer.js": "30984e08348c751bae53480515e0b2d9f95b8a5d0800b88b912e78135ef8e3f6",
+    "services/startupProgressService.js": "40844604e958ca93b64667bfefc719fb9750345494fc615a4ed398d131b36421",
+    "test/STARTUP-LOADING-2026-11-26.md": "8b1b2179014ca71a26d108e03e3a5668a1ef1bba75468d7a682f15c657bfd4a2",
+    "test/appDesktop.test.js": "34a94a39e456ce1e6b7b00166c28c1ada6957f6574b6f25d2df11863bcaa9055",
+    "test/support/launcherFeedbackHarness.ps1": "e45b9c2b04b4dc8f9d631e36d6cea937c86f8bbbcd4d0c68e81e6e0f48801f4b",
+    "test/startupDependencies.test.js": "1d0cb29426f2a9db3d47173d5f868b4a3de39b59cf4d785d56e53d1903b6e9b8",
+    "test/startupDesktop.ui.test.js": "9521d55760e78bcb52932d09476d3487679cba9687f32c260bac12002485c347",
+    "test/startupProgress.test.js": "dd0649c9bbeb2d4b128505701203eb2a31d17e17e9f1f0ed4ce036da01163c48",
+    "test/startupProgress.ui.test.js": "0c957de82b0d41d52025ff1d4b63235088f2925b8e9b7d4bf7c58e7fedb7dbf9",
+    "test/support/startupDependenciesHarness.mjs": "b35004f592888044151b353da615e8ae3b33a1a2c6d71bae446d7498c3fcadf4",
+    "test/support/startupProgressHarness.ps1": "45d674dad4e63729db29f77e9fab482eac18ecf1451e3995148c31fe733e3397",
+    "test/loginFonts.ui.test.js": "de5775fe86f39da56b2e7d028c09961da7652250026f91f378d9bc75da367463"
+  },
+  "sourceFingerprints": {
+    "public/js/authClient.js": "c87819d26120dcaa99c2584ede8c517a547e9fda56956f0d6361907bacbf77b2",
+    "public/js/updateStatusView.js": "b639c9f942db489d901b5220fad19fa928187007ba3bbd9bac60658aa07291ed",
+    "test/updateCheckToast.ui.test.js": "453b735f5780c03173d740d75a252ac51983b907e10b5bbb1c198cea5c194827",
+    "test/updateAvailability.ui.test.js": "b3744da443703c6bde48146e962daa01d2e9c096514ca87cdc7f29a623911668",
+    "test/README.md": "de06ffd27aefb1c8a33a917d8c876a54f5c27f4df219308a0ff36c0b70d8ac5e"
+  },
+  "evidenceFingerprints": {
+    "logs/round4-update-check-toast.log": "73695bb87c6336e496a51445797f4cccbc216eeec43d501aa2f61ce9460e41b3",
+    "logs/round4-update-check-toast-focused.log": "efd8e54261041785c7649e192312010075db3267361e6211982884d614ce7e38",
+    "logs/round4-update-check-toast-final.log": "6f622a577bc93cce7a512b8e096d4b0b8409c7c07403318c3a5fbe497ac7a52a"
+  },
+  "notes": [
+    "Initial new tests exposed an inherited eight-pixel Logout margin that misaligned the shared action row. The compact action row now resets that margin; both surfaces pass.",
+    "Login/automatic badge/offline retry/monitor tests passed in the related suite. New focused tests verify manual latest/update/offline toast results, elapsed dismissal, replacement timer, pending requests, focus preservation, closed-menu persistence and PC/tablet bounds.",
+    "All APIs are synthetic; fixtures explicitly provide valid Opening Schedule data. No installation, real sessions or real records are used."
+  ]
+}

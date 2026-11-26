@@ -50,11 +50,11 @@ for (const embedded of [false, true]) test(`WS number editing supports Enter, ca
     const input = page.locator('[data-edit-history-number-id="10"]');
     assert.equal(await page.locator('[data-edit-history-number-id="11"]').count(), 0);
     await input.fill('26'); await input.press('Escape'); assert.equal(await input.inputValue(), '101');
-    await input.fill('26'); await input.press('Tab'); assert.equal(await input.inputValue(), '101');
+    await input.fill('26'); await input.press('Tab'); assert.equal(await input.inputValue(), '26');
     await input.fill('201'); await input.press('Enter'); assert.equal(f.writes().length, 0);
     await input.fill('26'); await input.press('Enter');
     await page.waitForFunction(() => document.getElementById('statusLine').textContent === 'Fixture WS correction failed');
-    assert.equal(await input.inputValue(), '101'); assert.equal(await input.isEnabled(), true);
+    assert.equal(await input.inputValue(), '26'); assert.equal(await input.isEnabled(), true);
     fail = false; await input.fill('26'); await input.press('Enter'); await waitForSignal(pending);
     await input.evaluate(el => el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
     assert.equal(f.writes().length, 2); assert.equal(await page.locator('#saveButton').isDisabled(), true);

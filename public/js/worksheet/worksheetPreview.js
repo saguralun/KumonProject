@@ -10,6 +10,7 @@
 // plenty from here), so there's no circular import for this pairing.
 import { els, setStatus, state, isHistoryEditPending } from "./worksheetState.js";
 import { compareWorksheetReceiveDate } from './worksheetHistory.js';
+import { completionControlHelp } from './worksheetCompletionHelp.js';
 import {
     buildPreviewRecords,
     escapeHtml,
@@ -700,6 +701,7 @@ export function updateSecondaryActions() {
     if (!context) {
         els.completeWsLevel.disabled = true;
         els.completeWsLevel.classList.add("hidden");
+        els.completionHint.textContent = '';
         els.completeZunLevel.disabled = true;
         els.receiveCd.disabled = true;
         els.receiveCd.classList.add("hidden");
@@ -725,21 +727,34 @@ export function updateSecondaryActions() {
     );
     const canUseMainCompleteButton = canUseAtButton || canUseFreeLevelButton;
 
-    els.completeWsLevel.disabled = !canUseMainCompleteButton || state.isCompletingLevel || isHistoryEditPending();
-    els.completeWsLevel.classList.toggle("hidden", !canUseMainCompleteButton);
-    setActionButton(
-        els.completeWsLevel,
-        canUseFreeLevelButton ? "🎯" : "📝",
-        canUseFreeLevelButton ? "จบ Level" : "สอบ AT"
-    );
+    const busy = state.isLoadingContext ? 'กำลังโหลดข้อมูลวิชา กรุณารอ'
+        : state.isSaving ? 'กำลังบันทึก WS กรุณารอผล'
+        : state.isCompletingLevel || state.isCompletingZun ? 'กำลังบันทึกผลจบระดับ กรุณารอผล'
+        : isHistoryEditPending() ? 'กำลังแก้ประวัติ WS กรุณารอผล' : '';
+    els.completeWsLevel.disabled = !canUseMainCompleteButton || Boolean(busy);
+    els.completeWsLevel.classList.toggle("hidden", state.progressKind !== 'main');
     const canUseZunButton = Boolean(
         state.progressKind === "zun"
         && context.completionState?.zunCompletion?.canComplete
     );
 
-    els.completeZunLevel.disabled = !canUseZunButton || state.isCompletingZun || isHistoryEditPending();
-    els.completeZunLevel.classList.toggle("hidden", !canUseZunButton);
+    const hasZun = Boolean(context.enrollment.currentZunLevelMasterId || context.enrollment.currentZunLevelCode);
+    els.completeZunLevel.disabled = !canUseZunButton || Boolean(busy);
+    els.completeZunLevel.classList.toggle("hidden", state.progressKind !== 'zun' || !hasZun);
     setActionButton(els.completeZunLevel, "🎯", "จบ Zun");
+    const help = completionControlHelp({ kind: state.progressKind, at: atCompletion, free: freeLevelCompletion,
+        zun: context.completionState?.zunCompletion, hasZun, mainAllowed: canUseMainCompleteButton, zunAllowed: canUseZunButton, busy });
+    setActionButton(els.completeWsLevel, help.mainLabel === 'จบ Level' ? '🎯' : '📝', help.mainLabel);
+    els.completionHint.textContent = help.message;
+    els.completeWsLevel.title = els.completeZunLevel.title = help.message;
+    // A disabled circular action must not cover the level/worksheet values.
+    // Move the existing button below the ring; a ready action retains its
+    // original position, listeners and keyboard behavior.
+    for (const button of [els.completeWsLevel, els.completeZunLevel]) {
+        const target = button.disabled ? els.completionActions : els.worksheetProgressLevel.parentElement;
+        if (button.parentElement !== target) target.append(button);
+        button.classList.toggle('completion-action-blocked', button.disabled);
+    }
 
     const cdRequirements = currentCdRequirements();
     const cdRequirement = cdRequirements.find(item => !item.hasReceived) || cdRequirements[0] || null;

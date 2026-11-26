@@ -1,4 +1,9 @@
 <!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>KumonDB</title>
-<style>body{margin:0;display:grid;place-items:center;height:100vh;background:#eef3f8;color:#0f172a;font:18px 'Segoe UI',sans-serif}</style></head>
-<body>กำลังเปิด KumonDB...</body></html>
+<style>
+body{margin:0;display:grid;place-items:center;height:100vh;background:#eef3f8;color:#0f172a;font:18px 'Segoe UI',Tahoma,sans-serif}
+.loading{width:420px;max-width:80vw;padding:32px;border:1px solid #d9e3ef;border-radius:20px;background:white;box-shadow:0 16px 48px #17305015;text-align:center}
+h1{margin:0 0 18px;font-size:26px}p{margin:12px 0;color:#52657c}.track{height:6px;border-radius:6px;overflow:hidden;background:#e6eff8}.bar{width:35%;height:100%;border-radius:6px;background:#1393d1;animation:loading 1.5s ease-in-out infinite}
+small{color:#73849a;font-size:14px}@keyframes loading{from{transform:translateX(-100%)}to{transform:translateX(390%)}}@media(prefers-reduced-motion:reduce){.bar{animation:none;width:100%}}
+</style></head>
+<body><main class="loading" role="status" aria-live="polite"><h1>KumonDB</h1><div class="track" aria-hidden="true"><div class="bar"></div></div><p>กำลังโหลดหน้าล็อกอิน...</p><small>โปรแกรมจะเปิดให้ใช้งานเมื่อพร้อม</small></main></body></html>
